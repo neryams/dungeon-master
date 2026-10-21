@@ -19,7 +19,7 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     await server.close();
   });
   const tools = (await client.listTools()).tools.map((t) => t.name);
-  assert.equal(tools.length, 15);
+  assert.equal(tools.length, 17);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));
   const result = await client.callTool({

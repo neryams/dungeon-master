@@ -24,11 +24,17 @@ If your client doesn't discover local plugins, use the direct MCP and skill inst
 - Graph/grid map authoring, atomic subgroup movement, explicit reveal masks and actual PNG tool responses.
 - Cryptographic dice, recorded physical dice, idempotent retries, revision conflicts and explicit corrections.
 - Append-only JSON event history, replayable state, Markdown scene records and journal-backed historical retrieval.
-- Five skills: create, run, close, maintain, and optional host-generated artwork.
+- Six skills: create, run, close, maintain, player sheets, and optional host-generated artwork.
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.
 
 There is no complete rules engine. The DM supplies adjudicated outcomes and resource changes. The campaign records whether you use 2014 or 2024 5e; it does not redistribute rulebooks or automatically apply every spell, feature or rest rule.
+
+## Ask for your sheet
+
+Ask “Show my character sheet,” “What am I carrying?” or “Where is everyone?” The player-sheet skill reads current saved health, resources, complete visible inventory and regional/tactical placements. It asks which character when the conversation does not identify one. “Show the current map” returns a PNG at the same saved revision.
+
+Sheets default to the player view and include their source revision. Ask again after an action for a fresh snapshot; old chat messages do not update themselves. These lookups do not advance play or contact the journal.
 
 ## Commands
 

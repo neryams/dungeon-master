@@ -47,3 +47,7 @@ Optional story/map fields retain schemaVersion 1; existing event files are never
 Map creation saves graph drawing coordinates. src/maps.ts produces a deterministic SVG internally and rasterizes with direct Sharp; MCP returns PNG image blocks plus structured metadata. A mutation commits first, then replays its saved revision for rendering. Exact retries use the original revision even after later changes. Rendering failures leave gameplay committed; render-only recovery accepts that revision. Derived files are keyed by map, revision, audience and viewport in .dm/maps. They are excluded from export; original assets and event definitions survive import, and rendering regenerates the schematic. Byte equality is tested on the same renderer/font environment, not promised across different Sharp/font versions.
 
 Optional host image generation is an agent skill, never a model API integration. Generated art is stored under assets with audience, purpose and source revision. It is displayed independently from tactical geometry.
+
+## Conversational sheets (0.3.0)
+
+src/sheets.ts derives full character sheets and compact party overviews from one audience-filtered state snapshot. Service lookups read authoritative events once, then join visible owned items and map placements without consulting journal history or writing caches. Unlike resume, full sheet inventories have no entity-count cutoff. The player-sheet skill uses fresh tool results and explicit source revisions; no independent sheet storage or synchronization is required.

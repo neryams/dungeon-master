@@ -95,3 +95,14 @@ Movement commits before rendering. On failure, the response says `positions save
 `register_map_art` takes mapId and `art: {path, purpose, sourceRevision, visibility}` plus mutation metadata. Path must be an existing non-symlink file under assets/, up to 50 MiB and recognized by Sharp as an image; sourceRevision must contain the map. Artwork is separate from schematic rendering and is included in exports. The create-map-art skill uses host image generation when available, without model API fallback.
 
 Low-level `set_map` ({id,map}), `set_positions` ({map,positions}), `set_reveal` ({map,revealed,nodes,edges,cells,regions,features}) and `register_art` ({map,art}) are typed reducer operations. Use the domain map tools for creation, asset file verification and rendering. To add bounds to an old grid, read its full map, preserve other fields and save `set_map` with explicit bounds/origin. Historical events remain unchanged. Legacy move_token retains its old replay semantics; use set_positions/new tools for same-level transfer behavior.
+
+## Conversational sheets (0.3.0)
+
+- `get_character_sheet`: `{characterId, audience?: "party" | "dm"}`. Returns campaign identity, revision, audience, the full visible character entity, `inventory` (all visible item entities owned by that character, including depleted stacks), and `placements`. Missing, hidden and non-character IDs return NOT_FOUND. NPCs use get_campaign_entity.
+- `get_party_overview`: `{audience?: "party" | "dm"}`. Returns campaign identity, revision, audience, `rosterSource` (explicit or legacy-characters), and members with ID/name, HP/max/temp, AC, conditions, resources, visible inventory entry count and placements. Explicit roster order is preserved, including an empty roster; only legacy campaigns without a roster infer members from character entities.
+
+Both new tools default to party audience. They read one authoritative state snapshot, filter it before joining records, and never search/flush the journal or mutate gameplay. Inventory is not capped by the resume packet's entity limit. Inventory entries are records/stacks, not a sum of quantities. Stable ID ordering makes inventories and placements predictable.
+
+Placements include mapId/mapName, kind, regional/tactical level, scale and exact position. Graph placements include a node label and a linked location's ID/name when visible. Hidden maps, rooms and unrevealed grid positions are omitted. Empty placements mean no visible saved placement; scene location is never substituted. Multiple recorded placements are preserved, including legacy duplicates.
+
+Use the player-sheet skill for identity resolution and concise answers. A map shown alongside a sheet should call render_location_map with the sheet's audience and revision. Later gameplay writes require another lookup for updated totals. There is no automatic update of already displayed chat messages, player authentication, or persistent panel in this increment.

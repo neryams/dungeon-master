@@ -1,3 +1,4 @@
+import { characterSheet, partyOverview } from './sheets.js';
 import { stat } from 'node:fs/promises';
 import sharp from 'sharp';
 import { prepareMap, renderMap, schematic } from './maps.js';
@@ -23,6 +24,10 @@ import {
 const Audience = z.enum(['dm', 'party']).default('dm');
 const metadata = Mutation.shape;
 export const inputs = {
+  get_character_sheet: z
+    .object({ characterId: Id, audience: z.enum(['party', 'dm']).default('party') })
+    .strict(),
+  get_party_overview: z.object({ audience: z.enum(['party', 'dm']).default('party') }).strict(),
   create_location_map: z
     .object({ ...metadata, entity: Entity, audience: Audience, viewport: Viewport.optional() })
     .strict(),
@@ -114,6 +119,10 @@ export const inputs = {
 };
 export type ToolName = keyof typeof inputs;
 export const descriptions: Record<ToolName, string> = {
+  get_character_sheet:
+    'Read one character’s exact saved stats, complete visible owned inventory and regional/tactical map placements from one revision. Defaults to party audience. No journal or gameplay writes.',
+  get_party_overview:
+    'List the saved party roster with HP, conditions, resources and separate map placements from one revision. Defaults to party audience; use character IDs for full sheets. No journal or gameplay writes.',
   create_location_map:
     'Validate and save a new graph or bounded grid map with stable layout, location links and initial markers; return PNG pixels. Existing IDs are rejected.',
   update_map_positions:
@@ -165,6 +174,28 @@ export class CampaignService {
   }
   async execute(name: ToolName, raw: unknown): Promise<unknown> {
     switch (name) {
+      case 'get_character_sheet': {
+        const i = inputs[name].parse(raw);
+        const { state: original } = await this.store.read();
+        const state = i.audience === 'party' ? partyState(original) : original;
+        return {
+          campaign: { id: this.store.config.id, name: this.store.config.name },
+          revision: state.revision,
+          audience: i.audience,
+          ...characterSheet(state, i.characterId),
+        };
+      }
+      case 'get_party_overview': {
+        const i = inputs[name].parse(raw);
+        const { state: original } = await this.store.read();
+        const state = i.audience === 'party' ? partyState(original) : original;
+        return {
+          campaign: { id: this.store.config.id, name: this.store.config.name },
+          revision: state.revision,
+          audience: i.audience,
+          ...partyOverview(state),
+        };
+      }
       case 'render_location_map': {
         const i = inputs[name].parse(raw);
         return this.renderAt(i.mapId, i.audience, i.revision, i.viewport);
