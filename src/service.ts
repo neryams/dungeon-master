@@ -1,13 +1,71 @@
+import { stat } from 'node:fs/promises';
+import sharp from 'sharp';
+import { prepareMap, renderMap, schematic } from './maps.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CampaignStore, atomicWrite, safePath } from './store.js';
-import { CampaignError, partyState, rollDice } from './domain.js';
+import { CampaignError, partyState, rollDice, replay } from './domain.js';
 import { JournalAdapter } from './journal.js';
-import { Mutation, Change, Id, Visibility, JournalRecord } from './schema.js';
+import {
+  Mutation,
+  Change,
+  Id,
+  Visibility,
+  JournalRecord,
+  Entity,
+  Position,
+  Viewport,
+  Cell,
+  Region,
+  MapArt,
+} from './schema.js';
 
 const Audience = z.enum(['dm', 'party']).default('dm');
 const metadata = Mutation.shape;
 export const inputs = {
+  create_location_map: z
+    .object({ ...metadata, entity: Entity, audience: Audience, viewport: Viewport.optional() })
+    .strict(),
+  update_map_positions: z
+    .object({
+      ...metadata,
+      mapId: Id,
+      positions: z
+        .array(Position.extend({ entityId: Id }))
+        .min(1)
+        .max(100)
+        .optional(),
+      group: z
+        .object({ entityIds: z.array(Id).min(1).max(100), position: Position })
+        .strict()
+        .optional(),
+      audience: Audience,
+      viewport: Viewport.optional(),
+    })
+    .strict(),
+  render_location_map: z
+    .object({
+      mapId: Id,
+      audience: Audience,
+      revision: z.number().int().min(0).optional(),
+      viewport: Viewport.optional(),
+    })
+    .strict(),
+  set_map_reveal: z
+    .object({
+      ...metadata,
+      mapId: Id,
+      revealed: z.boolean(),
+      nodes: z.array(Id).default([]),
+      edges: z.array(z.tuple([Id, Id])).default([]),
+      cells: z.array(Cell).max(10000).default([]),
+      regions: z.array(Region).max(1000).default([]),
+      features: z.array(Id).default([]),
+      audience: Audience,
+      viewport: Viewport.optional(),
+    })
+    .strict(),
+  register_map_art: z.object({ ...metadata, mapId: Id, art: MapArt }).strict(),
   campaign_status: z.object({}).strict(),
   resume_campaign: z.object({ audience: Audience }).strict(),
   get_campaign_entity: z.object({ id: Id, audience: Audience }).strict(),
@@ -56,6 +114,16 @@ export const inputs = {
 };
 export type ToolName = keyof typeof inputs;
 export const descriptions: Record<ToolName, string> = {
+  create_location_map:
+    'Validate and save a new graph or bounded grid map with stable layout, location links and initial markers; return PNG pixels. Existing IDs are rejected.',
+  update_map_positions:
+    'Atomically set listed positions or move an explicitly selected roster group; omitted markers stay. Same-level transfers remove old placements. Save before rendering and return original-revision PNG on exact retry.',
+  render_location_map:
+    'Render saved state as PNG pixels without gameplay changes. Optional revision enables render-only recovery. Player audience filters hidden geometry and markers.',
+  set_map_reveal:
+    'Explicitly reveal or conceal nodes, cells, regions and features, then render. No automatic line of sight.',
+  register_map_art:
+    'Register existing campaign-local assets with purpose, source map revision and explicit visibility. Artwork is displayed separately from schematic grids.',
   campaign_status:
     'Inspect the bound campaign identity, current revision, active session and journal delivery health. No arbitrary workspace paths.',
   resume_campaign:
@@ -90,12 +158,117 @@ export class CampaignService {
   constructor(
     public store: CampaignStore,
     public journal: JournalAdapter,
+    public renderer: typeof renderMap = renderMap,
   ) {}
   private meta(input: Record<string, unknown>): Mutation {
     return Mutation.parse(Object.fromEntries(Object.keys(metadata).map((k) => [k, input[k]])));
   }
   async execute(name: ToolName, raw: unknown): Promise<unknown> {
     switch (name) {
+      case 'render_location_map': {
+        const i = inputs[name].parse(raw);
+        return this.renderAt(i.mapId, i.audience, i.revision, i.viewport);
+      }
+      case 'create_location_map': {
+        const i = inputs[name].parse(raw);
+        if (i.entity.kind !== 'map' || !i.entity.map)
+          throw new CampaignError('INVALID_MAP', 'Expected map entity');
+        const result = await this.store.transact(this.meta(i), { name, input: i }, (state) => {
+          if (state.entities[i.entity.id])
+            throw new CampaignError('INVALID_MAP', 'Entity already exists');
+          const e = prepareMap(i.entity);
+          const tokens = e.map!.tokens;
+          e.map!.tokens = {};
+          return {
+            changes: [
+              { type: 'put_entity', entity: e },
+              ...(Object.keys(tokens).length
+                ? [
+                    {
+                      type: 'set_positions' as const,
+                      map: e.id,
+                      positions: Object.entries(tokens).map(([entityId, p]) => ({
+                        entityId,
+                        ...p,
+                      })),
+                    },
+                  ]
+                : []),
+            ],
+            records: [],
+          };
+        });
+        return this.renderMutation(result, i.entity.id, i.audience, i.viewport);
+      }
+      case 'update_map_positions': {
+        const i = inputs[name].parse(raw);
+        if (!!i.positions === !!i.group)
+          throw new CampaignError('INVALID_INPUT', 'Supply exactly one of positions or group');
+        const result = await this.store.transact(this.meta(i), { name, input: i }, (state) => {
+          if (i.group && i.group.entityIds.some((id) => !state.party?.includes(id)))
+            throw new CampaignError(
+              'INVALID_GROUP',
+              'Group members must be in explicit party roster',
+            );
+          return {
+            changes: [
+              {
+                type: 'set_positions',
+                map: i.mapId,
+                positions:
+                  i.positions ??
+                  i.group!.entityIds.map((entityId) => ({ entityId, ...i.group!.position })),
+              },
+            ],
+            records: [],
+          };
+        });
+        return this.renderMutation(result, i.mapId, i.audience, i.viewport);
+      }
+      case 'set_map_reveal': {
+        const i = inputs[name].parse(raw);
+        const result = await this.store.transact(this.meta(i), { name, input: i }, () => ({
+          changes: [
+            {
+              type: 'set_reveal',
+              map: i.mapId,
+              revealed: i.revealed,
+              nodes: i.nodes,
+              edges: i.edges,
+              cells: i.cells,
+              regions: i.regions,
+              features: i.features,
+            },
+          ],
+          records: [],
+        }));
+        return this.renderMutation(result, i.mapId, i.audience, i.viewport);
+      }
+      case 'register_map_art': {
+        const i = inputs[name].parse(raw);
+        const { events } = await this.store.read();
+        // Exact retries do not depend on a derived or moved asset still existing.
+        if (!events.some((e) => e.operationId === i.operationId)) {
+          const assetPath = await safePath(this.store.root, i.art.path);
+          const file = await stat(assetPath);
+          if (!file.isFile() || file.size > 50 * 1024 * 1024)
+            throw new CampaignError('INVALID_ART', 'Expected an asset file up to 50 MiB');
+          try {
+            await sharp(assetPath).metadata();
+          } catch {
+            throw new CampaignError('INVALID_ART', 'Asset is not a supported image');
+          }
+          const source = replay(events.slice(0, i.art.sourceRevision));
+          if (!source.entities[i.mapId]?.map || source.revision !== i.art.sourceRevision)
+            throw new CampaignError('INVALID_ART', 'Source revision must contain this map');
+        }
+        return mutationResult(
+          await this.store.transact(this.meta(i), { name, input: i }, () => ({
+            changes: [{ type: 'register_art', map: i.mapId, art: i.art }],
+            records: [],
+          })),
+        );
+      }
       case 'campaign_status': {
         inputs[name].parse(raw);
         const { state } = await this.store.read();
@@ -249,6 +422,58 @@ export class CampaignService {
       }
     }
   }
+  private async renderAt(
+    mapId: string,
+    audience: 'dm' | 'party',
+    revision?: number,
+    viewport?: z.infer<typeof Viewport>,
+  ) {
+    const { events, state } = await this.store.read();
+    if (revision !== undefined && revision > state.revision)
+      throw new CampaignError('NOT_FOUND', 'Revision not found');
+    const source = revision === undefined ? state : replay(events.slice(0, revision));
+    return this.renderer(this.store.root, source, mapId, audience, viewport);
+  }
+  private async renderMutation(
+    result: Awaited<ReturnType<CampaignStore['transact']>>,
+    mapId: string,
+    audience: 'dm' | 'party',
+    viewport?: z.infer<typeof Viewport>,
+  ) {
+    const base = {
+      revision: result.event.sequence,
+      currentRevision: result.state.revision,
+      eventId: result.event.id,
+      duplicate: result.duplicate,
+      mapId,
+      audience,
+      warnings: result.warnings,
+    };
+    try {
+      const rendered = await this.renderAt(mapId, audience, result.event.sequence, viewport);
+      return { ...base, ...rendered, warnings: [...base.warnings, ...rendered.warnings] };
+    } catch {
+      const { events } = await this.store.read();
+      let metadata: Record<string, unknown> = {};
+      try {
+        const { svg, ...data } = schematic(
+          replay(events.slice(0, result.event.sequence)),
+          mapId,
+          audience,
+          viewport,
+        );
+        metadata = data;
+      } catch {
+        /* A concealed map cannot expose metadata. */
+      }
+      return {
+        ...base,
+        ...metadata,
+        status: 'positions saved; rendering failed',
+        warnings: [...base.warnings, 'State saved; retry render_location_map with this revision.'],
+      };
+    }
+  }
   async resume(audience: 'dm' | 'party'): Promise<Record<string, unknown>> {
     const { events, state: original } = await this.store.read();
     const state = audience === 'party' ? partyState(original) : original;
@@ -259,7 +484,22 @@ export class CampaignService {
       state.scene?.map,
     ]);
     for (const e of Object.values(state.entities))
-      if (e.kind === 'character' || e.kind === 'quest') relevant.add(e.id);
+      if (
+        (e.kind === 'character' && (!state.party || state.party.includes(e.id))) ||
+        (e.kind === 'quest' &&
+          (e.quest
+            ? e.quest.status === 'active'
+            : !['resolved', 'dormant', 'abandoned', 'completed', 'closed'].includes(
+                e.status ?? '',
+              )))
+      )
+        relevant.add(e.id);
+    for (const id of state.focus?.activeQuestIds ?? [])
+      if (!state.entities[id]?.quest || state.entities[id].quest?.status === 'active')
+        relevant.add(id);
+    for (const e of Object.values(state.entities))
+      if (e.map && Object.keys(e.map.tokens).some((id) => state.party?.includes(id)))
+        relevant.add(e.id);
     for (const e of Object.values(state.entities))
       if (e.item?.owner && relevant.has(e.item.owner)) relevant.add(e.id);
     const entities = Object.values(state.entities).filter((e) => relevant.has(e.id));
@@ -282,6 +522,26 @@ export class CampaignService {
       revision: state.revision,
       session: state.session,
       time: state.time,
+      focus: state.focus
+        ? {
+            ...state.focus,
+            activeQuestIds: state.focus.activeQuestIds.filter(
+              (id) =>
+                state.entities[id] &&
+                (!state.entities[id].quest || state.entities[id].quest?.status === 'active'),
+            ),
+          }
+        : undefined,
+      party:
+        state.party ??
+        Object.values(state.entities)
+          .filter((e) => e.kind === 'character')
+          .map((e) => e.id),
+      pressures: state.pressures,
+      activeQuests: Object.values(state.entities).filter((e) => e.quest?.status === 'active'),
+      interactions: Object.values(state.entities)
+        .filter((e) => e.interaction && relevant.has(e.id))
+        .map((e) => ({ id: e.id, interaction: e.interaction })),
       scene: state.scene,
       encounter: state.encounter,
       entities: entities.slice(0, 100),

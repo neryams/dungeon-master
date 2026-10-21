@@ -30,12 +30,104 @@ export const Character = z
     resources: z.record(Id, Resource).default({}),
   })
   .strict();
+export const QuestProgress = z
+  .object({
+    objective: Text,
+    stakes: Text,
+    progress: z.array(Text).default([]),
+    leads: z.array(Text).default([]),
+    completionConditions: z.array(Text).default([]),
+    status: z.enum(['active', 'resolved', 'dormant', 'abandoned']).default('active'),
+  })
+  .strict();
+export const Interaction = z
+  .object({
+    wants: z.array(Text).default([]),
+    knows: z.array(Text).default([]),
+    disclosed: z.array(Text).default([]),
+    offers: z.array(Text).default([]),
+    unresolvedTopics: z.array(Text).default([]),
+    resolvedTopics: z.array(Text).default([]),
+    status: z.enum(['open', 'served']).default('open'),
+  })
+  .strict();
+export const Focus = z.object({ primaryObjective: Text, activeQuestIds: z.array(Id) }).strict();
+export const Pressure = z
+  .object({
+    id: Id,
+    name: Text,
+    trigger: z.string().min(1).max(20000),
+    consequence: Text,
+    visibility: Visibility.default('dm'),
+    occurrences: Nonnegative.default(0),
+    lastTrigger: Text.optional(),
+  })
+  .strict();
+export const Position = z
+  .object({
+    x: z.number().finite().optional(),
+    y: z.number().finite().optional(),
+    node: Id.optional(),
+  })
+  .strict();
+export const Cell = z.object({ x: Nonnegative, y: Nonnegative }).strict();
+export const Region = z
+  .object({
+    x: Nonnegative,
+    y: Nonnegative,
+    width: Int.min(1).max(1000),
+    height: Int.min(1).max(1000),
+  })
+  .strict();
+export const Viewport = z
+  .object({ x: Int, y: Int, width: Int.min(1).max(40), height: Int.min(1).max(40) })
+  .strict();
+export const MapArt = z
+  .object({
+    path: z
+      .string()
+      .regex(/^assets\/[a-zA-Z0-9_./-]+$/)
+      .refine((p) => !p.split('/').includes('..')),
+    purpose: Text,
+    sourceRevision: Nonnegative,
+    visibility: Visibility,
+  })
+  .strict();
 export const MapData = z
   .object({
     kind: z.enum(['grid', 'graph']),
+    level: z.enum(['regional', 'tactical']).optional(),
+    bounds: z
+      .object({ width: Int.min(1).max(1000), height: Int.min(1).max(1000) })
+      .strict()
+      .optional(),
+    origin: z.literal('upper-left').optional(),
+    layout: z.record(Id, Cell).optional(),
+    locations: z.record(Id, Id).optional(),
+    labels: z.record(Id, Text).optional(),
+    features: z
+      .array(
+        z
+          .object({
+            id: Id,
+            x: Nonnegative,
+            y: Nonnegative,
+            label: Text,
+            kind: z.enum(['terrain', 'obstacle', 'landmark']),
+            visibility: Visibility,
+            revealed: z.boolean(),
+            location: Id.optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+    revealedCells: z.array(Cell).max(10000).optional(),
+    revealedRegions: z.array(Region).max(1000).optional(),
+    art: z.array(MapArt).optional(),
     scale: z.string().max(100).default('5 feet'),
     nodes: z.array(Id).default([]),
     edges: z.array(z.tuple([Id, Id])).default([]),
+    revealedEdges: z.array(z.tuple([Id, Id])).optional(),
     tokens: z
       .record(
         Id,
@@ -74,6 +166,8 @@ export const Entity = z
       .strict()
       .optional(),
     map: MapData.optional(),
+    quest: QuestProgress.optional(),
+    interaction: Interaction.optional(),
   })
   .strict();
 export type Entity = z.infer<typeof Entity>;
@@ -94,9 +188,55 @@ export const Scene = z
     map: Id.optional(),
     summary: Text.default(''),
     unresolved: z.array(Text).default([]),
+    centralQuestion: Text.optional(),
+    progress: z.array(Text).optional(),
+    pendingDecision: Text.optional(),
+    exitConditions: z.array(Text).optional(),
   })
   .strict();
 export const Change = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('set_focus'), focus: Focus }).strict(),
+  z.object({ type: z.literal('set_party'), members: z.array(Id).max(100) }).strict(),
+  z.object({ type: z.literal('set_quest'), id: Id, quest: QuestProgress }).strict(),
+  z.object({ type: z.literal('set_interaction'), id: Id, interaction: Interaction }).strict(),
+  z
+    .object({
+      type: z.literal('define_pressure'),
+      pressure: Pressure.omit({ occurrences: true, lastTrigger: true }),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('trigger_pressure'),
+      id: Id,
+      trigger: Text,
+      evidence: z.string().min(1).max(20000),
+    })
+    .strict(),
+  z.object({ type: z.literal('set_map'), id: Id, map: MapData }).strict(),
+  z
+    .object({
+      type: z.literal('set_positions'),
+      map: Id,
+      positions: z
+        .array(Position.extend({ entityId: Id }))
+        .min(1)
+        .max(100),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('set_reveal'),
+      map: Id,
+      revealed: z.boolean(),
+      nodes: z.array(Id).default([]),
+      edges: z.array(z.tuple([Id, Id])).default([]),
+      cells: z.array(Cell).max(10000).default([]),
+      regions: z.array(Region).max(1000).default([]),
+      features: z.array(Id).default([]),
+    })
+    .strict(),
+  z.object({ type: z.literal('register_art'), map: Id, art: MapArt }).strict(),
   z.object({ type: z.literal('put_entity'), entity: Entity }).strict(),
   z.object({ type: z.literal('damage'), id: Id, amount: Nonnegative }).strict(),
   z.object({ type: z.literal('heal'), id: Id, amount: Nonnegative }).strict(),
@@ -201,6 +341,9 @@ export const CampaignConfig = z
 export type CampaignConfig = z.infer<typeof CampaignConfig>;
 export interface State {
   revision: number;
+  focus?: z.infer<typeof Focus>;
+  party?: string[];
+  pressures?: Record<string, z.infer<typeof Pressure>>;
   entities: Record<string, Entity>;
   encounter?: z.infer<typeof Encounter>;
   scene?: z.infer<typeof Scene>;

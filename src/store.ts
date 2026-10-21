@@ -25,7 +25,7 @@ export function stableJson(value: unknown): string {
       .join(',')}}`;
   return JSON.stringify(value);
 }
-export async function atomicWrite(path: string, value: string): Promise<void> {
+export async function atomicWrite(path: string, value: string | Buffer): Promise<void> {
   const tmp = `${path}.${randomUUID()}.tmp`;
   try {
     const file = await open(tmp, 'wx', 0o600);

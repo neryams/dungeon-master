@@ -11,10 +11,11 @@ import { CampaignService, descriptions, inputs, ToolName } from './service.js';
 import { CampaignError } from './domain.js';
 
 export function createMcpServer(service: CampaignService): McpServer {
-  const server = new McpServer({ name: 'dungeon-master', version: '0.1.0' });
+  const server = new McpServer({ name: 'dungeon-master', version: '0.2.0' });
   for (const name of Object.keys(inputs) as ToolName[]) {
     const readOnly = [
       'campaign_status',
+      'render_location_map',
       'get_campaign_entity',
       'search_campaign_history',
       'read_campaign_record',
@@ -44,7 +45,18 @@ export function createMcpServer(service: CampaignService): McpServer {
               status: 'ok',
             }) + '\n',
           );
-          return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
+          const { image, ...structured } = data as Record<string, unknown> & {
+            image?: { data: string; mimeType: 'image/png' };
+          };
+          return {
+            structuredContent: structured,
+            content: [
+              { type: 'text' as const, text: JSON.stringify(structured) },
+              ...(image
+                ? [{ type: 'image' as const, mimeType: image.mimeType, data: image.data }]
+                : []),
+            ],
+          };
         } catch (error) {
           const details =
             error instanceof CampaignError

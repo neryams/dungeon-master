@@ -1,15 +1,371 @@
 {
   "opening": "## Arrival\nMara reaches Briar Ford at dusk. Ferryman Oren explains that the guiding lantern across the river has gone dark. He offers 20 silver for its safe return.\n\n## Unresolved\nMara has not yet chosen whether to question Oren, inspect the landing, or cross the river.",
   "changes": [
-    {"type":"put_entity","entity":{"id":"mara","kind":"character","name":"Mara","character":{"abilities":{"str":12,"dex":16,"con":14,"int":10,"wis":13,"cha":11},"hp":9,"maxHp":12,"ac":14,"resources":{"hit-dice":{"current":1,"max":1},"silver":{"current":10,"max":1000000}}}}},
-    {"type":"put_entity","entity":{"id":"oren","kind":"npc","name":"Oren","description":"A worried ferryman who offered 20 silver for recovering the guiding lantern."}},
-    {"type":"put_entity","entity":{"id":"ford","kind":"location","name":"Briar Ford","description":"A river landing at dusk."}},
-    {"type":"put_entity","entity":{"id":"potion","kind":"item","name":"Healing potion","item":{"quantity":1,"owner":"mara"}}},
-    {"type":"put_entity","entity":{"id":"lantern-quest","kind":"quest","name":"Recover the guiding lantern","status":"open","description":"Oren offers 20 silver for its return."}},
-    {"type":"put_entity","entity":{"id":"lantern-secret","kind":"npc","name":"The stranded keeper","visibility":"dm","knowledge":"plan","description":"The keeper moved the lantern to guide a stranded child. This is a proposed reveal, not established player knowledge."}},
-    {"type":"put_entity","entity":{"id":"ford-map","kind":"map","name":"Briar Ford map","map":{"kind":"graph","nodes":["landing","island","far-bank"],"edges":[["landing","island"],["island","far-bank"]],"tokens":{"mara":{"node":"landing"}},"revealed":["landing"]}}},
-    {"type":"set_session","session":"session-001"},
-    {"type":"set_time","time":"Harvest eve, dusk"},
-    {"type":"set_scene","scene":{"id":"arrival","title":"The dark lantern","location":"ford","present":["mara","oren"],"map":"ford-map","summary":"The guiding lantern has gone dark. Oren offers a reward.","unresolved":["How does Mara investigate?"]}}
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "mara",
+        "kind": "character",
+        "name": "Mara",
+        "character": {
+          "abilities": {
+            "str": 12,
+            "dex": 16,
+            "con": 14,
+            "int": 10,
+            "wis": 13,
+            "cha": 11
+          },
+          "hp": 9,
+          "maxHp": 12,
+          "ac": 14,
+          "resources": {
+            "hit-dice": {
+              "current": 1,
+              "max": 1
+            },
+            "silver": {
+              "current": 10,
+              "max": 1000000
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "tess",
+        "kind": "character",
+        "name": "Tess",
+        "description": "Mara\u2019s traveling companion; seeking safe passage for their caravan.",
+        "character": {
+          "hp": 11,
+          "maxHp": 11
+        }
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "oren",
+        "kind": "npc",
+        "name": "Oren",
+        "description": "A worried ferryman who offered 20 silver for recovering the guiding lantern."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "ford",
+        "kind": "location",
+        "name": "Briar Ford",
+        "description": "A river landing at dusk."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "potion",
+        "kind": "item",
+        "name": "Healing potion",
+        "item": {
+          "quantity": 1,
+          "owner": "mara"
+        }
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "lantern-quest",
+        "kind": "quest",
+        "name": "Recover the guiding lantern",
+        "status": "open",
+        "description": "Oren offers 20 silver for its return."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "lantern-secret",
+        "kind": "npc",
+        "name": "The stranded keeper",
+        "visibility": "dm",
+        "knowledge": "plan",
+        "description": "The keeper moved the lantern to guide a stranded child. This is a proposed reveal, not established player knowledge."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "ford-map",
+        "kind": "map",
+        "name": "Briar Ford map",
+        "map": {
+          "kind": "graph",
+          "nodes": ["landing", "island", "far-bank"],
+          "edges": [
+            ["landing", "island"],
+            ["island", "far-bank"]
+          ],
+          "tokens": {
+            "mara": {
+              "node": "landing"
+            }
+          },
+          "revealed": ["landing"]
+        }
+      }
+    },
+    {
+      "type": "set_session",
+      "session": "session-001"
+    },
+    {
+      "type": "set_time",
+      "time": "Harvest eve, dusk"
+    },
+    {
+      "type": "set_scene",
+      "scene": {
+        "id": "arrival",
+        "title": "The dark lantern",
+        "location": "ford",
+        "present": ["mara", "tess", "oren"],
+        "map": "ford-map",
+        "summary": "The guiding lantern has gone dark. Oren offers a reward.",
+        "unresolved": ["How does Mara investigate?"],
+        "centralQuestion": "How will the party find the lantern before the crossing becomes unsafe?",
+        "progress": [],
+        "pendingDecision": "Inspect the landing, borrow the skiff, or take the bridge?",
+        "exitConditions": ["Choose a route and begin the search"]
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "settlement",
+        "kind": "location",
+        "name": "Briar Village",
+        "description": "A small river settlement dependent on the crossing."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "bridge",
+        "kind": "location",
+        "name": "Old Toll Bridge",
+        "description": "A narrow bridge overlooking the landing."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "mill",
+        "kind": "location",
+        "name": "Abandoned Mill",
+        "description": "Tracks lead from the river toward the mill."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "shrine",
+        "kind": "location",
+        "name": "River Shrine",
+        "description": "Fresh wax matches the missing lantern."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "trail",
+        "kind": "location",
+        "name": "Upstream Trail",
+        "description": "A muddy path with small footprints."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "island",
+        "kind": "location",
+        "name": "Reed Island",
+        "description": "A sheltered place in the river."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "ada",
+        "kind": "npc",
+        "name": "Ada the miller",
+        "description": "Saw a light moving upstream; offers a rope."
+      }
+    },
+    {
+      "type": "put_entity",
+      "entity": {
+        "id": "iven",
+        "kind": "npc",
+        "name": "Iven the caretaker",
+        "description": "Knows the shrine path and can lend a dry cloak."
+      }
+    },
+    {
+      "type": "set_party",
+      "members": ["mara", "tess"]
+    },
+    {
+      "type": "set_focus",
+      "focus": {
+        "primaryObjective": "Restore safe passage by recovering the guiding lantern.",
+        "activeQuestIds": ["lantern-quest"]
+      }
+    },
+    {
+      "type": "set_quest",
+      "id": "lantern-quest",
+      "quest": {
+        "objective": "Recover the guiding lantern and restore the crossing.",
+        "stakes": "The party\u2019s caravan and the village supplies cannot cross safely after dark.",
+        "progress": [],
+        "leads": [
+          "Inspect the landing for tracks",
+          "Ask Ada about the moving light",
+          "Follow wax traces to the shrine"
+        ],
+        "completionConditions": [
+          "Lantern returned or another reliable crossing light established",
+          "Stranded travelers reach safety"
+        ],
+        "status": "active"
+      }
+    },
+    {
+      "type": "set_interaction",
+      "id": "oren",
+      "interaction": {
+        "wants": ["Safe passage restored"],
+        "knows": ["The light moved upstream", "The current is dangerous"],
+        "disclosed": ["The lantern is missing", "Reward is 20 silver"],
+        "offers": ["A skiff and directions"],
+        "unresolvedTopics": ["Which route will the party take?"],
+        "resolvedTopics": ["Reward amount"],
+        "status": "open"
+      }
+    },
+    {
+      "type": "define_pressure",
+      "pressure": {
+        "id": "flood",
+        "name": "Rising flood",
+        "trigger": "The party spends an hour at the crossing",
+        "consequence": "The lower landing floods; use the bridge or upstream path.",
+        "visibility": "dm"
+      }
+    }
+  ],
+  "briefing": "You and your traveling companion Tess need this crossing for your caravan. The lantern is dark. Oren offers a skiff, directions, and 20 silver. Inspect the landing, cross the bridge, or follow the upstream trail\u2014or propose another approach.",
+  "dmReference": "The keeper moved the lantern to guide a stranded child, not to steal it. Tracks at the landing, Ada\u2019s sighting, and wax at the shrine each lead upstream. The rising flood advances only after the recorded one-hour trigger. Negotiation over the agreed reward should not repeat.",
+  "bridgeMap": {
+    "id": "river-crossing",
+    "kind": "map",
+    "name": "Briar Ford \u2014 Old Toll Bridge",
+    "map": {
+      "kind": "grid",
+      "level": "tactical",
+      "bounds": {
+        "width": 20,
+        "height": 20
+      },
+      "scale": "5 feet",
+      "tokens": {
+        "mara": {
+          "x": 3,
+          "y": 6
+        },
+        "tess": {
+          "x": 3,
+          "y": 7
+        }
+      },
+      "revealedRegions": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 10,
+          "height": 12
+        }
+      ],
+      "features": [
+        {
+          "id": "bridge",
+          "x": 4,
+          "y": 6,
+          "label": "Old Toll Bridge",
+          "kind": "landmark",
+          "location": "bridge",
+          "visibility": "party",
+          "revealed": true
+        },
+        {
+          "id": "rocks",
+          "x": 7,
+          "y": 8,
+          "label": "River rocks",
+          "kind": "obstacle",
+          "visibility": "party",
+          "revealed": true
+        },
+        {
+          "id": "cache",
+          "x": 15,
+          "y": 4,
+          "label": "Keeper cache",
+          "kind": "landmark",
+          "visibility": "dm",
+          "revealed": false
+        }
+      ]
+    }
+  },
+  "concludeFerryman": [
+    {
+      "type": "set_interaction",
+      "id": "oren",
+      "interaction": {
+        "wants": ["Safe passage restored"],
+        "knows": ["The light moved upstream", "The current is dangerous"],
+        "disclosed": [
+          "The lantern is missing",
+          "Reward is 20 silver",
+          "The light moved upstream",
+          "The current is dangerous"
+        ],
+        "offers": ["A skiff and directions"],
+        "unresolvedTopics": [],
+        "resolvedTopics": ["Reward amount", "Crossing routes", "Everything Oren knows"],
+        "status": "served"
+      }
+    },
+    {
+      "type": "set_scene",
+      "scene": {
+        "id": "arrival",
+        "title": "The dark lantern",
+        "location": "ford",
+        "present": ["mara", "tess", "oren"],
+        "map": "river-crossing",
+        "summary": "The guiding lantern has gone dark. Oren offers a reward.",
+        "unresolved": ["How does Mara investigate?"],
+        "centralQuestion": "How will the party find the lantern before the crossing becomes unsafe?",
+        "progress": ["Oren has shared everything he knows and offered the skiff."],
+        "pendingDecision": "Cross together or scout the upstream trail?",
+        "exitConditions": ["Choose a route and begin the search"]
+      }
+    }
   ]
 }

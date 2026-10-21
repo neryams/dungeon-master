@@ -16,3 +16,14 @@ Initialization creates an isolated campaign workspace and a bound plugin/marketp
 Once campaign tools are available, call campaign_status. Confirm it is the intended campaign before writing. Use apply_campaign_changes to create characters, starting inventory, locations, maps, quests, session and scene. Batch related entities so references are valid at the end of the transaction. Keep DM secrets in separate visibility=dm entities or records; campaign configuration, scene summaries and unresolved questions are player-facing.
 
 Call record_scene for the opening situation and resume_campaign to verify setup. Report the campaign folder, saved revision and any pending journal delivery. Do not create a GitHub repository, push data or start external hosting as part of initialization.
+
+Build a playable opening in stages, using the player's answers already available in context:
+
+1. Gather edition, tone, difficulty, boundaries and preferences, desired campaign length, and party details. Give each character a goal, bond, and unresolved problem. Establish why they stay together and why the opening matters to them. Save the public agreement with record_scene and set_party with explicit member IDs.
+2. Establish one central conflict: participants, competing wants, and what happens without intervention. Save private motives and future possibilities separately as DM records or plan entities. Define pressures with explicit fictional triggers; conversation length never advances them.
+3. Prepare one starting settlement, roughly 4–6 nearby locations and 3–5 essential NPCs. These are defaults, not quotas. Link map rooms/landmarks to location entities. Put essential clues in several discoverable places or interactions.
+4. Save an opening quest with set_quest: objective, stakes, progress, leads, completionConditions and status=active. Save set_focus with the primary objective and activeQuestIds. Create NPC interaction records with wants, knows, disclosed, offers, unresolvedTopics and resolvedTopics; undisclosed knowledge is private.
+5. Save set_scene with centralQuestion, progress, pendingDecision and exitConditions. Start with an immediate meaningful decision and several approaches, allowing unexpected choices. Use create_location_map for the initial layout and positions; for grids supply explicit bounds and reveal masks.
+6. Write a short player briefing with record_scene visibility=party and a separate private DM reference with visibility=dm. Expand later detail as the party approaches it.
+
+Finish by calling resume_campaign, get_campaign_entity for the objective/party/map as needed, and render_location_map. Verify a clear objective, actionable pending decision, correct party state and readable initial map. Report saved revision and any rendering/delivery warning. A proposed opening is not saved until tools confirm it.

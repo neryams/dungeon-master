@@ -46,3 +46,52 @@ Read tools supporting visibility accept `audience: dm|party` (default dm). Playe
 ## Error handling
 
 MCP errors contain a code and useful message, with field paths for input validation. `REVISION_CONFLICT` includes currentRevision. `OPERATION_REUSED` means the input differs from the saved operation. Invalid changes leave no partial event. Missing journal delivery produces a successful committed write with `journal.status=pending`; retry delivery, not the gameplay action. `INTERNAL_ERROR` may represent an uncertain commit: retry the exact operation ID and input.
+
+## Story progress and party
+
+| Operation          | Fields                                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_focus`        | `focus: {primaryObjective, activeQuestIds}`                                                                                                    |
+| `set_party`        | `members`: explicit character IDs                                                                                                              |
+| `set_quest`        | quest entity `id`, `quest: {objective, stakes, progress[], leads[], completionConditions[], status}`; status active/resolved/dormant/abandoned |
+| `set_interaction`  | NPC `id`, `interaction: {wants[], knows[], disclosed[], offers[], unresolvedTopics[], resolvedTopics[], status: open                           | served}` |
+| `define_pressure`  | `pressure: {id, name, trigger, consequence, visibility}`; defines once                                                                         |
+| `trigger_pressure` | pressure `id`, exact defined `trigger`, nonempty fictional `evidence`; increments occurrences and saves lastTrigger                            |
+
+`set_scene` additionally accepts centralQuestion, progress[], pendingDecision and exitConditions[]. Fields describe public progress; put secrets in separate DM entities/records. NPC wants/knows/offers are private in party views; public disclosed and topic fields must not contain secrets. Pressures never advance implicitly. Quest and interaction updates replace their structured records: preserve prior progress and resolved topics when updating.
+
+Resume prioritizes focus, active quests, scene decision/progress, relevant NPC interactions, explicit party and maps containing its members. Legacy campaigns infer party from character entities. Resolved/dormant/abandoned quests stay readable by ID. Scene location is the viewpoint, not an automatic relocation of the roster.
+
+## Map authoring and rendering
+
+`create_location_map` takes mutation metadata, `entity` (kind map), optional audience and viewport. Existing IDs are rejected. Grid maps require bounds `{width,height}` (1–1000), zero-based integer cells, upper-left origin, x right/y down; default scale is 5 feet per cell. Graph maps use nodes/edges and assign any missing drawing coordinates once into layout. Map level defaults to tactical for grids and regional for graphs.
+
+Maps accept `locations` (node ID to location entity ID), `labels` (node ID to text), `features` ({id,x,y,label,kind:terrain|obstacle|landmark,visibility,revealed,location?}), `revealedCells` ({x,y}[]) and `revealedRegions` ({x,y,width,height}[]). Graph visibility uses revealed node IDs and optional revealedEdges pairs; omitted revealedEdges preserves legacy visibility for edges between revealed nodes. Links must reference location entities. Features on a player grid also require their cell to be revealed. New grids start concealed unless an explicit mask is supplied.
+
+`update_map_positions` takes mapId, positions [{entityId,x,y}] or [{entityId,node}] and mutation metadata. Alternatively supply `group: {entityIds, position:{x,y}}` (or node) to move explicitly selected roster members together. Exactly one of positions/group is required. All placements commit atomically; omitted characters stay put. New placement removes that character from other maps at the same level, preserving placements at other levels. Shared cells are allowed. Movement distance and collision rules remain DM decisions.
+
+```json
+{
+  "operationId": "crossing-turn-04",
+  "expectedRevision": 27,
+  "mapId": "river-crossing",
+  "positions": [
+    { "entityId": "mara", "x": 4, "y": 6 },
+    { "entityId": "tess", "x": 5, "y": 6 }
+  ],
+  "audience": "dm",
+  "reason": "The party advances onto the bridge"
+}
+```
+
+`set_map_reveal` takes mapId, revealed boolean, optional nodes[], edges[] (node pairs), cells[], regions[], features[] plus mutation metadata; explicitly conceals/reveals only those targets. Masks stay as compact rectangles; concealing a cell splits its containing region without expanding the entire grid. No automatic line of sight.
+
+`render_location_map` takes mapId, optional audience (dm/party), revision and viewport `{x,y,width,height}`. Width/height are 1–40 cells; default 20×20, clamped for smaller bounded maps. Legacy unbounded grids infer an origin from existing positions. Offscreen markers produce a warning. This is a read-only gameplay operation, though it persists a derived file.
+
+Successful map responses contain an image/png MCP block, structured positions visible inside the viewport, mapId, revision, audience, viewport, warnings and campaign-relative path. Text responses do not repeat base64 data. PNGs live in `.dm/maps/` with revision/audience/viewport-specific filenames. Local inspection of that path is a fallback for hosts without image display.
+
+Movement commits before rendering. On failure, the response says `positions saved; rendering failed` and identifies the saved revision. Retry only `render_location_map` at that revision. Exact mutation retries replay the original event revision and return its image, with currentRevision separately reported. They never label a later image as the earlier operation.
+
+`register_map_art` takes mapId and `art: {path, purpose, sourceRevision, visibility}` plus mutation metadata. Path must be an existing non-symlink file under assets/, up to 50 MiB and recognized by Sharp as an image; sourceRevision must contain the map. Artwork is separate from schematic rendering and is included in exports. The create-map-art skill uses host image generation when available, without model API fallback.
+
+Low-level `set_map` ({id,map}), `set_positions` ({map,positions}), `set_reveal` ({map,revealed,nodes,edges,cells,regions,features}) and `register_art` ({map,art}) are typed reducer operations. Use the domain map tools for creation, asset file verification and rendering. To add bounds to an old grid, read its full map, preserve other fields and save `set_map` with explicit bounds/origin. Historical events remain unchanged. Legacy move_token retains its old replay semantics; use set_positions/new tools for same-level transfer behavior.

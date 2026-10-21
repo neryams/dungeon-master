@@ -174,8 +174,52 @@ async function main() {
         title: 'Arrival at Briar Ford',
         content: example.opening,
       });
+      const mutate = async (
+        name: import('./service.js').ToolName,
+        args: Record<string, unknown>,
+      ) => {
+        const { state } = await store.read();
+        return service.execute(name, {
+          operationId: randomUUID(),
+          expectedRevision: state.revision,
+          reason: 'Briar Ford map demonstration',
+          ...args,
+        });
+      };
+      await mutate('record_scene', {
+        title: 'Player briefing',
+        content: example.briefing,
+        visibility: 'party',
+      });
+      await mutate('record_scene', {
+        title: 'Private opening reference',
+        content: example.dmReference,
+        visibility: 'dm',
+      });
+      await mutate('create_location_map', { entity: example.bridgeMap });
+      await mutate('apply_campaign_changes', { changes: example.concludeFerryman });
+      await mutate('update_map_positions', {
+        mapId: 'river-crossing',
+        group: { entityIds: ['mara', 'tess'], position: { x: 4, y: 6 } },
+      });
+      await mutate('update_map_positions', {
+        mapId: 'river-crossing',
+        positions: [{ entityId: 'tess', x: 5, y: 8 }],
+      });
+      const views = [];
+      for (const audience of ['dm', 'party']) {
+        const { image, ...metadata } = (await service.execute('render_location_map', {
+          mapId: 'river-crossing',
+          audience,
+        })) as Record<string, unknown>;
+        views.push(metadata);
+      }
       console.log(
-        JSON.stringify({ campaign: store.root, resume: await service.resume('party') }, null, 2),
+        JSON.stringify(
+          { campaign: store.root, views, resume: await service.resume('party') },
+          null,
+          2,
+        ),
       );
     } finally {
       await service.close();

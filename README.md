@@ -20,10 +20,11 @@ If your client doesn't discover local plugins, use the direct MCP and skill inst
 
 ## What is included
 
-- Exact characters, HP/temp HP, inventory, resources, conditions, initiative, world time, relationships, quests and map positions.
+- Exact characters, HP/temp HP, inventory, resources, conditions, initiative, world time, story progress, party roster and map positions.
+- Graph/grid map authoring, atomic subgroup movement, explicit reveal masks and actual PNG tool responses.
 - Cryptographic dice, recorded physical dice, idempotent retries, revision conflicts and explicit corrections.
 - Append-only JSON event history, replayable state, Markdown scene records and journal-backed historical retrieval.
-- Four skills: create, run, close and maintain a campaign.
+- Five skills: create, run, close, maintain, and optional host-generated artwork.
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.
 
@@ -39,7 +40,7 @@ node dist/cli.js import /tmp/campaign-backup.json --campaign ~/Campaigns/restore
 node dist/cli.js demo
 ```
 
-`demo` creates a temporary example campaign, not a campaign in your personal folder. It writes an opening scene and may initialize the shared journal daemon/model. Use the isolated integration tests when you want to avoid changing the existing journal runtime.
+`demo` creates a temporary example campaign, not a campaign in your personal folder. It records a playable opening, concludes the ferryman interaction, moves onto the bridge, splits the party and renders DM/player PNGs. It may initialize the shared journal daemon/model. Use the isolated integration tests when you want to avoid changing the existing journal runtime.
 
 Export includes committed events and assets; import rebuilds state and makes journal records available from authoritative history immediately. Run `journal-sync` to materialize and reindex Markdown. Keep backups somewhere durable: a local Git repository without commits or a remote is not a backup service. Git commits and pushes are explicit user actions.
 
