@@ -51,3 +51,11 @@ Optional host image generation is an agent skill, never a model API integration.
 ## Conversational sheets (0.3.0)
 
 src/sheets.ts derives full character sheets and compact party overviews from one audience-filtered state snapshot. Service lookups read authoritative events once, then join visible owned items and map placements without consulting journal history or writing caches. Unlike resume, full sheet inventories have no entity-count cutoff. The player-sheet skill uses fresh tool results and explicit source revisions; no independent sheet storage or synchronization is required.
+
+## Player dashboard (0.4.0)
+
+`dungeon-master panel` starts an independent, campaign-bound HTTP reader. It does not instantiate the journal adapter or expose CampaignService as HTTP RPC. `/api/state` projects one replayed snapshot into party sheets, active quests, current scene/focus, visible map summaries and encounter order. The projection uses the existing visibility rules; public prose must still be authored without secrets. A hidden active participant has no active player highlight (filtered encounter turn is -1, a projection-only sentinel never persisted).
+
+`/api/map` requires mapId and revision, with optional x/y/width/height as a complete viewport. It renders a party schematic in memory, checks the revision again after rendering, and returns 409 if state has advanced. The browser discards obsolete responses. Eight PNGs at most are cached in memory, cleared at revision changes; rendering is serialized with busy responses. Panel reads do not write campaign files. There is no schema migration.
+
+The server serves only bundled UI and two authenticated GET endpoints. Random per-run bearer tokens are passed in URL fragments and retained in browser session storage, never query strings or server logs. Restart invalidates old links. Host/origin checks, a restrictive CSP, text-only prose rendering, no CORS and no-store responses complement the token boundary. LAN mode enables IPv4 listening explicitly. It uses HTTP on trusted networks; it is not public hosting or individual player authorization.

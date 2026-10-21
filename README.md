@@ -1,6 +1,6 @@
 # Dungeon Master
 
-An open-source D&D DM plugin for local Codex/ChatGPT Work. ChatGPT narrates and adjudicates; campaign tools save exact state and use [journal-rag](https://github.com/neryams/workspace-docs-mcp) internally for campaign memory. No OpenAI model API calls or web application.
+An open-source D&D DM plugin for local Codex/ChatGPT Work. ChatGPT narrates and adjudicates; campaign tools save exact state and use [journal-rag](https://github.com/neryams/workspace-docs-mcp) internally for campaign memory. No OpenAI model API calls. An optional local web panel provides read-only player views.
 
 ## Start locally
 
@@ -76,3 +76,17 @@ npm run package:plugin
 The real journal integration test uses private temporary IPC/log directories and intentionally forces keyword fallback, avoiding model downloads and the user's existing daemon. `npm test` covers actual MCP transport as well as state, visibility and recovery. [Verification notes](docs/verification.md) distinguish automated checks from app UI and live storytelling checks.
 
 See [architecture](docs/architecture.md), [tool interfaces](docs/tools.md), and [cloud connection guidance](docs/cloud.md). The package archive is generated at `build/dungeon-master-plugin.tgz`; no artifacts are published automatically.
+
+## Open the player dashboard
+
+```bash
+node dist/cli.js panel --campaign ~/Campaigns/my-campaign
+# Optional: allow other computers/phones on the same trusted network
+node dist/cli.js panel --campaign ~/Campaigns/my-campaign --lan
+```
+
+Open the complete access link printed in the terminal. The panel shows party sheets, inventory, resources, positions, current story, active quests, turn order and player maps. It refreshes every two seconds while visible; it cannot change gameplay. Campaign tools continue running separately. Map controls select a viewport or center on a selected character with a visible grid position.
+
+The default listens only on this computer, port 4317. Use `--port 4318` if that port is occupied. `--lan` prints candidate network addresses; share a complete LAN link with players. The host must stay on and its firewall must allow that port. VPN or virtual-adapter addresses may not be reachable from another device. Stop with Ctrl+C. Restarting creates new access links.
+
+Everyone with the link sees the same party-visible state, not DM secrets or individual private sheets. LAN mode uses unencrypted HTTP and is intended for a trusted local network, not internet exposure. There are no accounts or cloud services. Public descriptions and scene prose must not contain DM secrets. The panel does not serve original artwork or campaign files.

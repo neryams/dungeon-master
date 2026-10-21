@@ -12,9 +12,11 @@ import { exportCampaign, importCampaign } from './backup.js';
 import { CampaignService } from './service.js';
 import { JournalAdapter, McpJournal } from './journal.js';
 import { serve } from './server.js';
+import { startPanel } from './panel.js';
 
 const usage = `Dungeon Master (Node >=22)
   dungeon-master init <slug> [--name NAME] [--edition 2014|2024] [--parent DIR] [--config JSON]
+  dungeon-master panel --campaign DIR [--lan] [--port PORT]
   dungeon-master serve --campaign DIR
   dungeon-master validate --campaign DIR
   dungeon-master export --campaign DIR --output FILE
@@ -37,6 +39,8 @@ const { positionals, values } = parseArgs({
     config: { type: 'string' },
     output: { type: 'string' },
     help: { type: 'boolean' },
+    lan: { type: 'boolean' },
+    port: { type: 'string' },
   },
 });
 const [command, arg] = positionals;
@@ -233,6 +237,20 @@ async function main() {
     const store = await importCampaign(root, JSON.parse(await readFile(arg, 'utf8')));
     git(store.root);
     console.log(JSON.stringify(await setup(store), null, 2));
+    return;
+  }
+  if (command === 'panel') {
+    const port = Number(values.port ?? 4317);
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+      throw new Error('Port must be between 1 and 65535');
+    const panel = await startPanel(root, { lan: values.lan, port });
+    console.log(
+      'Read-only player panel. Keep this process running. Access links:\n' + panel.urls.join('\n'),
+    );
+    for (const signal of ['SIGINT', 'SIGTERM'] as const)
+      process.once(signal, () => {
+        void panel.close().then(() => process.exit(0));
+      });
     return;
   }
   if (command === 'serve') {

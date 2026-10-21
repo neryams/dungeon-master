@@ -451,10 +451,8 @@ export function partyState(state: State): State {
   if (out.encounter) {
     const active = out.encounter.participants[out.encounter.turn]?.id;
     out.encounter.participants = out.encounter.participants.filter((p) => visible(p.id));
-    out.encounter.turn = Math.max(
-      0,
-      out.encounter.participants.findIndex((p) => p.id === active),
-    );
+    // Projection only: -1 means the active participant is not visible.
+    out.encounter.turn = out.encounter.participants.findIndex((p) => p.id === active);
     if (!out.encounter.participants.length) delete out.encounter;
   }
   if (out.scene) {
