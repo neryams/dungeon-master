@@ -54,7 +54,7 @@ MCP errors contain a code and useful message, with field paths for input validat
 | `set_focus`        | `focus: {primaryObjective, activeQuestIds}`                                                                                                    |
 | `set_party`        | `members`: explicit character IDs                                                                                                              |
 | `set_quest`        | quest entity `id`, `quest: {objective, stakes, progress[], leads[], completionConditions[], status}`; status active/resolved/dormant/abandoned |
-| `set_interaction`  | NPC `id`, `interaction: {wants[], knows[], disclosed[], offers[], unresolvedTopics[], resolvedTopics[], status: open                           | served}` |
+| `set_interaction`  | NPC `id`, `interaction: {wants[], knows[], disclosed[], offers[], unresolvedTopics[], resolvedTopics[], status: open or served}`               |
 | `define_pressure`  | `pressure: {id, name, trigger, consequence, visibility}`; defines once                                                                         |
 | `trigger_pressure` | pressure `id`, exact defined `trigger`, nonempty fictional `evidence`; increments occurrences and saves lastTrigger                            |
 
