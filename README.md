@@ -28,7 +28,7 @@ If your client doesn't discover local plugins, use the direct MCP and skill inst
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.
 
-There is no complete rules engine. The DM supplies adjudicated outcomes and resource changes. The campaign records whether you use 2014 or 2024 5e; it does not redistribute rulebooks or automatically apply every spell, feature or rest rule.
+There is no complete rules engine. The DM supplies adjudicated outcomes and resource changes. The campaign records whether you use 2014 or 2024 5e; it bundles licensed SRD references but does not automatically apply every spell, feature or rest rule.
 
 ## Ask for your sheet
 
@@ -99,4 +99,4 @@ The tools enforce that workflow and saved-state consistency. They do not supply 
 
 Existing campaigns retain legacy behavior until configure_review enables reviewed play. Pending actions survive restarts and exports. See [tool contracts](docs/tools.md#referee-workflow) and [architecture](docs/architecture.md#referee-reviewed-play-050) for the guard boundaries and limitations.
 
-Edition-matched official SRD references are bundled for offline lookup. [Attribution and extraction notes](rules/ATTRIBUTION.md) accompany the pinned text. Non-SRD features require supplied rules or explicit DM judgment.
+Edition-matched SRD references are bundled for offline lookup. `search_rules` defaults to coherent Markdown sections for 2024 and PDF pages for 2014. `list_rule_sections` browses a paginated table of contents; `read_rules` accepts `sectionId` and optional `part`, or the existing `page`/`count` locator. Section reads include up to 30 child links; follow `nextChildOffset` through `list_rule_sections` for the rest. Use `search_rules` with `format: "pages"` for the original PDF extraction. Section results carry stable IDs, heading paths, source links and a `corpusRevision` for referee citations. The community conversion is pinned and audited; see [coverage and limitations](docs/rules-coverage.md). No runtime downloads or vector database are required. [Attribution and extraction notes](rules/ATTRIBUTION.md) accompany the pinned text. Non-SRD features require supplied rules or explicit DM judgment.

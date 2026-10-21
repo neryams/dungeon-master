@@ -1,0 +1,93 @@
+[
+  {
+    "file": "animals.md",
+    "headings": 254,
+    "sections": 255,
+    "tables": 95,
+    "warnings": []
+  },
+  {
+    "file": "character-creation.md",
+    "headings": 43,
+    "sections": 44,
+    "tables": 13,
+    "warnings": []
+  },
+  {
+    "file": "character-origins.md",
+    "headings": 29,
+    "sections": 30,
+    "tables": 3,
+    "warnings": []
+  },
+  {
+    "file": "classes.md",
+    "headings": 424,
+    "sections": 425,
+    "tables": 105,
+    "warnings": []
+  },
+  {
+    "file": "equipment.md",
+    "headings": 134,
+    "sections": 135,
+    "tables": 15,
+    "warnings": []
+  },
+  {
+    "file": "feats.md",
+    "headings": 24,
+    "sections": 25,
+    "tables": 0,
+    "warnings": []
+  },
+  {
+    "file": "gameplay-toolbox.md",
+    "headings": 81,
+    "sections": 82,
+    "tables": 9,
+    "warnings": []
+  },
+  {
+    "file": "magic-items.md",
+    "headings": 298,
+    "sections": 299,
+    "tables": 55,
+    "warnings": []
+  },
+  {
+    "file": "monsters-A-Z.md",
+    "headings": 913,
+    "sections": 914,
+    "tables": 235,
+    "warnings": []
+  },
+  {
+    "file": "monsters.md",
+    "headings": 35,
+    "sections": 36,
+    "tables": 3,
+    "warnings": []
+  },
+  {
+    "file": "playing-the-game.md",
+    "headings": 105,
+    "sections": 106,
+    "tables": 13,
+    "warnings": []
+  },
+  {
+    "file": "rules-glossary.md",
+    "headings": 158,
+    "sections": 159,
+    "tables": 14,
+    "warnings": []
+  },
+  {
+    "file": "spells.md",
+    "headings": 379,
+    "sections": 380,
+    "tables": 19,
+    "warnings": []
+  }
+]

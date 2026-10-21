@@ -310,6 +310,8 @@ export const RuleCitation = z
   .object({
     source: z.enum(['srd-5.1', 'srd-5.2.1', 'house-rule', 'supplied-rule']),
     reference: RequiredText,
+    sectionId: z.string().min(1).optional(),
+    corpusRevision: z.string().min(1).optional(),
     page: Int.min(1).optional(),
   })
   .strict();

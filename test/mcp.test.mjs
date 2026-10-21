@@ -19,7 +19,7 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     await server.close();
   });
   const tools = (await client.listTools()).tools.map((t) => t.name);
-  assert.equal(tools.length, 29);
+  assert.equal(tools.length, 30);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));
   const result = await client.callTool({
@@ -50,6 +50,17 @@ test('MCP exposes only domain tools, validates input and reports revision confli
   assert.equal(invalid.isError, true);
   const rules = await client.callTool({ name: 'read_rules', arguments: { page: 6 } });
   assert.equal(rules.structuredContent.source.id, 'srd-5.2.1');
+  const toc = await client.callTool({ name: 'list_rule_sections', arguments: { limit: 2 } });
+  assert.equal(toc.structuredContent.sections.length, 2);
+  const sectionSearch = await client.callTool({
+    name: 'search_rules',
+    arguments: { query: 'Long Jump' },
+  });
+  const section = await client.callTool({
+    name: 'read_rules',
+    arguments: { sectionId: sectionSearch.structuredContent.hits[0].id },
+  });
+  assert.match(section.structuredContent.text, /Strength score/);
   const policy = await client.callTool({
     name: 'configure_review',
     arguments: {

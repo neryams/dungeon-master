@@ -17,7 +17,7 @@ import {
 } from './schema.js';
 import { actionStatus, gameplayFingerprint, reviewAction } from './review.js';
 import { applyPayload, CampaignError, rollDice } from './domain.js';
-import { ruleInputs, executeRules, ruleBook } from './rules.js';
+import { ruleInputs, executeRules, validateRuleCitation } from './rules.js';
 const text = z.string().trim().min(1).max(20000),
   metadata = Mutation.shape;
 export const refereeInputs = {
@@ -102,10 +102,12 @@ export const refereeDescriptions: Record<keyof typeof refereeInputs, string> = {
     'Rebase stale action context under a new ID, preserving rolled results and original procedure. Requires a new ruling before approval.',
   administer_campaign:
     'Explicit administrative bypass: record reason, adjudication and purpose, then apply changes or an optional roll. Never bypasses state validation. Use for unavailable delegation, overriding rulings, corrections or world preparation.',
+  list_rule_sections:
+    'Browse bounded edition-specific rule headings. Omit parentId for documents, or supply a section ID for its children.',
   search_rules:
-    'Search the bundled edition-specific official SRD text offline. Returns source/version and PDF page references, not inferred rules.',
+    'Search the bundled edition-specific official SRD text offline. Defaults to sections for 2024, pages for 2014. Use format=pages for the original PDF extraction.',
   read_rules:
-    'Read up to three bundled official SRD PDF pages by one-based PDF page number. Uses campaign edition unless explicitly overridden.',
+    'Read a sectionId and optional continuation part, or up to three PDF pages using page/count. Uses campaign edition unless explicitly overridden.',
 };
 function packet(
   state: State,
@@ -153,7 +155,7 @@ export async function executeReferee(
   name: keyof typeof refereeInputs,
   raw: unknown,
 ): Promise<unknown> {
-  if (name === 'search_rules' || name === 'read_rules')
+  if (name === 'search_rules' || name === 'read_rules' || name === 'list_rule_sections')
     return executeRules(name, raw, store.config.edition);
   if (name === 'get_action') {
     const i = refereeInputs[name].parse(raw),
@@ -186,22 +188,15 @@ export async function executeReferee(
         : name === 'amend_action_rolls'
           ? refereeInputs.amend_action_rolls.parse(raw).citations
           : [];
-  for (const citation of citations) {
-    if (citation.source.startsWith('srd-')) {
-      const book = await ruleBook(store.config.edition);
-      if (citation.source !== book.id || !citation.page || citation.page > book.pages.length)
+  const result = await store.transact(meta, { name, input: i }, async (state) => {
+    for (const citation of citations) {
+      await validateRuleCitation(citation, store.config.edition);
+      if (citation.source === 'house-rule' && !store.config.houseRules.includes(citation.reference))
         throw new CampaignError(
           'INVALID_CITATION',
-          'Use the campaign edition and a valid PDF page',
+          'House-rule citation must quote an existing configured house rule',
         );
     }
-    if (citation.source === 'house-rule' && !store.config.houseRules.includes(citation.reference))
-      throw new CampaignError(
-        'INVALID_CITATION',
-        'House-rule citation must quote an existing configured house rule',
-      );
-  }
-  const result = await store.transact(meta, { name, input: i }, (state) => {
     const base: Payload = { changes: [], records: [] };
     switch (name) {
       case 'configure_review': {

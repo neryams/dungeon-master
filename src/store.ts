@@ -155,7 +155,7 @@ export class CampaignStore {
   async transact(
     meta: Mutation,
     request: unknown,
-    make: (state: State, events: Event[]) => Payload,
+    make: (state: State, events: Event[]) => Payload | Promise<Payload>,
   ): Promise<{ event: Event; state: State; duplicate: boolean; warnings: string[] }> {
     meta = Mutation.parse(meta);
     const hash = createHash('sha256').update(stableJson(request)).digest('hex');
@@ -174,7 +174,7 @@ export class CampaignStore {
         throw new CampaignError('REVISION_CONFLICT', 'Reload current state before changing it', {
           currentRevision: state.revision,
         });
-      const payload = Payload.parse(make(structuredClone(state), events));
+      const payload = Payload.parse(await make(structuredClone(state), events));
       const recordIds = new Set(events.flatMap((e) => e.payload.records.map((r) => r.id)));
       for (const r of payload.records) {
         if (recordIds.has(r.id))

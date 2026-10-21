@@ -1,0 +1,4529 @@
+{
+  "corpusRevision": "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4:v1:84b1fe665277eaeb609f926bc6e210c619cf18fe7ed90ca4bb7d5a938d6efc62",
+  "method": "PDF contents/index pages 2–4 heading coverage with explicit extraction dispositions; representative mechanics against bundled official PDF extraction",
+  "coverage": [
+    {
+      "title": "Contents                                                          Fighter",
+      "pdfPage": 47,
+      "sectionIds": [
+        "classes/classes/fighter"
+      ],
+      "disposition": "PDF column/header extraction artifact"
+    },
+    {
+      "title": "Spells",
+      "pdfPage": 104,
+      "sectionIds": [
+        "magic-items/magic-items/crafting-magic-items/tools/spells",
+        "spells",
+        "spells/spells"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Fighter Subclass: Champion",
+      "pdfPage": 49,
+      "sectionIds": [
+        "classes/classes/fighter/fighter-subclass-champion"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gaining Spells",
+      "pdfPage": 104,
+      "sectionIds": [
+        "spells/spells/gaining-spells"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Monk",
+      "pdfPage": 49,
+      "sectionIds": [
+        "classes/classes/monk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Casting Spells",
+      "pdfPage": 104,
+      "sectionIds": [
+        "spells/spells/casting-spells"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Legal Information",
+      "pdfPage": 1,
+      "sectionIds": [],
+      "disposition": "Legal attribution retained separately in rules/ATTRIBUTION.md and vendor LICENSE"
+    },
+    {
+      "title": "Monk Subclass: Warrior of the Open                                       Spell Descriptions",
+      "pdfPage": 107,
+      "sectionIds": [
+        "spells/spells/spell-descriptions"
+      ],
+      "disposition": "PDF columns interleaved; Monk subclass independently present"
+    },
+    {
+      "title": "Hand",
+      "pdfPage": 52,
+      "sectionIds": [
+        "classes/classes/monk/monk-subclass-warrior-of-the-open-hand"
+      ],
+      "disposition": "PDF wrapped heading"
+    },
+    {
+      "title": "Rules Glossary",
+      "pdfPage": 176,
+      "sectionIds": [
+        "rules-glossary",
+        "rules-glossary/rules-glossary"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Playing the Game",
+      "pdfPage": 5,
+      "sectionIds": [
+        "playing-the-game",
+        "playing-the-game/playing-the-game"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Paladin",
+      "pdfPage": 53,
+      "sectionIds": [
+        "classes/classes/paladin"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rhythm of Play",
+      "pdfPage": 5,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/rhythm-of-play"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Paladin Spell List",
+      "pdfPage": 55,
+      "sectionIds": [
+        "classes/classes/paladin/paladin-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gameplay Toolbox",
+      "pdfPage": 192,
+      "sectionIds": [
+        "gameplay-toolbox",
+        "gameplay-toolbox/gameplay-toolbox"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "The Six Abilities",
+      "pdfPage": 5,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/the-six-abilities"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Travel Pace",
+      "pdfPage": 192,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/travel-pace",
+        "playing-the-game/playing-the-game/exploration/travel/travel-pace"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tests",
+      "pdfPage": 6,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/d20-tests"
+      ],
+      "disposition": "PDF TOC parser excludes digits in titles"
+    },
+    {
+      "title": "Ranger",
+      "pdfPage": 57,
+      "sectionIds": [
+        "classes/classes/ranger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Creating a Background",
+      "pdfPage": 192,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/creating-a-background"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ability Checks",
+      "pdfPage": 6,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/d20-tests/ability-checks",
+        "playing-the-game/playing-the-game/social-interaction/ability-checks"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ranger Spell List",
+      "pdfPage": 60,
+      "sectionIds": [
+        "classes/classes/ranger/ranger-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Curses and Magical Contagions",
+      "pdfPage": 193,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/curses-and-magical-contagions"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Saving Throws",
+      "pdfPage": 7,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/d20-tests/saving-throws",
+        "spells/spells/saving-throws"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ranger Subclass: Hunter",
+      "pdfPage": 61,
+      "sectionIds": [
+        "classes/classes/ranger/ranger-subclass-hunter"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Environmental Effects",
+      "pdfPage": 195,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/environmental-effects"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Attack Rolls",
+      "pdfPage": 7,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/d20-tests/attack-rolls",
+        "spells/spells/attack-rolls"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rogue",
+      "pdfPage": 61,
+      "sectionIds": [
+        "classes/classes/rogue"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Fear and Mental Stress",
+      "pdfPage": 196,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/fear-and-mental-stress"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Advantage/Disadvantage",
+      "pdfPage": 7,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/d20-tests/advantage-disadvantage"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rogue Subclass: Thief",
+      "pdfPage": 64,
+      "sectionIds": [
+        "classes/classes/rogue/rogue-subclass-thief"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Poison",
+      "pdfPage": 197,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/poison"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Proficiency",
+      "pdfPage": 8,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/proficiency",
+        "rules-glossary/rules-glossary/rules-definitions/proficiency"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sorcerer",
+      "pdfPage": 64,
+      "sectionIds": [
+        "classes/classes/sorcerer"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Traps",
+      "pdfPage": 199,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/traps"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Actions",
+      "pdfPage": 9,
+      "sectionIds": [
+        "animals/animals/allosaurus/actions",
+        "animals/animals/ankylosaurus/actions",
+        "animals/animals/ape/actions",
+        "animals/animals/archelon/actions",
+        "animals/animals/baboon/actions",
+        "animals/animals/badger/actions",
+        "animals/animals/bat/actions",
+        "animals/animals/black-bear/actions",
+        "animals/animals/blood-hawk/actions",
+        "animals/animals/boar/actions",
+        "animals/animals/brown-bear/actions",
+        "animals/animals/camel/actions",
+        "animals/animals/cat/actions",
+        "animals/animals/constrictor-snake/actions",
+        "animals/animals/crab/actions",
+        "animals/animals/crocodile/actions",
+        "animals/animals/deer/actions",
+        "animals/animals/dire-wolf/actions",
+        "animals/animals/draft-horse/actions",
+        "animals/animals/eagle/actions",
+        "animals/animals/elephant/actions",
+        "animals/animals/elk/actions",
+        "animals/animals/flying-snake/actions",
+        "animals/animals/frog/actions",
+        "animals/animals/giant-ape/actions",
+        "animals/animals/giant-badger/actions",
+        "animals/animals/giant-bat/actions",
+        "animals/animals/giant-boar/actions",
+        "animals/animals/giant-centipede/actions",
+        "animals/animals/giant-constrictor-snake/actions",
+        "animals/animals/giant-crab/actions",
+        "animals/animals/giant-crocodile/actions",
+        "animals/animals/giant-eagle/actions",
+        "animals/animals/giant-elk/actions",
+        "animals/animals/giant-fire-beetle/actions",
+        "animals/animals/giant-frog/actions",
+        "animals/animals/giant-goat/actions",
+        "animals/animals/giant-hyena/actions",
+        "animals/animals/giant-lizard/actions",
+        "animals/animals/giant-octopus/actions",
+        "animals/animals/giant-owl/actions",
+        "animals/animals/giant-rat/actions",
+        "animals/animals/giant-scorpion/actions",
+        "animals/animals/giant-seahorse/actions",
+        "animals/animals/giant-shark/actions",
+        "animals/animals/giant-spider/actions",
+        "animals/animals/giant-toad/actions",
+        "animals/animals/giant-venomous-snake/actions",
+        "animals/animals/giant-vulture/actions",
+        "animals/animals/giant-wasp/actions",
+        "animals/animals/giant-weasel/actions",
+        "animals/animals/giant-wolf-spider/actions",
+        "animals/animals/goat/actions",
+        "animals/animals/hawk/actions",
+        "animals/animals/hippopotamus/actions",
+        "animals/animals/hunter-shark/actions",
+        "animals/animals/hyena/actions",
+        "animals/animals/jackal/actions",
+        "animals/animals/killer-whale/actions",
+        "animals/animals/lion/actions",
+        "animals/animals/lizard/actions",
+        "animals/animals/mammoth/actions",
+        "animals/animals/mastiff/actions",
+        "animals/animals/mule/actions",
+        "animals/animals/octopus/actions",
+        "animals/animals/owl/actions",
+        "animals/animals/panther/actions",
+        "animals/animals/piranha/actions",
+        "animals/animals/plesiosaurus/actions",
+        "animals/animals/polar-bear/actions",
+        "animals/animals/pony/actions",
+        "animals/animals/pteranodon/actions",
+        "animals/animals/rat/actions",
+        "animals/animals/raven/actions",
+        "animals/animals/reef-shark/actions",
+        "animals/animals/rhinoceros/actions",
+        "animals/animals/riding-horse/actions",
+        "animals/animals/saber-toothed-tiger/actions",
+        "animals/animals/scorpion/actions",
+        "animals/animals/seahorse/actions",
+        "animals/animals/spider/actions",
+        "animals/animals/swarm-of-bats/actions",
+        "animals/animals/swarm-of-insects/actions",
+        "animals/animals/swarm-of-piranhas/actions",
+        "animals/animals/swarm-of-rats/actions",
+        "animals/animals/swarm-of-ravens/actions",
+        "animals/animals/swarm-of-venomous-snakes/actions",
+        "animals/animals/tiger/actions",
+        "animals/animals/triceratops/actions",
+        "animals/animals/tyrannosaurus-rex/actions",
+        "animals/animals/venomous-snake/actions",
+        "animals/animals/vulture/actions",
+        "animals/animals/warhorse/actions",
+        "animals/animals/weasel/actions",
+        "animals/animals/wolf/actions",
+        "magic-items/magic-items/magic-items-a-z/actions",
+        "monsters-A-Z/monsters-a-z/aboleth/aboleth/actions",
+        "monsters-A-Z/monsters-a-z/air-elemental/air-elemental/actions",
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-armor/actions",
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-flying-sword/actions",
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-rug-of-smothering/actions",
+        "monsters-A-Z/monsters-a-z/ankheg/ankheg/actions",
+        "monsters-A-Z/monsters-a-z/assassin/assassin/actions",
+        "monsters-A-Z/monsters-a-z/awakened-plants/awakened-shrub/actions",
+        "monsters-A-Z/monsters-a-z/awakened-plants/awakened-tree/actions",
+        "monsters-A-Z/monsters-a-z/axe-beak/axe-beak/actions",
+        "monsters-A-Z/monsters-a-z/azer/azer-sentinel/actions",
+        "monsters-A-Z/monsters-a-z/balor/balor/actions",
+        "monsters-A-Z/monsters-a-z/bandits/bandit/actions",
+        "monsters-A-Z/monsters-a-z/bandits/bandit-captain/actions",
+        "monsters-A-Z/monsters-a-z/barbed-devil/barbed-devil/actions",
+        "monsters-A-Z/monsters-a-z/basilisk/basilisk/actions",
+        "monsters-A-Z/monsters-a-z/bearded-devil/bearded-devil/actions",
+        "monsters-A-Z/monsters-a-z/behir/behir/actions",
+        "monsters-A-Z/monsters-a-z/berserker/berserker/actions",
+        "monsters-A-Z/monsters-a-z/black-dragons/black-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/black-dragons/young-black-dragon/actions",
+        "monsters-A-Z/monsters-a-z/black-dragons/adult-black-dragon/actions",
+        "monsters-A-Z/monsters-a-z/black-dragons/ancient-black-dragon/actions",
+        "monsters-A-Z/monsters-a-z/black-pudding/black-pudding/actions",
+        "monsters-A-Z/monsters-a-z/blink-dog/blink-dog/actions",
+        "monsters-A-Z/monsters-a-z/blue-dragons/blue-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/blue-dragons/young-blue-dragon/actions",
+        "monsters-A-Z/monsters-a-z/blue-dragons/adult-blue-dragon/actions",
+        "monsters-A-Z/monsters-a-z/blue-dragons/ancient-blue-dragon/actions",
+        "monsters-A-Z/monsters-a-z/bone-devil/bone-devil/actions",
+        "monsters-A-Z/monsters-a-z/brass-dragons/brass-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/brass-dragons/young-brass-dragon/actions",
+        "monsters-A-Z/monsters-a-z/brass-dragons/adult-brass-dragon/actions",
+        "monsters-A-Z/monsters-a-z/brass-dragons/ancient-brass-dragon/actions",
+        "monsters-A-Z/monsters-a-z/bronze-dragons/bronze-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/bronze-dragons/young-bronze-dragon/actions",
+        "monsters-A-Z/monsters-a-z/bronze-dragons/adult-bronze-dragon/actions",
+        "monsters-A-Z/monsters-a-z/bronze-dragons/ancient-bronze-dragon/actions",
+        "monsters-A-Z/monsters-a-z/bugbears/bugbear-stalker/actions",
+        "monsters-A-Z/monsters-a-z/bugbears/bugbear-warrior/actions",
+        "monsters-A-Z/monsters-a-z/bulette/bulette/actions",
+        "monsters-A-Z/monsters-a-z/centaur/centaur-trooper/actions",
+        "monsters-A-Z/monsters-a-z/chain-devil/chain-devil/actions",
+        "monsters-A-Z/monsters-a-z/chimera/chimera/actions",
+        "monsters-A-Z/monsters-a-z/chuul/chuul/actions",
+        "monsters-A-Z/monsters-a-z/clay-golem/clay-golem/actions",
+        "monsters-A-Z/monsters-a-z/cloaker/cloaker/actions",
+        "monsters-A-Z/monsters-a-z/cloud-giant/cloud-giant/actions",
+        "monsters-A-Z/monsters-a-z/cockatrice/cockatrice/actions",
+        "monsters-A-Z/monsters-a-z/commoner/commoner/actions",
+        "monsters-A-Z/monsters-a-z/copper-dragons/copper-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/copper-dragons/young-copper-dragon/actions",
+        "monsters-A-Z/monsters-a-z/copper-dragons/adult-copper-dragon/actions",
+        "monsters-A-Z/monsters-a-z/copper-dragons/ancient-copper-dragon/actions",
+        "monsters-A-Z/monsters-a-z/couatl/couatl/actions",
+        "monsters-A-Z/monsters-a-z/crawling-claw/swarm-of-crawling-claws/actions",
+        "monsters-A-Z/monsters-a-z/cultists/cultist/actions",
+        "monsters-A-Z/monsters-a-z/cultists/cultist-fanatic/actions",
+        "monsters-A-Z/monsters-a-z/darkmantle/darkmantle/actions",
+        "monsters-A-Z/monsters-a-z/death-dog/death-dog/actions",
+        "monsters-A-Z/monsters-a-z/deva/deva/actions",
+        "monsters-A-Z/monsters-a-z/djinni/djinni/actions",
+        "monsters-A-Z/monsters-a-z/doppelganger/doppelganger/actions",
+        "monsters-A-Z/monsters-a-z/dragon-turtle/dragon-turtle/actions",
+        "monsters-A-Z/monsters-a-z/dretch/dretch/actions",
+        "monsters-A-Z/monsters-a-z/drider/drider/actions",
+        "monsters-A-Z/monsters-a-z/druid/druid/actions",
+        "monsters-A-Z/monsters-a-z/dryad/dryad/actions",
+        "monsters-A-Z/monsters-a-z/earth-elemental/earth-elemental/actions",
+        "monsters-A-Z/monsters-a-z/efreeti/efreeti/actions",
+        "monsters-A-Z/monsters-a-z/erinyes/erinyes/actions",
+        "monsters-A-Z/monsters-a-z/ettercap/ettercap/actions",
+        "monsters-A-Z/monsters-a-z/ettin/ettin/actions",
+        "monsters-A-Z/monsters-a-z/fire-elemental/fire-elemental/actions",
+        "monsters-A-Z/monsters-a-z/fire-giant/fire-giant/actions",
+        "monsters-A-Z/monsters-a-z/flesh-golem/flesh-golem/actions",
+        "monsters-A-Z/monsters-a-z/frost-giant/frost-giant/actions",
+        "monsters-A-Z/monsters-a-z/fungi/violet-fungus/actions",
+        "monsters-A-Z/monsters-a-z/gargoyle/gargoyle/actions",
+        "monsters-A-Z/monsters-a-z/gelatinous-cube/gelatinous-cube/actions",
+        "monsters-A-Z/monsters-a-z/ghast/ghast/actions",
+        "monsters-A-Z/monsters-a-z/ghost/ghost/actions",
+        "monsters-A-Z/monsters-a-z/ghoul/ghoul/actions",
+        "monsters-A-Z/monsters-a-z/gibbering-mouther/gibbering-mouther/actions",
+        "monsters-A-Z/monsters-a-z/glabrezu/glabrezu/actions",
+        "monsters-A-Z/monsters-a-z/gladiator/gladiator/actions",
+        "monsters-A-Z/monsters-a-z/gnoll/gnoll-warrior/actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-minion/actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-warrior/actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-boss/actions",
+        "monsters-A-Z/monsters-a-z/gold-dragons/gold-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/gold-dragons/young-gold-dragon/actions",
+        "monsters-A-Z/monsters-a-z/gold-dragons/adult-gold-dragon/actions",
+        "monsters-A-Z/monsters-a-z/gold-dragons/ancient-gold-dragon/actions",
+        "monsters-A-Z/monsters-a-z/gorgon/gorgon/actions",
+        "monsters-A-Z/monsters-a-z/gray-ooze/gray-ooze/actions",
+        "monsters-A-Z/monsters-a-z/green-dragons/green-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/green-dragons/young-green-dragon/actions",
+        "monsters-A-Z/monsters-a-z/green-dragons/adult-green-dragon/actions",
+        "monsters-A-Z/monsters-a-z/green-dragons/ancient-green-dragon/actions",
+        "monsters-A-Z/monsters-a-z/green-hag/green-hag/actions",
+        "monsters-A-Z/monsters-a-z/grick/grick/actions",
+        "monsters-A-Z/monsters-a-z/griffon/griffon/actions",
+        "monsters-A-Z/monsters-a-z/grimlock/grimlock/actions",
+        "monsters-A-Z/monsters-a-z/guardian-naga/guardian-naga/actions",
+        "monsters-A-Z/monsters-a-z/guards/guard/actions",
+        "monsters-A-Z/monsters-a-z/guards/guard-captain/actions",
+        "monsters-A-Z/monsters-a-z/half-dragon/half-dragon/actions",
+        "monsters-A-Z/monsters-a-z/harpy/harpy/actions",
+        "monsters-A-Z/monsters-a-z/hell-hound/hell-hound/actions",
+        "monsters-A-Z/monsters-a-z/hezrou/hezrou/actions",
+        "monsters-A-Z/monsters-a-z/hill-giant/hill-giant/actions",
+        "monsters-A-Z/monsters-a-z/hippogriff/hippogriff/actions",
+        "monsters-A-Z/monsters-a-z/hobgoblins/hobgoblin-warrior/actions",
+        "monsters-A-Z/monsters-a-z/hobgoblins/hobgoblin-captain/actions",
+        "monsters-A-Z/monsters-a-z/homunculus/homunculus/actions",
+        "monsters-A-Z/monsters-a-z/horned-devil/horned-devil/actions",
+        "monsters-A-Z/monsters-a-z/hydra/hydra/actions",
+        "monsters-A-Z/monsters-a-z/ice-devil/ice-devil/actions",
+        "monsters-A-Z/monsters-a-z/imp/imp/actions",
+        "monsters-A-Z/monsters-a-z/incubus/incubus/actions",
+        "monsters-A-Z/monsters-a-z/invisible-stalker/invisible-stalker/actions",
+        "monsters-A-Z/monsters-a-z/iron-golem/iron-golem/actions",
+        "monsters-A-Z/monsters-a-z/knight/knight/actions",
+        "monsters-A-Z/monsters-a-z/kobold/kobold-warrior/actions",
+        "monsters-A-Z/monsters-a-z/kraken/kraken/actions",
+        "monsters-A-Z/monsters-a-z/lamia/lamia/actions",
+        "monsters-A-Z/monsters-a-z/lemure/lemure/actions",
+        "monsters-A-Z/monsters-a-z/lich/lich/actions",
+        "monsters-A-Z/monsters-a-z/mages/mage/actions",
+        "monsters-A-Z/monsters-a-z/mages/archmage/actions",
+        "monsters-A-Z/monsters-a-z/magmin/magmin/actions",
+        "monsters-A-Z/monsters-a-z/manticore/manticore/actions",
+        "monsters-A-Z/monsters-a-z/marilith/marilith/actions",
+        "monsters-A-Z/monsters-a-z/medusa/medusa/actions",
+        "monsters-A-Z/monsters-a-z/mephits/dust-mephit/actions",
+        "monsters-A-Z/monsters-a-z/mephits/ice-mephit/actions",
+        "monsters-A-Z/monsters-a-z/mephits/magma-mephit/actions",
+        "monsters-A-Z/monsters-a-z/mephits/steam-mephit/actions",
+        "monsters-A-Z/monsters-a-z/merfolk/merfolk-skirmisher/actions",
+        "monsters-A-Z/monsters-a-z/merrow/merrow/actions",
+        "monsters-A-Z/monsters-a-z/mimic/mimic/actions",
+        "monsters-A-Z/monsters-a-z/minotaur-of-baphomet/minotaur-of-baphomet/actions",
+        "monsters-A-Z/monsters-a-z/mummies/mummy/actions",
+        "monsters-A-Z/monsters-a-z/mummies/mummy-lord/actions",
+        "monsters-A-Z/monsters-a-z/nalfeshnee/nalfeshnee/actions",
+        "monsters-A-Z/monsters-a-z/night-hag/night-hag/actions",
+        "monsters-A-Z/monsters-a-z/nightmare/nightmare/actions",
+        "monsters-A-Z/monsters-a-z/noble/noble/actions",
+        "monsters-A-Z/monsters-a-z/ochre-jelly/ochre-jelly/actions",
+        "monsters-A-Z/monsters-a-z/ogre/ogre/actions",
+        "monsters-A-Z/monsters-a-z/oni/oni/actions",
+        "monsters-A-Z/monsters-a-z/otyugh/otyugh/actions",
+        "monsters-A-Z/monsters-a-z/owlbear/owlbear/actions",
+        "monsters-A-Z/monsters-a-z/pegasus/pegasus/actions",
+        "monsters-A-Z/monsters-a-z/phase-spider/phase-spider/actions",
+        "monsters-A-Z/monsters-a-z/pirates/pirate/actions",
+        "monsters-A-Z/monsters-a-z/pirates/pirate-captain/actions",
+        "monsters-A-Z/monsters-a-z/pit-fiend/pit-fiend/actions",
+        "monsters-A-Z/monsters-a-z/planetar/planetar/actions",
+        "monsters-A-Z/monsters-a-z/priests/priest-acolyte/actions",
+        "monsters-A-Z/monsters-a-z/priests/priest/actions",
+        "monsters-A-Z/monsters-a-z/pseudodragon/pseudodragon/actions",
+        "monsters-A-Z/monsters-a-z/purple-worm/purple-worm/actions",
+        "monsters-A-Z/monsters-a-z/quasit/quasit/actions",
+        "monsters-A-Z/monsters-a-z/rakshasa/rakshasa/actions",
+        "monsters-A-Z/monsters-a-z/red-dragons/red-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/red-dragons/young-red-dragon/actions",
+        "monsters-A-Z/monsters-a-z/red-dragons/adult-red-dragon/actions",
+        "monsters-A-Z/monsters-a-z/red-dragons/ancient-red-dragon/actions",
+        "monsters-A-Z/monsters-a-z/remorhaz/remorhaz/actions",
+        "monsters-A-Z/monsters-a-z/roc/roc/actions",
+        "monsters-A-Z/monsters-a-z/roper/roper/actions",
+        "monsters-A-Z/monsters-a-z/rust-monster/rust-monster/actions",
+        "monsters-A-Z/monsters-a-z/sahuagin/sahuagin-warrior/actions",
+        "monsters-A-Z/monsters-a-z/salamander/salamander/actions",
+        "monsters-A-Z/monsters-a-z/satyr/satyr/actions",
+        "monsters-A-Z/monsters-a-z/scout/scout/actions",
+        "monsters-A-Z/monsters-a-z/sea-hag/sea-hag/actions",
+        "monsters-A-Z/monsters-a-z/shadow/shadow/actions",
+        "monsters-A-Z/monsters-a-z/shambling-mound/shambling-mound/actions",
+        "monsters-A-Z/monsters-a-z/shield-guardian/shield-guardian/actions",
+        "monsters-A-Z/monsters-a-z/silver-dragons/silver-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/silver-dragons/young-silver-dragon/actions",
+        "monsters-A-Z/monsters-a-z/silver-dragons/adult-silver-dragon/actions",
+        "monsters-A-Z/monsters-a-z/silver-dragons/ancient-silver-dragon/actions",
+        "monsters-A-Z/monsters-a-z/skeletons/skeleton/actions",
+        "monsters-A-Z/monsters-a-z/skeletons/warhorse-skeleton/actions",
+        "monsters-A-Z/monsters-a-z/skeletons/minotaur-skeleton/actions",
+        "monsters-A-Z/monsters-a-z/solar/solar/actions",
+        "monsters-A-Z/monsters-a-z/specter/specter/actions",
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-wonder/actions",
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-lore/actions",
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-valor/actions",
+        "monsters-A-Z/monsters-a-z/spirit-naga/spirit-naga/actions",
+        "monsters-A-Z/monsters-a-z/sprite/sprite/actions",
+        "monsters-A-Z/monsters-a-z/spy/spy/actions",
+        "monsters-A-Z/monsters-a-z/stirge/stirge/actions",
+        "monsters-A-Z/monsters-a-z/stone-giant/stone-giant/actions",
+        "monsters-A-Z/monsters-a-z/stone-golem/stone-golem/actions",
+        "monsters-A-Z/monsters-a-z/storm-giant/storm-giant/actions",
+        "monsters-A-Z/monsters-a-z/succubus/succubus/actions",
+        "monsters-A-Z/monsters-a-z/tarrasque/tarrasque/actions",
+        "monsters-A-Z/monsters-a-z/toughs/tough/actions",
+        "monsters-A-Z/monsters-a-z/toughs/tough-boss/actions",
+        "monsters-A-Z/monsters-a-z/treant/treant/actions",
+        "monsters-A-Z/monsters-a-z/troll/troll/actions",
+        "monsters-A-Z/monsters-a-z/troll/troll-limb/actions",
+        "monsters-A-Z/monsters-a-z/unicorn/unicorn/actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire-familiar/actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire-spawn/actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire/actions",
+        "monsters-A-Z/monsters-a-z/vrock/vrock/actions",
+        "monsters-A-Z/monsters-a-z/warriors/warrior-infantry/actions",
+        "monsters-A-Z/monsters-a-z/warriors/warrior-veteran/actions",
+        "monsters-A-Z/monsters-a-z/water-elemental/water-elemental/actions",
+        "monsters-A-Z/monsters-a-z/werebear/werebear/actions",
+        "monsters-A-Z/monsters-a-z/wereboar/wereboar/actions",
+        "monsters-A-Z/monsters-a-z/wererat/wererat/actions",
+        "monsters-A-Z/monsters-a-z/weretiger/weretiger/actions",
+        "monsters-A-Z/monsters-a-z/werewolf/werewolf/actions",
+        "monsters-A-Z/monsters-a-z/white-dragons/white-dragon-wyrmling/actions",
+        "monsters-A-Z/monsters-a-z/white-dragons/young-white-dragon/actions",
+        "monsters-A-Z/monsters-a-z/white-dragons/adult-white-dragon/actions",
+        "monsters-A-Z/monsters-a-z/white-dragons/ancient-white-dragon/actions",
+        "monsters-A-Z/monsters-a-z/wight/wight/actions",
+        "monsters-A-Z/monsters-a-z/will-o-wisp/will-o-wisp/actions",
+        "monsters-A-Z/monsters-a-z/winter-wolf/winter-wolf/actions",
+        "monsters-A-Z/monsters-a-z/worg/worg/actions",
+        "monsters-A-Z/monsters-a-z/wraith/wraith/actions",
+        "monsters-A-Z/monsters-a-z/wyvern/wyvern/actions",
+        "monsters-A-Z/monsters-a-z/xorn/xorn/actions",
+        "monsters-A-Z/monsters-a-z/zombies/zombie/actions",
+        "monsters-A-Z/monsters-a-z/zombies/ogre-zombie/actions",
+        "monsters/monsters/parts-of-a-stat-block/actions",
+        "playing-the-game/playing-the-game/actions",
+        "spells/spells/spell-descriptions/animate-objects/animated-object/actions",
+        "spells/spells/spell-descriptions/find-steed/otherworldly-steed/actions",
+        "spells/spells/spell-descriptions/giant-insect/giant-insect/actions",
+        "spells/spells/spell-descriptions/summon-dragon/draconic-spirit/actions"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Metamagic Options",
+      "pdfPage": 66,
+      "sectionIds": [
+        "classes/classes/sorcerer/metamagic-options"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Combat Encounters",
+      "pdfPage": 202,
+      "sectionIds": [
+        "gameplay-toolbox/gameplay-toolbox/combat-encounters"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bonus Actions",
+      "pdfPage": 10,
+      "sectionIds": [
+        "animals/animals/elephant/bonus-actions",
+        "animals/animals/giant-ape/bonus-actions",
+        "animals/animals/giant-hyena/bonus-actions",
+        "animals/animals/giant-seahorse/bonus-actions",
+        "animals/animals/mammoth/bonus-actions",
+        "animals/animals/panther/bonus-actions",
+        "animals/animals/saber-toothed-tiger/bonus-actions",
+        "animals/animals/tiger/bonus-actions",
+        "monsters-A-Z/monsters-a-z/assassin/assassin/bonus-actions",
+        "monsters-A-Z/monsters-a-z/balor/balor/bonus-actions",
+        "monsters-A-Z/monsters-a-z/basilisk/basilisk/bonus-actions",
+        "monsters-A-Z/monsters-a-z/behir/behir/bonus-actions",
+        "monsters-A-Z/monsters-a-z/blink-dog/blink-dog/bonus-actions",
+        "monsters-A-Z/monsters-a-z/bugbears/bugbear-stalker/bonus-actions",
+        "monsters-A-Z/monsters-a-z/bulette/bulette/bonus-actions",
+        "monsters-A-Z/monsters-a-z/centaur/centaur-trooper/bonus-actions",
+        "monsters-A-Z/monsters-a-z/clay-golem/clay-golem/bonus-actions",
+        "monsters-A-Z/monsters-a-z/cloaker/cloaker/bonus-actions",
+        "monsters-A-Z/monsters-a-z/cloud-giant/cloud-giant/bonus-actions",
+        "monsters-A-Z/monsters-a-z/couatl/couatl/bonus-actions",
+        "monsters-A-Z/monsters-a-z/cultists/cultist-fanatic/bonus-actions",
+        "monsters-A-Z/monsters-a-z/deva/deva/bonus-actions",
+        "monsters-A-Z/monsters-a-z/doppelganger/doppelganger/bonus-actions",
+        "monsters-A-Z/monsters-a-z/drider/drider/bonus-actions",
+        "monsters-A-Z/monsters-a-z/dryad/dryad/bonus-actions",
+        "monsters-A-Z/monsters-a-z/ettercap/ettercap/bonus-actions",
+        "monsters-A-Z/monsters-a-z/frost-giant/frost-giant/bonus-actions",
+        "monsters-A-Z/monsters-a-z/gnoll/gnoll-warrior/bonus-actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-minion/bonus-actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-warrior/bonus-actions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-boss/bonus-actions",
+        "monsters-A-Z/monsters-a-z/gorgon/gorgon/bonus-actions",
+        "monsters-A-Z/monsters-a-z/half-dragon/half-dragon/bonus-actions",
+        "monsters-A-Z/monsters-a-z/hezrou/hezrou/bonus-actions",
+        "monsters-A-Z/monsters-a-z/incubus/incubus/bonus-actions",
+        "monsters-A-Z/monsters-a-z/lamia/lamia/bonus-actions",
+        "monsters-A-Z/monsters-a-z/mages/mage/bonus-actions",
+        "monsters-A-Z/monsters-a-z/mages/archmage/bonus-actions",
+        "monsters-A-Z/monsters-a-z/magmin/magmin/bonus-actions",
+        "monsters-A-Z/monsters-a-z/marilith/marilith/bonus-actions",
+        "monsters-A-Z/monsters-a-z/mimic/mimic/bonus-actions",
+        "monsters-A-Z/monsters-a-z/nalfeshnee/nalfeshnee/bonus-actions",
+        "monsters-A-Z/monsters-a-z/night-hag/night-hag/bonus-actions",
+        "monsters-A-Z/monsters-a-z/oni/oni/bonus-actions",
+        "monsters-A-Z/monsters-a-z/phase-spider/phase-spider/bonus-actions",
+        "monsters-A-Z/monsters-a-z/pirates/pirate-captain/bonus-actions",
+        "monsters-A-Z/monsters-a-z/planetar/planetar/bonus-actions",
+        "monsters-A-Z/monsters-a-z/priests/priest-acolyte/bonus-actions",
+        "monsters-A-Z/monsters-a-z/priests/priest/bonus-actions",
+        "monsters-A-Z/monsters-a-z/purple-worm/purple-worm/bonus-actions",
+        "monsters-A-Z/monsters-a-z/remorhaz/remorhaz/bonus-actions",
+        "monsters-A-Z/monsters-a-z/roc/roc/bonus-actions",
+        "monsters-A-Z/monsters-a-z/sahuagin/sahuagin-warrior/bonus-actions",
+        "monsters-A-Z/monsters-a-z/shadow/shadow/bonus-actions",
+        "monsters-A-Z/monsters-a-z/solar/solar/bonus-actions",
+        "monsters-A-Z/monsters-a-z/spy/spy/bonus-actions",
+        "monsters-A-Z/monsters-a-z/stone-golem/stone-golem/bonus-actions",
+        "monsters-A-Z/monsters-a-z/succubus/succubus/bonus-actions",
+        "monsters-A-Z/monsters-a-z/tarrasque/tarrasque/bonus-actions",
+        "monsters-A-Z/monsters-a-z/troll/troll/bonus-actions",
+        "monsters-A-Z/monsters-a-z/unicorn/unicorn/bonus-actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire-familiar/bonus-actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire-spawn/bonus-actions",
+        "monsters-A-Z/monsters-a-z/vampires/vampire/bonus-actions",
+        "monsters-A-Z/monsters-a-z/werebear/werebear/bonus-actions",
+        "monsters-A-Z/monsters-a-z/wereboar/wereboar/bonus-actions",
+        "monsters-A-Z/monsters-a-z/wererat/wererat/bonus-actions",
+        "monsters-A-Z/monsters-a-z/weretiger/weretiger/bonus-actions",
+        "monsters-A-Z/monsters-a-z/werewolf/werewolf/bonus-actions",
+        "monsters-A-Z/monsters-a-z/will-o-wisp/will-o-wisp/bonus-actions",
+        "monsters-A-Z/monsters-a-z/xorn/xorn/bonus-actions",
+        "playing-the-game/playing-the-game/actions/bonus-actions",
+        "spells/spells/spell-descriptions/find-steed/otherworldly-steed/bonus-actions",
+        "spells/spells/spell-descriptions/giant-insect/giant-insect/bonus-actions"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sorcerer Spell List",
+      "pdfPage": 67,
+      "sectionIds": [
+        "classes/classes/sorcerer/sorcerer-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Items",
+      "pdfPage": 204,
+      "sectionIds": [
+        "equipment/equipment/magic-items",
+        "magic-items",
+        "magic-items/magic-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Reactions",
+      "pdfPage": 10,
+      "sectionIds": [
+        "animals/animals/giant-octopus/reactions",
+        "animals/animals/octopus/reactions",
+        "monsters-A-Z/monsters-a-z/bandits/bandit-captain/reactions",
+        "monsters-A-Z/monsters-a-z/black-pudding/black-pudding/reactions",
+        "monsters-A-Z/monsters-a-z/chain-devil/chain-devil/reactions",
+        "monsters-A-Z/monsters-a-z/erinyes/erinyes/reactions",
+        "monsters-A-Z/monsters-a-z/fungi/shrieker-fungus/reactions",
+        "monsters-A-Z/monsters-a-z/gladiator/gladiator/reactions",
+        "monsters-A-Z/monsters-a-z/goblins/goblin-boss/reactions",
+        "monsters-A-Z/monsters-a-z/knight/knight/reactions",
+        "monsters-A-Z/monsters-a-z/lich/lich/reactions",
+        "monsters-A-Z/monsters-a-z/mages/mage/reactions",
+        "monsters-A-Z/monsters-a-z/mages/archmage/reactions",
+        "monsters-A-Z/monsters-a-z/marilith/marilith/reactions",
+        "monsters-A-Z/monsters-a-z/mummies/mummy-lord/reactions",
+        "monsters-A-Z/monsters-a-z/nalfeshnee/nalfeshnee/reactions",
+        "monsters-A-Z/monsters-a-z/noble/noble/reactions",
+        "monsters-A-Z/monsters-a-z/ochre-jelly/ochre-jelly/reactions",
+        "monsters-A-Z/monsters-a-z/pirates/pirate-captain/reactions",
+        "monsters-A-Z/monsters-a-z/rust-monster/rust-monster/reactions",
+        "monsters-A-Z/monsters-a-z/shield-guardian/shield-guardian/reactions",
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-wonder/reactions",
+        "monsters-A-Z/monsters-a-z/stone-giant/stone-giant/reactions",
+        "monsters-A-Z/monsters-a-z/warriors/warrior-veteran/reactions",
+        "monsters/monsters/parts-of-a-stat-block/reactions",
+        "playing-the-game/playing-the-game/actions/reactions"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Item Categories",
+      "pdfPage": 204,
+      "sectionIds": [
+        "magic-items/magic-items/magic-item-categories"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Social Interaction",
+      "pdfPage": 10,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/social-interaction"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warlock",
+      "pdfPage": 70,
+      "sectionIds": [
+        "classes/classes/warlock"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Item Rarity",
+      "pdfPage": 205,
+      "sectionIds": [
+        "magic-items/magic-items/magic-item-rarity"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Exploration",
+      "pdfPage": 11,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Eldritch Invocation Options",
+      "pdfPage": 72,
+      "sectionIds": [
+        "classes/classes/warlock/eldritch-invocation-options"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Activating a Magic Item",
+      "pdfPage": 206,
+      "sectionIds": [
+        "magic-items/magic-items/activating-a-magic-item"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vision and Light",
+      "pdfPage": 11,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration/vision-and-light"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warlock Spell List",
+      "pdfPage": 74,
+      "sectionIds": [
+        "classes/classes/warlock/warlock-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "“The Next Dawn”",
+      "pdfPage": 206,
+      "sectionIds": [
+        "magic-items/magic-items/the-next-dawn"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hiding",
+      "pdfPage": 11,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration/hiding"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warlock Subclass: Fiend Patron",
+      "pdfPage": 76,
+      "sectionIds": [
+        "classes/classes/warlock/warlock-subclass-fiend-patron"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cursed Items",
+      "pdfPage": 206,
+      "sectionIds": [
+        "magic-items/magic-items/cursed-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Interacting with Objects",
+      "pdfPage": 11,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration/interacting-with-objects"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wizard",
+      "pdfPage": 77,
+      "sectionIds": [
+        "classes/classes/wizard"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Item Resilience",
+      "pdfPage": 206,
+      "sectionIds": [
+        "magic-items/magic-items/magic-item-resilience"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hazards",
+      "pdfPage": 12,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration/hazards"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wizard Spell List",
+      "pdfPage": 79,
+      "sectionIds": [
+        "classes/classes/wizard/wizard-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Crafting Magic Items",
+      "pdfPage": 206,
+      "sectionIds": [
+        "magic-items/magic-items/crafting-magic-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Travel",
+      "pdfPage": 12,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/exploration/travel"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wizard Subclass: Evoker",
+      "pdfPage": 82,
+      "sectionIds": [
+        "classes/classes/wizard/wizard-subclass-evoker"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sentient Magic Items",
+      "pdfPage": 207,
+      "sectionIds": [
+        "magic-items/magic-items/sentient-magic-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Combat",
+      "pdfPage": 13,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "The Order of Combat",
+      "pdfPage": 13,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/the-order-of-combat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Character Origins",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins",
+        "character-origins/character-origins"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Items A–Z",
+      "pdfPage": 209,
+      "sectionIds": [
+        "magic-items/magic-items/magic-items-a-z"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Movement and Position",
+      "pdfPage": 14,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/movement-and-position"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Character Backgrounds",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Monsters",
+      "pdfPage": 254,
+      "sectionIds": [
+        "monsters",
+        "monsters/monsters"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Making an Attack",
+      "pdfPage": 14,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/making-an-attack"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Acolyte",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds/background-descriptions/acolyte"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Stat Block Overview",
+      "pdfPage": 254,
+      "sectionIds": [
+        "monsters/monsters/stat-block-overview"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ranged Attacks",
+      "pdfPage": 15,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/ranged-attacks"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Criminal",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds/background-descriptions/criminal"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Parts of a Stat Block",
+      "pdfPage": 254,
+      "sectionIds": [
+        "monsters/monsters/parts-of-a-stat-block"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Melee Attacks",
+      "pdfPage": 15,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/melee-attacks"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sage",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds/background-descriptions/sage"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Running a Monster",
+      "pdfPage": 255,
+      "sectionIds": [],
+      "disposition": "Present as a blockquote in monsters.md, not a Markdown heading"
+    },
+    {
+      "title": "Mounted Combat",
+      "pdfPage": 15,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/mounted-combat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Soldier",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds/background-descriptions/soldier"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Monsters A–Z",
+      "pdfPage": 258,
+      "sectionIds": [
+        "monsters-A-Z",
+        "monsters-A-Z/monsters-a-z"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Underwater Combat",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/combat/underwater-combat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Character Species",
+      "pdfPage": 83,
+      "sectionIds": [
+        "character-origins/character-origins/character-species"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dragonborn",
+      "pdfPage": 84,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/dragonborn"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Animals",
+      "pdfPage": 344,
+      "sectionIds": [
+        "animals",
+        "animals/animals"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Damage and Healing",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dwarf",
+      "pdfPage": 84,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/dwarf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hit Points",
+      "pdfPage": 16,
+      "sectionIds": [
+        "monsters/monsters/parts-of-a-stat-block/hit-points",
+        "playing-the-game/playing-the-game/damage-and-healing/hit-points",
+        "rules-glossary/rules-glossary/rules-definitions/hit-points"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Damage Rolls",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/damage-rolls"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Elf",
+      "pdfPage": 84,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/elf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Critical Hits",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/critical-hits"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gnome",
+      "pdfPage": 85,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/gnome"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Goliath",
+      "pdfPage": 85,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/goliath"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Saving Throws and Damage",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/saving-throws-and-damage"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Damage Types",
+      "pdfPage": 16,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/damage-types",
+        "rules-glossary/rules-glossary/rules-definitions/damage-types"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Halfling",
+      "pdfPage": 86,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/halfling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Resistance and Vulnerability",
+      "pdfPage": 17,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/resistance-and-vulnerability"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Human",
+      "pdfPage": 86,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/human"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Immunity",
+      "pdfPage": 17,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/immunity",
+        "rules-glossary/rules-glossary/rules-definitions/immunity"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Orc",
+      "pdfPage": 86,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/orc"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Aboleth",
+      "pdfPage": 258,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/aboleth",
+        "monsters-A-Z/monsters-a-z/aboleth/aboleth"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Healing",
+      "pdfPage": 17,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/healing",
+        "rules-glossary/rules-glossary/rules-definitions/healing"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tiefling",
+      "pdfPage": 86,
+      "sectionIds": [
+        "character-origins/character-origins/character-species/species-descriptions/tiefling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Black Dragon",
+      "pdfPage": 264,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/black-dragons/adult-black-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hit Points",
+      "pdfPage": 17,
+      "sectionIds": [
+        "monsters/monsters/parts-of-a-stat-block/hit-points",
+        "playing-the-game/playing-the-game/damage-and-healing/hit-points",
+        "rules-glossary/rules-glossary/rules-definitions/hit-points"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Feats",
+      "pdfPage": 87,
+      "sectionIds": [
+        "feats",
+        "feats/feats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Blue Dragon",
+      "pdfPage": 266,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/blue-dragons/adult-blue-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Temporary Hit Points",
+      "pdfPage": 18,
+      "sectionIds": [
+        "playing-the-game/playing-the-game/damage-and-healing/temporary-hit-points",
+        "rules-glossary/rules-glossary/rules-definitions/swim-speed/temporary-hit-points"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Feat Descriptions",
+      "pdfPage": 87,
+      "sectionIds": [
+        "feats/feats/feat-descriptions"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Brass Dragon",
+      "pdfPage": 268,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/brass-dragons/adult-brass-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Character Creation",
+      "pdfPage": 19,
+      "sectionIds": [
+        "character-creation",
+        "character-creation/character-creation"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Origin Feats",
+      "pdfPage": 87,
+      "sectionIds": [
+        "feats/feats/feat-descriptions/origin-feats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Bronze Dragon",
+      "pdfPage": 270,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bronze-dragons/adult-bronze-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Choose a Character Sheet",
+      "pdfPage": 19,
+      "sectionIds": [
+        "character-creation/character-creation/choose-a-character-sheet"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "General Feats",
+      "pdfPage": 87,
+      "sectionIds": [
+        "feats/feats/feat-descriptions/general-feats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Copper Dragon",
+      "pdfPage": 276,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/copper-dragons/adult-copper-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Create Your Character",
+      "pdfPage": 19,
+      "sectionIds": [
+        "character-creation/character-creation/create-your-character"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Fighting Style Feats",
+      "pdfPage": 87,
+      "sectionIds": [
+        "feats/feats/feat-descriptions/fighting-style-feats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Gold Dragon",
+      "pdfPage": 291,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gold-dragons/adult-gold-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Level Advancement",
+      "pdfPage": 23,
+      "sectionIds": [
+        "character-creation/character-creation/level-advancement"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Epic Boon Feats",
+      "pdfPage": 88,
+      "sectionIds": [
+        "feats/feats/feat-descriptions/epic-boon-feats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Green Dragon",
+      "pdfPage": 294,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/green-dragons/adult-green-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Starting at Higher Levels",
+      "pdfPage": 24,
+      "sectionIds": [
+        "character-creation/character-creation/starting-at-higher-levels"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Equipment",
+      "pdfPage": 89,
+      "sectionIds": [
+        "character-origins/character-origins/character-backgrounds/parts-of-a-background/equipment",
+        "equipment",
+        "equipment/equipment"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Red Dragon",
+      "pdfPage": 318,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/red-dragons/adult-red-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Multiclassing",
+      "pdfPage": 24,
+      "sectionIds": [
+        "character-creation/character-creation/multiclassing"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Coins",
+      "pdfPage": 89,
+      "sectionIds": [
+        "equipment/equipment/coins"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult Silver Dragon",
+      "pdfPage": 324,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/silver-dragons/adult-silver-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Trinkets",
+      "pdfPage": 26,
+      "sectionIds": [
+        "character-creation/character-creation/trinkets"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Weapons",
+      "pdfPage": 89,
+      "sectionIds": [
+        "equipment/equipment/weapons",
+        "magic-items/magic-items/magic-item-categories/weapons"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Adult White Dragon",
+      "pdfPage": 340,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/white-dragons/adult-white-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Properties",
+      "pdfPage": 89,
+      "sectionIds": [
+        "equipment/equipment/weapons/properties"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Air Elemental",
+      "pdfPage": 258,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/air-elemental",
+        "monsters-A-Z/monsters-a-z/air-elemental/air-elemental"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Classes",
+      "pdfPage": 28,
+      "sectionIds": [
+        "classes",
+        "classes/classes"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mastery Properties",
+      "pdfPage": 90,
+      "sectionIds": [
+        "equipment/equipment/weapons/mastery-properties"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Allosaurus",
+      "pdfPage": 344,
+      "sectionIds": [
+        "animals/animals/allosaurus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Barbarian",
+      "pdfPage": 28,
+      "sectionIds": [
+        "classes/classes/barbarian"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Armor",
+      "pdfPage": 92,
+      "sectionIds": [
+        "equipment/equipment/armor",
+        "magic-items/magic-items/magic-item-categories/armor"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Black Dragon",
+      "pdfPage": 265,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/black-dragons/ancient-black-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tools",
+      "pdfPage": 93,
+      "sectionIds": [
+        "equipment/equipment/tools",
+        "equipment/equipment/crafting-nonmagical-items/tools",
+        "magic-items/magic-items/crafting-magic-items/tools"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Blue Dragon",
+      "pdfPage": 267,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/blue-dragons/ancient-blue-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Path of the Berserker",
+      "pdfPage": 30,
+      "sectionIds": [
+        "classes/classes/barbarian/barbarian-subclass-path-of-the-berserker"
+      ],
+      "disposition": "Full subclass heading retained"
+    },
+    {
+      "title": "Adventuring Gear",
+      "pdfPage": 94,
+      "sectionIds": [
+        "equipment/equipment/adventuring-gear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Brass Dragon",
+      "pdfPage": 269,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/brass-dragons/ancient-brass-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bard",
+      "pdfPage": 31,
+      "sectionIds": [
+        "classes/classes/bard"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mounts and Vehicles",
+      "pdfPage": 100,
+      "sectionIds": [
+        "equipment/equipment/mounts-and-vehicles"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Bronze Dragon",
+      "pdfPage": 271,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bronze-dragons/ancient-bronze-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bard Spell List",
+      "pdfPage": 33,
+      "sectionIds": [
+        "classes/classes/bard/bard-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lifestyle Expenses",
+      "pdfPage": 101,
+      "sectionIds": [
+        "equipment/equipment/lifestyle-expenses"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Copper Dragon",
+      "pdfPage": 277,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/copper-dragons/ancient-copper-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Food, Drink, and Lodging",
+      "pdfPage": 101,
+      "sectionIds": [
+        "equipment/equipment/food-drink-and-lodging"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Gold Dragon",
+      "pdfPage": 292,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gold-dragons/ancient-gold-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "College of Lore",
+      "pdfPage": 35,
+      "sectionIds": [
+        "classes/classes/bard/bard-subclass-college-of-lore"
+      ],
+      "disposition": "Full subclass heading retained"
+    },
+    {
+      "title": "Hirelings",
+      "pdfPage": 102,
+      "sectionIds": [
+        "equipment/equipment/hirelings"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Green Dragon",
+      "pdfPage": 294,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/green-dragons/ancient-green-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cleric",
+      "pdfPage": 36,
+      "sectionIds": [
+        "classes/classes/cleric"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Spellcasting",
+      "pdfPage": 102,
+      "sectionIds": [
+        "character-creation/character-creation/multiclassing/class-features/spellcasting",
+        "equipment/equipment/spellcasting",
+        "monsters/monsters/parts-of-a-stat-block/actions/spellcasting"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Red Dragon",
+      "pdfPage": 319,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/red-dragons/ancient-red-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cleric Spell List",
+      "pdfPage": 38,
+      "sectionIds": [
+        "classes/classes/cleric/cleric-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magic Items",
+      "pdfPage": 102,
+      "sectionIds": [
+        "equipment/equipment/magic-items",
+        "magic-items",
+        "magic-items/magic-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient Silver Dragon",
+      "pdfPage": 325,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/silver-dragons/ancient-silver-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cleric Subclass: Life Domain",
+      "pdfPage": 40,
+      "sectionIds": [
+        "classes/classes/cleric/cleric-subclass-life-domain"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Crafting Nonmagical Items",
+      "pdfPage": 103,
+      "sectionIds": [
+        "equipment/equipment/crafting-nonmagical-items"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ancient White Dragon",
+      "pdfPage": 341,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/white-dragons/ancient-white-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Druid",
+      "pdfPage": 41,
+      "sectionIds": [
+        "classes/classes/druid",
+        "monsters-A-Z/monsters-a-z/druid",
+        "monsters-A-Z/monsters-a-z/druid/druid"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Brewing Potions of Healing",
+      "pdfPage": 103,
+      "sectionIds": [
+        "equipment/equipment/brewing-potions-of-healing"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Animated Armor",
+      "pdfPage": 259,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-armor"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Druid Spell List",
+      "pdfPage": 44,
+      "sectionIds": [
+        "classes/classes/druid/druid-spell-list"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Scribing Spell Scrolls",
+      "pdfPage": 103,
+      "sectionIds": [
+        "equipment/equipment/scribing-spell-scrolls"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Animated Flying Sword",
+      "pdfPage": 259,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-flying-sword"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Animated Rug of Smothering",
+      "pdfPage": 259,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/animated-objects/animated-rug-of-smothering"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Circle of the Land",
+      "pdfPage": 46,
+      "sectionIds": [
+        "classes/classes/druid/druid-subclass-circle-of-the-land"
+      ],
+      "disposition": "Full subclass heading retained"
+    },
+    {
+      "title": "Ankheg",
+      "pdfPage": 259,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ankheg",
+        "monsters-A-Z/monsters-a-z/ankheg/ankheg"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dryad",
+      "pdfPage": 282,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/dryad",
+        "monsters-A-Z/monsters-a-z/dryad/dryad"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Guard",
+      "pdfPage": 296,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/guards/guard"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ankylosaurus",
+      "pdfPage": 344,
+      "sectionIds": [
+        "animals/animals/ankylosaurus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dust Mephit",
+      "pdfPage": 307,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mephits/dust-mephit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Guard Captain",
+      "pdfPage": 296,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/guards/guard-captain"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ape",
+      "pdfPage": 344,
+      "sectionIds": [
+        "animals/animals/ape"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Eagle",
+      "pdfPage": 348,
+      "sectionIds": [
+        "animals/animals/eagle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Guardian Naga",
+      "pdfPage": 296,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/guardian-naga",
+        "monsters-A-Z/monsters-a-z/guardian-naga/guardian-naga"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Archelon",
+      "pdfPage": 344,
+      "sectionIds": [
+        "animals/animals/archelon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Earth Elemental",
+      "pdfPage": 282,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/earth-elemental",
+        "monsters-A-Z/monsters-a-z/earth-elemental/earth-elemental"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Half-Dragon",
+      "pdfPage": 297,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/half-dragon",
+        "monsters-A-Z/monsters-a-z/half-dragon/half-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Archmage",
+      "pdfPage": 305,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mages/archmage"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Efreeti",
+      "pdfPage": 283,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/efreeti",
+        "monsters-A-Z/monsters-a-z/efreeti/efreeti"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Harpy",
+      "pdfPage": 297,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/harpy",
+        "monsters-A-Z/monsters-a-z/harpy/harpy"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Assassin",
+      "pdfPage": 260,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/assassin",
+        "monsters-A-Z/monsters-a-z/assassin/assassin"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Elephant",
+      "pdfPage": 348,
+      "sectionIds": [
+        "animals/animals/elephant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hawk",
+      "pdfPage": 355,
+      "sectionIds": [
+        "animals/animals/hawk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Awakened Shrub",
+      "pdfPage": 260,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/awakened-plants/awakened-shrub"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Elk",
+      "pdfPage": 348,
+      "sectionIds": [
+        "animals/animals/elk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hell Hound",
+      "pdfPage": 297,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hell-hound",
+        "monsters-A-Z/monsters-a-z/hell-hound/hell-hound"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Awakened Tree",
+      "pdfPage": 260,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/awakened-plants/awakened-tree"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Erinyes",
+      "pdfPage": 283,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/erinyes",
+        "monsters-A-Z/monsters-a-z/erinyes/erinyes"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hezrou",
+      "pdfPage": 298,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hezrou",
+        "monsters-A-Z/monsters-a-z/hezrou/hezrou"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Axe Beak",
+      "pdfPage": 260,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/axe-beak",
+        "monsters-A-Z/monsters-a-z/axe-beak/axe-beak"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ettercap",
+      "pdfPage": 284,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ettercap",
+        "monsters-A-Z/monsters-a-z/ettercap/ettercap"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hill Giant",
+      "pdfPage": 298,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hill-giant",
+        "monsters-A-Z/monsters-a-z/hill-giant/hill-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Azer Sentinel",
+      "pdfPage": 261,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/azer/azer-sentinel"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ettin",
+      "pdfPage": 284,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ettin",
+        "monsters-A-Z/monsters-a-z/ettin/ettin"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hippogriff",
+      "pdfPage": 298,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hippogriff",
+        "monsters-A-Z/monsters-a-z/hippogriff/hippogriff"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Baboon",
+      "pdfPage": 345,
+      "sectionIds": [
+        "animals/animals/baboon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Fire Elemental",
+      "pdfPage": 284,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/fire-elemental",
+        "monsters-A-Z/monsters-a-z/fire-elemental/fire-elemental"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hippopotamus",
+      "pdfPage": 355,
+      "sectionIds": [
+        "animals/animals/hippopotamus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Badger",
+      "pdfPage": 345,
+      "sectionIds": [
+        "animals/animals/badger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Fire Giant",
+      "pdfPage": 285,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/fire-giant",
+        "monsters-A-Z/monsters-a-z/fire-giant/fire-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hobgoblin Captain",
+      "pdfPage": 299,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hobgoblins/hobgoblin-captain"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Balor",
+      "pdfPage": 261,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/balor",
+        "monsters-A-Z/monsters-a-z/balor/balor"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Flesh Golem",
+      "pdfPage": 285,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/flesh-golem",
+        "monsters-A-Z/monsters-a-z/flesh-golem/flesh-golem"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hobgoblin Warrior",
+      "pdfPage": 298,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hobgoblins/hobgoblin-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bandit",
+      "pdfPage": 261,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bandits/bandit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Flying Snake",
+      "pdfPage": 348,
+      "sectionIds": [
+        "animals/animals/flying-snake"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Homunculus",
+      "pdfPage": 299,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/homunculus",
+        "monsters-A-Z/monsters-a-z/homunculus/homunculus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bandit Captain",
+      "pdfPage": 261,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bandits/bandit-captain"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Frog",
+      "pdfPage": 348,
+      "sectionIds": [
+        "animals/animals/frog"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Horned Devil",
+      "pdfPage": 299,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/horned-devil",
+        "monsters-A-Z/monsters-a-z/horned-devil/horned-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Barbed Devil",
+      "pdfPage": 262,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/barbed-devil",
+        "monsters-A-Z/monsters-a-z/barbed-devil/barbed-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Frost Giant",
+      "pdfPage": 285,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/frost-giant",
+        "monsters-A-Z/monsters-a-z/frost-giant/frost-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hunter Shark",
+      "pdfPage": 356,
+      "sectionIds": [
+        "animals/animals/hunter-shark"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Basilisk",
+      "pdfPage": 262,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/basilisk",
+        "monsters-A-Z/monsters-a-z/basilisk/basilisk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gargoyle",
+      "pdfPage": 286,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gargoyle",
+        "monsters-A-Z/monsters-a-z/gargoyle/gargoyle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hydra",
+      "pdfPage": 300,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/hydra",
+        "monsters-A-Z/monsters-a-z/hydra/hydra"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bat",
+      "pdfPage": 345,
+      "sectionIds": [
+        "animals/animals/bat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gelatinous Cube",
+      "pdfPage": 286,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gelatinous-cube",
+        "monsters-A-Z/monsters-a-z/gelatinous-cube/gelatinous-cube"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Hyena",
+      "pdfPage": 356,
+      "sectionIds": [
+        "animals/animals/hyena"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bearded Devil",
+      "pdfPage": 262,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bearded-devil",
+        "monsters-A-Z/monsters-a-z/bearded-devil/bearded-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ghast",
+      "pdfPage": 287,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ghast",
+        "monsters-A-Z/monsters-a-z/ghast/ghast"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ice Devil",
+      "pdfPage": 300,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ice-devil",
+        "monsters-A-Z/monsters-a-z/ice-devil/ice-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Behir",
+      "pdfPage": 263,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/behir",
+        "monsters-A-Z/monsters-a-z/behir/behir"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ghost",
+      "pdfPage": 287,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ghost",
+        "monsters-A-Z/monsters-a-z/ghost/ghost"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ice Mephit",
+      "pdfPage": 307,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mephits/ice-mephit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Berserker",
+      "pdfPage": 263,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/berserker",
+        "monsters-A-Z/monsters-a-z/berserker/berserker"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ghoul",
+      "pdfPage": 288,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ghoul",
+        "monsters-A-Z/monsters-a-z/ghoul/ghoul"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Imp",
+      "pdfPage": 300,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/imp",
+        "monsters-A-Z/monsters-a-z/imp/imp"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Black Bear",
+      "pdfPage": 345,
+      "sectionIds": [
+        "animals/animals/black-bear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Ape",
+      "pdfPage": 349,
+      "sectionIds": [
+        "animals/animals/giant-ape"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Incubus",
+      "pdfPage": 301,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/incubus",
+        "monsters-A-Z/monsters-a-z/incubus/incubus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Black Dragon Wyrmling",
+      "pdfPage": 263,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/black-dragons/black-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Badger",
+      "pdfPage": 349,
+      "sectionIds": [
+        "animals/animals/giant-badger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Invisible Stalker",
+      "pdfPage": 301,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/invisible-stalker",
+        "monsters-A-Z/monsters-a-z/invisible-stalker/invisible-stalker"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Black Pudding",
+      "pdfPage": 265,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/black-pudding",
+        "monsters-A-Z/monsters-a-z/black-pudding/black-pudding"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Bat",
+      "pdfPage": 349,
+      "sectionIds": [
+        "animals/animals/giant-bat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Iron Golem",
+      "pdfPage": 302,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/iron-golem",
+        "monsters-A-Z/monsters-a-z/iron-golem/iron-golem"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Blink Dog",
+      "pdfPage": 266,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/blink-dog",
+        "monsters-A-Z/monsters-a-z/blink-dog/blink-dog"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Boar",
+      "pdfPage": 349,
+      "sectionIds": [
+        "animals/animals/giant-boar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Jackal",
+      "pdfPage": 356,
+      "sectionIds": [
+        "animals/animals/jackal"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Blood Hawk",
+      "pdfPage": 345,
+      "sectionIds": [
+        "animals/animals/blood-hawk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Centipede",
+      "pdfPage": 349,
+      "sectionIds": [
+        "animals/animals/giant-centipede"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Killer Whale",
+      "pdfPage": 356,
+      "sectionIds": [
+        "animals/animals/killer-whale"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Blue Dragon Wyrmling",
+      "pdfPage": 266,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/blue-dragons/blue-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Constrictor Snake",
+      "pdfPage": 350,
+      "sectionIds": [
+        "animals/animals/giant-constrictor-snake"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Knight",
+      "pdfPage": 302,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/knight",
+        "monsters-A-Z/monsters-a-z/knight/knight"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Boar",
+      "pdfPage": 346,
+      "sectionIds": [
+        "animals/animals/boar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Crab",
+      "pdfPage": 350,
+      "sectionIds": [
+        "animals/animals/giant-crab"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Kobold Warrior",
+      "pdfPage": 302,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/kobold/kobold-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bone Devil",
+      "pdfPage": 267,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bone-devil",
+        "monsters-A-Z/monsters-a-z/bone-devil/bone-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Crocodile",
+      "pdfPage": 350,
+      "sectionIds": [
+        "animals/animals/giant-crocodile"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Kraken",
+      "pdfPage": 303,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/kraken",
+        "monsters-A-Z/monsters-a-z/kraken/kraken"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Brass Dragon Wyrmling",
+      "pdfPage": 268,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/brass-dragons/brass-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Eagle",
+      "pdfPage": 350,
+      "sectionIds": [
+        "animals/animals/giant-eagle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lamia",
+      "pdfPage": 303,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/lamia",
+        "monsters-A-Z/monsters-a-z/lamia/lamia"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bronze Dragon Wyrmling",
+      "pdfPage": 269,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bronze-dragons/bronze-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Elk",
+      "pdfPage": 351,
+      "sectionIds": [
+        "animals/animals/giant-elk"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lemure",
+      "pdfPage": 304,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/lemure",
+        "monsters-A-Z/monsters-a-z/lemure/lemure"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Brown Bear",
+      "pdfPage": 346,
+      "sectionIds": [
+        "animals/animals/brown-bear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Fire Beetle",
+      "pdfPage": 351,
+      "sectionIds": [
+        "animals/animals/giant-fire-beetle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lich",
+      "pdfPage": 304,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/lich",
+        "monsters-A-Z/monsters-a-z/lich/lich"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bugbear Stalker",
+      "pdfPage": 271,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bugbears/bugbear-stalker"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Frog",
+      "pdfPage": 351,
+      "sectionIds": [
+        "animals/animals/giant-frog"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lion",
+      "pdfPage": 356,
+      "sectionIds": [
+        "animals/animals/lion"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bugbear Warrior",
+      "pdfPage": 272,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bugbears/bugbear-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Goat",
+      "pdfPage": 351,
+      "sectionIds": [
+        "animals/animals/giant-goat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Lizard",
+      "pdfPage": 357,
+      "sectionIds": [
+        "animals/animals/lizard"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Bulette",
+      "pdfPage": 272,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bulette",
+        "monsters-A-Z/monsters-a-z/bulette/bulette"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Hyena",
+      "pdfPage": 352,
+      "sectionIds": [
+        "animals/animals/giant-hyena"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mage",
+      "pdfPage": 305,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mages/mage"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Camel",
+      "pdfPage": 346,
+      "sectionIds": [
+        "animals/animals/camel"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Lizard",
+      "pdfPage": 352,
+      "sectionIds": [
+        "animals/animals/giant-lizard"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magma Mephit",
+      "pdfPage": 307,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mephits/magma-mephit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cat",
+      "pdfPage": 346,
+      "sectionIds": [
+        "animals/animals/cat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Octopus",
+      "pdfPage": 352,
+      "sectionIds": [
+        "animals/animals/giant-octopus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Magmin",
+      "pdfPage": 305,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/magmin",
+        "monsters-A-Z/monsters-a-z/magmin/magmin"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Centaur Trooper",
+      "pdfPage": 272,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/centaur/centaur-trooper"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Owl",
+      "pdfPage": 352,
+      "sectionIds": [
+        "animals/animals/giant-owl"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mammoth",
+      "pdfPage": 357,
+      "sectionIds": [
+        "animals/animals/mammoth"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Chain Devil",
+      "pdfPage": 272,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/chain-devil",
+        "monsters-A-Z/monsters-a-z/chain-devil/chain-devil"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Rat",
+      "pdfPage": 353,
+      "sectionIds": [
+        "animals/animals/giant-rat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Manticore",
+      "pdfPage": 306,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/manticore",
+        "monsters-A-Z/monsters-a-z/manticore/manticore"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Chimera",
+      "pdfPage": 273,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/chimera",
+        "monsters-A-Z/monsters-a-z/chimera/chimera"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Scorpion",
+      "pdfPage": 353,
+      "sectionIds": [
+        "animals/animals/giant-scorpion"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Marilith",
+      "pdfPage": 306,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/marilith",
+        "monsters-A-Z/monsters-a-z/marilith/marilith"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Chuul",
+      "pdfPage": 273,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/chuul",
+        "monsters-A-Z/monsters-a-z/chuul/chuul"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Seahorse",
+      "pdfPage": 353,
+      "sectionIds": [
+        "animals/animals/giant-seahorse"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mastiff",
+      "pdfPage": 357,
+      "sectionIds": [
+        "animals/animals/mastiff"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Clay Golem",
+      "pdfPage": 274,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/clay-golem",
+        "monsters-A-Z/monsters-a-z/clay-golem/clay-golem"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Shark",
+      "pdfPage": 353,
+      "sectionIds": [
+        "animals/animals/giant-shark"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Medusa",
+      "pdfPage": 306,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/medusa",
+        "monsters-A-Z/monsters-a-z/medusa/medusa"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cloaker",
+      "pdfPage": 274,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/cloaker",
+        "monsters-A-Z/monsters-a-z/cloaker/cloaker"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Spider",
+      "pdfPage": 353,
+      "sectionIds": [
+        "animals/animals/giant-spider"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Merfolk Skirmisher",
+      "pdfPage": 308,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/merfolk/merfolk-skirmisher"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cloud Giant",
+      "pdfPage": 275,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/cloud-giant",
+        "monsters-A-Z/monsters-a-z/cloud-giant/cloud-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Toad",
+      "pdfPage": 354,
+      "sectionIds": [
+        "animals/animals/giant-toad"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Merrow",
+      "pdfPage": 308,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/merrow",
+        "monsters-A-Z/monsters-a-z/merrow/merrow"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cockatrice",
+      "pdfPage": 275,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/cockatrice",
+        "monsters-A-Z/monsters-a-z/cockatrice/cockatrice"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Venomous Snake",
+      "pdfPage": 354,
+      "sectionIds": [
+        "animals/animals/giant-venomous-snake"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mimic",
+      "pdfPage": 308,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mimic",
+        "monsters-A-Z/monsters-a-z/mimic/mimic"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Commoner",
+      "pdfPage": 275,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/commoner",
+        "monsters-A-Z/monsters-a-z/commoner/commoner"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Vulture",
+      "pdfPage": 354,
+      "sectionIds": [
+        "animals/animals/giant-vulture"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Minotaur of Baphomet",
+      "pdfPage": 309,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/minotaur-of-baphomet",
+        "monsters-A-Z/monsters-a-z/minotaur-of-baphomet/minotaur-of-baphomet"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Constrictor Snake",
+      "pdfPage": 346,
+      "sectionIds": [
+        "animals/animals/constrictor-snake"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Wasp",
+      "pdfPage": 354,
+      "sectionIds": [
+        "animals/animals/giant-wasp"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Minotaur Skeleton",
+      "pdfPage": 326,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/skeletons/minotaur-skeleton"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Copper Dragon Wyrmling",
+      "pdfPage": 275,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/copper-dragons/copper-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Weasel",
+      "pdfPage": 355,
+      "sectionIds": [
+        "animals/animals/giant-weasel"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mule",
+      "pdfPage": 357,
+      "sectionIds": [
+        "animals/animals/mule"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Couatl",
+      "pdfPage": 277,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/couatl",
+        "monsters-A-Z/monsters-a-z/couatl/couatl"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Giant Wolf Spider",
+      "pdfPage": 355,
+      "sectionIds": [
+        "animals/animals/giant-wolf-spider"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mummy",
+      "pdfPage": 309,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mummies/mummy"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Crab",
+      "pdfPage": 347,
+      "sectionIds": [
+        "animals/animals/crab"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gibbering Mouther",
+      "pdfPage": 288,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gibbering-mouther",
+        "monsters-A-Z/monsters-a-z/gibbering-mouther/gibbering-mouther"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Mummy Lord",
+      "pdfPage": 309,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mummies/mummy-lord"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Crocodile",
+      "pdfPage": 347,
+      "sectionIds": [
+        "animals/animals/crocodile"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Glabrezu",
+      "pdfPage": 289,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/glabrezu",
+        "monsters-A-Z/monsters-a-z/glabrezu/glabrezu"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Nalfeshnee",
+      "pdfPage": 310,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/nalfeshnee",
+        "monsters-A-Z/monsters-a-z/nalfeshnee/nalfeshnee"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cultist",
+      "pdfPage": 278,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/cultists/cultist"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gladiator",
+      "pdfPage": 289,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gladiator",
+        "monsters-A-Z/monsters-a-z/gladiator/gladiator"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Night Hag",
+      "pdfPage": 311,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/night-hag",
+        "monsters-A-Z/monsters-a-z/night-hag/night-hag"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Cultist Fanatic",
+      "pdfPage": 278,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/cultists/cultist-fanatic"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gnoll Warrior",
+      "pdfPage": 289,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gnoll/gnoll-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Nightmare",
+      "pdfPage": 311,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/nightmare",
+        "monsters-A-Z/monsters-a-z/nightmare/nightmare"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Darkmantle",
+      "pdfPage": 278,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/darkmantle",
+        "monsters-A-Z/monsters-a-z/darkmantle/darkmantle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Goat",
+      "pdfPage": 355,
+      "sectionIds": [
+        "animals/animals/goat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Noble",
+      "pdfPage": 312,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/noble",
+        "monsters-A-Z/monsters-a-z/noble/noble"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Death Dog",
+      "pdfPage": 279,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/death-dog",
+        "monsters-A-Z/monsters-a-z/death-dog/death-dog"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Goblin Boss",
+      "pdfPage": 290,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/goblins/goblin-boss"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ochre Jelly",
+      "pdfPage": 312,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ochre-jelly",
+        "monsters-A-Z/monsters-a-z/ochre-jelly/ochre-jelly"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Deer",
+      "pdfPage": 347,
+      "sectionIds": [
+        "animals/animals/deer"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Goblin Minion",
+      "pdfPage": 290,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/goblins/goblin-minion"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Octopus",
+      "pdfPage": 357,
+      "sectionIds": [
+        "animals/animals/octopus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Deva",
+      "pdfPage": 279,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/deva",
+        "monsters-A-Z/monsters-a-z/deva/deva"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Goblin Warrior",
+      "pdfPage": 290,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/goblins/goblin-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ogre",
+      "pdfPage": 312,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/ogre",
+        "monsters-A-Z/monsters-a-z/ogre/ogre"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dire Wolf",
+      "pdfPage": 347,
+      "sectionIds": [
+        "animals/animals/dire-wolf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gold Dragon Wyrmling",
+      "pdfPage": 290,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gold-dragons/gold-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Ogre Zombie",
+      "pdfPage": 344,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/zombies/ogre-zombie"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Djinni",
+      "pdfPage": 280,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/djinni",
+        "monsters-A-Z/monsters-a-z/djinni/djinni"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gorgon",
+      "pdfPage": 292,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gorgon",
+        "monsters-A-Z/monsters-a-z/gorgon/gorgon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Oni",
+      "pdfPage": 312,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/oni",
+        "monsters-A-Z/monsters-a-z/oni/oni"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Doppelganger",
+      "pdfPage": 280,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/doppelganger",
+        "monsters-A-Z/monsters-a-z/doppelganger/doppelganger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Gray Ooze",
+      "pdfPage": 293,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gray-ooze",
+        "monsters-A-Z/monsters-a-z/gray-ooze/gray-ooze"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Otyugh",
+      "pdfPage": 313,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/otyugh",
+        "monsters-A-Z/monsters-a-z/otyugh/otyugh"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Draft Horse",
+      "pdfPage": 347,
+      "sectionIds": [
+        "animals/animals/draft-horse"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Green Dragon Wyrmling",
+      "pdfPage": 293,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/green-dragons/green-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Owl",
+      "pdfPage": 358,
+      "sectionIds": [
+        "animals/animals/owl"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dragon Turtle",
+      "pdfPage": 281,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/dragon-turtle",
+        "monsters-A-Z/monsters-a-z/dragon-turtle/dragon-turtle"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Green Hag",
+      "pdfPage": 295,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/green-hag",
+        "monsters-A-Z/monsters-a-z/green-hag/green-hag"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Owlbear",
+      "pdfPage": 313,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/owlbear",
+        "monsters-A-Z/monsters-a-z/owlbear/owlbear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Dretch",
+      "pdfPage": 281,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/dretch",
+        "monsters-A-Z/monsters-a-z/dretch/dretch"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Grick",
+      "pdfPage": 295,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/grick",
+        "monsters-A-Z/monsters-a-z/grick/grick"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Panther",
+      "pdfPage": 358,
+      "sectionIds": [
+        "animals/animals/panther"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Drider",
+      "pdfPage": 281,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/drider",
+        "monsters-A-Z/monsters-a-z/drider/drider"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Griffon",
+      "pdfPage": 295,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/griffon",
+        "monsters-A-Z/monsters-a-z/griffon/griffon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pegasus",
+      "pdfPage": 313,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/pegasus",
+        "monsters-A-Z/monsters-a-z/pegasus/pegasus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Druid",
+      "pdfPage": 282,
+      "sectionIds": [
+        "classes/classes/druid",
+        "monsters-A-Z/monsters-a-z/druid",
+        "monsters-A-Z/monsters-a-z/druid/druid"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Grimlock",
+      "pdfPage": 296,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/grimlock",
+        "monsters-A-Z/monsters-a-z/grimlock/grimlock"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Phase Spider",
+      "pdfPage": 313,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/phase-spider",
+        "monsters-A-Z/monsters-a-z/phase-spider/phase-spider"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Piranha",
+      "pdfPage": 358,
+      "sectionIds": [
+        "animals/animals/piranha"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Treant",
+      "pdfPage": 333,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/treant",
+        "monsters-A-Z/monsters-a-z/treant/treant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pirate",
+      "pdfPage": 314,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/pirates/pirate"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Triceratops",
+      "pdfPage": 363,
+      "sectionIds": [
+        "animals/animals/triceratops"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pirate Captain",
+      "pdfPage": 314,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/pirates/pirate-captain"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Troll",
+      "pdfPage": 333,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/troll",
+        "monsters-A-Z/monsters-a-z/troll/troll"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pit Fiend",
+      "pdfPage": 314,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/pit-fiend",
+        "monsters-A-Z/monsters-a-z/pit-fiend/pit-fiend"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Troll Limb",
+      "pdfPage": 333,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/troll/troll-limb"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Planetar",
+      "pdfPage": 315,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/planetar",
+        "monsters-A-Z/monsters-a-z/planetar/planetar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tyrannosaurus Rex",
+      "pdfPage": 363,
+      "sectionIds": [
+        "animals/animals/tyrannosaurus-rex"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Plesiosaurus",
+      "pdfPage": 358,
+      "sectionIds": [
+        "animals/animals/plesiosaurus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Unicorn",
+      "pdfPage": 334,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/unicorn",
+        "monsters-A-Z/monsters-a-z/unicorn/unicorn"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Polar Bear",
+      "pdfPage": 359,
+      "sectionIds": [
+        "animals/animals/polar-bear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vampire",
+      "pdfPage": 335,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/vampires/vampire"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pony",
+      "pdfPage": 359,
+      "sectionIds": [
+        "animals/animals/pony"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vampire Familiar",
+      "pdfPage": 334,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/vampires/vampire-familiar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Priest",
+      "pdfPage": 316,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/priests/priest"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vampire Spawn",
+      "pdfPage": 334,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/vampires/vampire-spawn"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Priest Acolyte",
+      "pdfPage": 316,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/priests/priest-acolyte"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Venomous Snake",
+      "pdfPage": 363,
+      "sectionIds": [
+        "animals/animals/venomous-snake"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pseudodragon",
+      "pdfPage": 316,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/pseudodragon",
+        "monsters-A-Z/monsters-a-z/pseudodragon/pseudodragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Violet Fungus",
+      "pdfPage": 286,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/fungi/violet-fungus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Pteranodon",
+      "pdfPage": 359,
+      "sectionIds": [
+        "animals/animals/pteranodon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vrock",
+      "pdfPage": 336,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/vrock",
+        "monsters-A-Z/monsters-a-z/vrock/vrock"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Purple Worm",
+      "pdfPage": 316,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/purple-worm",
+        "monsters-A-Z/monsters-a-z/purple-worm/purple-worm"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Vulture",
+      "pdfPage": 363,
+      "sectionIds": [
+        "animals/animals/vulture"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Quasit",
+      "pdfPage": 317,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/quasit",
+        "monsters-A-Z/monsters-a-z/quasit/quasit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warhorse",
+      "pdfPage": 364,
+      "sectionIds": [
+        "animals/animals/warhorse"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rakshasa",
+      "pdfPage": 317,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/rakshasa",
+        "monsters-A-Z/monsters-a-z/rakshasa/rakshasa"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warhorse Skeleton",
+      "pdfPage": 326,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/skeletons/warhorse-skeleton"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rat",
+      "pdfPage": 359,
+      "sectionIds": [
+        "animals/animals/rat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warrior Infantry",
+      "pdfPage": 336,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/warriors/warrior-infantry"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Raven",
+      "pdfPage": 359,
+      "sectionIds": [
+        "animals/animals/raven"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Warrior Veteran",
+      "pdfPage": 337,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/warriors/warrior-veteran"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Red Dragon Wyrmling",
+      "pdfPage": 318,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/red-dragons/red-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Water Elemental",
+      "pdfPage": 337,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/water-elemental",
+        "monsters-A-Z/monsters-a-z/water-elemental/water-elemental"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Reef Shark",
+      "pdfPage": 360,
+      "sectionIds": [
+        "animals/animals/reef-shark"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Weasel",
+      "pdfPage": 364,
+      "sectionIds": [
+        "animals/animals/weasel"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Remorhaz",
+      "pdfPage": 319,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/remorhaz",
+        "monsters-A-Z/monsters-a-z/remorhaz/remorhaz"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Werebear",
+      "pdfPage": 337,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/werebear",
+        "monsters-A-Z/monsters-a-z/werebear/werebear"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rhinoceros",
+      "pdfPage": 360,
+      "sectionIds": [
+        "animals/animals/rhinoceros"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wereboar",
+      "pdfPage": 338,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/wereboar",
+        "monsters-A-Z/monsters-a-z/wereboar/wereboar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Riding Horse",
+      "pdfPage": 360,
+      "sectionIds": [
+        "animals/animals/riding-horse"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wererat",
+      "pdfPage": 338,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/wererat",
+        "monsters-A-Z/monsters-a-z/wererat/wererat"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Roc",
+      "pdfPage": 320,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/roc",
+        "monsters-A-Z/monsters-a-z/roc/roc"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Weretiger",
+      "pdfPage": 339,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/weretiger",
+        "monsters-A-Z/monsters-a-z/weretiger/weretiger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Roper",
+      "pdfPage": 320,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/roper",
+        "monsters-A-Z/monsters-a-z/roper/roper"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Werewolf",
+      "pdfPage": 339,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/werewolf",
+        "monsters-A-Z/monsters-a-z/werewolf/werewolf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Rust Monster",
+      "pdfPage": 320,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/rust-monster",
+        "monsters-A-Z/monsters-a-z/rust-monster/rust-monster"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "White Dragon Wyrmling",
+      "pdfPage": 339,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/white-dragons/white-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Saber-Toothed Tiger",
+      "pdfPage": 360,
+      "sectionIds": [
+        "animals/animals/saber-toothed-tiger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wight",
+      "pdfPage": 341,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/wight",
+        "monsters-A-Z/monsters-a-z/wight/wight"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sahuagin Warrior",
+      "pdfPage": 321,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sahuagin/sahuagin-warrior"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Will-o’-Wisp",
+      "pdfPage": 341,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/will-o-wisp",
+        "monsters-A-Z/monsters-a-z/will-o-wisp/will-o-wisp"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Salamander",
+      "pdfPage": 321,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/salamander",
+        "monsters-A-Z/monsters-a-z/salamander/salamander"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Winter Wolf",
+      "pdfPage": 342,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/winter-wolf",
+        "monsters-A-Z/monsters-a-z/winter-wolf/winter-wolf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Satyr",
+      "pdfPage": 321,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/satyr",
+        "monsters-A-Z/monsters-a-z/satyr/satyr"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wolf",
+      "pdfPage": 364,
+      "sectionIds": [
+        "animals/animals/wolf"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Scorpion",
+      "pdfPage": 360,
+      "sectionIds": [
+        "animals/animals/scorpion"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Worg",
+      "pdfPage": 342,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/worg",
+        "monsters-A-Z/monsters-a-z/worg/worg"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Scout",
+      "pdfPage": 322,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/scout",
+        "monsters-A-Z/monsters-a-z/scout/scout"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wraith",
+      "pdfPage": 342,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/wraith",
+        "monsters-A-Z/monsters-a-z/wraith/wraith"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sea Hag",
+      "pdfPage": 322,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sea-hag",
+        "monsters-A-Z/monsters-a-z/sea-hag/sea-hag"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Wyvern",
+      "pdfPage": 343,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/wyvern",
+        "monsters-A-Z/monsters-a-z/wyvern/wyvern"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Seahorse",
+      "pdfPage": 361,
+      "sectionIds": [
+        "animals/animals/seahorse"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Xorn",
+      "pdfPage": 343,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/xorn",
+        "monsters-A-Z/monsters-a-z/xorn/xorn"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Shadow",
+      "pdfPage": 322,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/shadow",
+        "monsters-A-Z/monsters-a-z/shadow/shadow"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Black Dragon",
+      "pdfPage": 264,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/black-dragons/young-black-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Shambling Mound",
+      "pdfPage": 323,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/shambling-mound",
+        "monsters-A-Z/monsters-a-z/shambling-mound/shambling-mound"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Blue Dragon",
+      "pdfPage": 266,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/blue-dragons/young-blue-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Shield Guardian",
+      "pdfPage": 323,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/shield-guardian",
+        "monsters-A-Z/monsters-a-z/shield-guardian/shield-guardian"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Brass Dragon",
+      "pdfPage": 268,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/brass-dragons/young-brass-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Shrieker Fungus",
+      "pdfPage": 286,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/fungi/shrieker-fungus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Bronze Dragon",
+      "pdfPage": 270,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/bronze-dragons/young-bronze-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Silver Dragon Wyrmling",
+      "pdfPage": 324,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/silver-dragons/silver-dragon-wyrmling"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Copper Dragon",
+      "pdfPage": 276,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/copper-dragons/young-copper-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Skeleton",
+      "pdfPage": 325,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/skeletons/skeleton"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Gold Dragon",
+      "pdfPage": 291,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/gold-dragons/young-gold-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Solar",
+      "pdfPage": 326,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/solar",
+        "monsters-A-Z/monsters-a-z/solar/solar"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Green Dragon",
+      "pdfPage": 293,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/green-dragons/young-green-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Specter",
+      "pdfPage": 327,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/specter",
+        "monsters-A-Z/monsters-a-z/specter/specter"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Red Dragon",
+      "pdfPage": 318,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/red-dragons/young-red-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sphinx of Lore",
+      "pdfPage": 327,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-lore"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young Silver Dragon",
+      "pdfPage": 324,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/silver-dragons/young-silver-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sphinx of Valor",
+      "pdfPage": 328,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-valor"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Young White Dragon",
+      "pdfPage": 340,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/white-dragons/young-white-dragon"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sphinx of Wonder",
+      "pdfPage": 327,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sphinxes/sphinx-of-wonder"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Zombie",
+      "pdfPage": 343,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/zombies/zombie"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Spider",
+      "pdfPage": 361,
+      "sectionIds": [
+        "animals/animals/spider"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Spirit Naga",
+      "pdfPage": 329,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/spirit-naga",
+        "monsters-A-Z/monsters-a-z/spirit-naga/spirit-naga"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Sprite",
+      "pdfPage": 329,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/sprite",
+        "monsters-A-Z/monsters-a-z/sprite/sprite"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Spy",
+      "pdfPage": 329,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/spy",
+        "monsters-A-Z/monsters-a-z/spy/spy"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Steam Mephit",
+      "pdfPage": 308,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/mephits/steam-mephit"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Stirge",
+      "pdfPage": 329,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/stirge",
+        "monsters-A-Z/monsters-a-z/stirge/stirge"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Stone Giant",
+      "pdfPage": 330,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/stone-giant",
+        "monsters-A-Z/monsters-a-z/stone-giant/stone-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Stone Golem",
+      "pdfPage": 330,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/stone-golem",
+        "monsters-A-Z/monsters-a-z/stone-golem/stone-golem"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Storm Giant",
+      "pdfPage": 330,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/storm-giant",
+        "monsters-A-Z/monsters-a-z/storm-giant/storm-giant"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Succubus",
+      "pdfPage": 331,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/succubus",
+        "monsters-A-Z/monsters-a-z/succubus/succubus"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Bats",
+      "pdfPage": 361,
+      "sectionIds": [
+        "animals/animals/swarm-of-bats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Crawling Claws",
+      "pdfPage": 278,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/crawling-claw/swarm-of-crawling-claws"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Insects",
+      "pdfPage": 361,
+      "sectionIds": [
+        "animals/animals/swarm-of-insects"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Piranhas",
+      "pdfPage": 362,
+      "sectionIds": [
+        "animals/animals/swarm-of-piranhas"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Rats",
+      "pdfPage": 362,
+      "sectionIds": [
+        "animals/animals/swarm-of-rats"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Ravens",
+      "pdfPage": 362,
+      "sectionIds": [
+        "animals/animals/swarm-of-ravens"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Swarm of Venomous Snakes",
+      "pdfPage": 362,
+      "sectionIds": [
+        "animals/animals/swarm-of-venomous-snakes"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tarrasque",
+      "pdfPage": 331,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/tarrasque",
+        "monsters-A-Z/monsters-a-z/tarrasque/tarrasque"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tiger",
+      "pdfPage": 363,
+      "sectionIds": [
+        "animals/animals/tiger"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tough",
+      "pdfPage": 332,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/toughs/tough"
+      ],
+      "disposition": "Exact normalized heading"
+    },
+    {
+      "title": "Tough Boss",
+      "pdfPage": 332,
+      "sectionIds": [
+        "monsters-A-Z/monsters-a-z/toughs/tough-boss"
+      ],
+      "disposition": "Exact normalized heading"
+    }
+  ],
+  "comparisons": [
+    {
+      "title": "Long Jump",
+      "pdfPage": [
+        184,
+        185
+      ],
+      "sectionId": "rules-glossary/rules-glossary/rules-definitions/long-jump",
+      "checkedPhrases": [
+        "Strength score",
+        "DC 10",
+        "quarter"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Concentration",
+      "pdfPage": 179,
+      "sectionId": "rules-glossary/rules-glossary/rules-definitions/concentration",
+      "checkedPhrases": [
+        "maximum DC of 30",
+        "Incapacitated"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Potion of Healing (50 GP)",
+      "pdfPage": 99,
+      "sectionId": "equipment/equipment/adventuring-gear/potion-of-healing-50-gp",
+      "checkedPhrases": [
+        "Bonus Action",
+        "2d4 + 2",
+        "5 feet"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Spell Slots",
+      "pdfPage": 104,
+      "sectionId": "spells/spells/casting-spells/spell-level/spell-slots",
+      "checkedPhrases": [
+        "four level 1",
+        "Long Rest"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Fireball",
+      "pdfPage": 131,
+      "sectionId": "spells/spells/spell-descriptions/fireball",
+      "checkedPhrases": [
+        "8d6 Fire",
+        "20-foot-radius",
+        "1d6"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Adult Red Dragon",
+      "pdfPage": 318,
+      "sectionId": "monsters-A-Z/monsters-a-z/red-dragons/adult-red-dragon",
+      "checkedPhrases": [
+        "256 (19d12 + 133)",
+        "19",
+        "40 ft."
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Level 5: Extra Attack",
+      "pdfPage": 29,
+      "sectionId": "classes/classes/barbarian/barbarian-class-features/level-5-extra-attack",
+      "checkedPhrases": [
+        "attack twice",
+        "Attack action"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    },
+    {
+      "title": "Barbarian Class Features",
+      "pdfPage": 28,
+      "sectionId": "classes/classes/barbarian/barbarian-class-features",
+      "checkedPhrases": [
+        "Rages",
+        "Weapon Mastery",
+        "Brutal Strike"
+      ],
+      "result": "Representative mechanics agree; not a whole-section equivalence proof"
+    }
+  ]
+}

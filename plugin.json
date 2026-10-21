@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "dungeon-master",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Run D&D campaigns with exact bookkeeping and durable journal-backed memory.",
   "license": "MIT",
   "keywords": ["tabletop", "campaign", "dnd", "memory"],

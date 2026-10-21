@@ -1,0 +1,99 @@
+{
+  "edition": "2024",
+  "version": "5.2.1",
+  "upstream": "https://github.com/downfallx/dnd-5e-srd-markdown",
+  "commit": "1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4",
+  "conversionVersion": 1,
+  "files": [
+    {
+      "file": "animals.md",
+      "sha256": "c42082103eb868c5b8b2f6c0cbdcc8146545c149cfc7af32524f9938eed658f9",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/animals.md",
+      "rules": true
+    },
+    {
+      "file": "character-creation.md",
+      "sha256": "1c8f477398cc7ca5721542698d67147f303e4dd5a5dacdad7cb7cec1119f7c42",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/character-creation.md",
+      "rules": true
+    },
+    {
+      "file": "character-origins.md",
+      "sha256": "76c92948e8e86011f3bab326d81faac5eaff9515016039cb33c3bf89e34163af",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/character-origins.md",
+      "rules": true
+    },
+    {
+      "file": "classes.md",
+      "sha256": "faed31b122429262362f97cec71c0ada54786dc7d8c26ebfaa104d4e26325327",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/classes.md",
+      "rules": true
+    },
+    {
+      "file": "equipment.md",
+      "sha256": "eef7cb0529d933ce10983fb2c16f51ce8b7ea8044bd0b5961fba5f472b6e9970",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/equipment.md",
+      "rules": true
+    },
+    {
+      "file": "feats.md",
+      "sha256": "3894f4a147df40adb8b090825b4c2e3e5ee2c67851aca42305b11f2477bcfbf7",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/feats.md",
+      "rules": true
+    },
+    {
+      "file": "gameplay-toolbox.md",
+      "sha256": "977fce5f89d3dae00c56bcf9321d6df07a0fde0182d7cda3e5e71b6762891adc",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/gameplay-toolbox.md",
+      "rules": true
+    },
+    {
+      "file": "magic-items.md",
+      "sha256": "96c71ad35dddf0e79e47ac3d7bbe96704b5209c1f6e1bf01d543080789e18e98",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/magic-items.md",
+      "rules": true
+    },
+    {
+      "file": "monsters-A-Z.md",
+      "sha256": "7ed4f82bc5991ac6aeebcd894e75872c8f4ce2b13fb22fe68838dc3ecd9ddfaa",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/monsters-A-Z.md",
+      "rules": true
+    },
+    {
+      "file": "monsters.md",
+      "sha256": "784a7e14a1f667b5c187b1fee5ef09bf88316f7174e81b2f74d54742bab813d3",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/monsters.md",
+      "rules": true
+    },
+    {
+      "file": "playing-the-game.md",
+      "sha256": "fbef5175da6b47b89587739240ef40260d885bc52646dd299464a4dc965e8907",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/playing-the-game.md",
+      "rules": true
+    },
+    {
+      "file": "rules-glossary.md",
+      "sha256": "9b25315ef6728518f55b5b0e016d2083091f648e955a4e2ad1c1cd5d31823b2f",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/rules-glossary.md",
+      "rules": true
+    },
+    {
+      "file": "spells.md",
+      "sha256": "3431f5b8f50fdb0c65cdf98f0164301c8757d20983d32b5ae9b5be7dc634bffb",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/spells.md",
+      "rules": true
+    },
+    {
+      "file": "README.md",
+      "sha256": "763bdbc31426df8d38aec14280d169e09b0f04b11972a1c30d797f68ad927b21",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/README.md",
+      "rules": false
+    },
+    {
+      "file": "LICENSE",
+      "sha256": "bf385054624693f9a50f5e0f8a1fc786eb9fb2d935d0422c39e99c6e94cbc973",
+      "sourceUrl": "https://raw.githubusercontent.com/downfallx/dnd-5e-srd-markdown/1b4b99dcb786cdd1a2fb26f8acec1551191f1ca4/LICENSE",
+      "rules": false
+    }
+  ]
+}

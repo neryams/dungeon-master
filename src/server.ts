@@ -11,12 +11,13 @@ import { CampaignService, descriptions, inputs, ToolName } from './service.js';
 import { CampaignError } from './domain.js';
 
 export function createMcpServer(service: CampaignService): McpServer {
-  const server = new McpServer({ name: 'dungeon-master', version: '0.5.0' });
+  const server = new McpServer({ name: 'dungeon-master', version: '0.6.0' });
   for (const name of Object.keys(inputs) as ToolName[]) {
     const readOnly = [
       'get_action',
       'search_rules',
       'read_rules',
+      'list_rule_sections',
       'campaign_status',
       'get_character_sheet',
       'get_party_overview',

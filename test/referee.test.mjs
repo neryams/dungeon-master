@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { cp, mkdir, symlink, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { fixture, hero, apply } from './helpers.mjs';
 import { CampaignStore } from '../dist/store.js';
 import { exportCampaign, importCampaign } from '../dist/backup.js';
@@ -381,12 +383,14 @@ test('rules use explicit editions and valid source/page citations; legacy remain
   assert.ok(found.hits.length);
   const jumping = await service.execute('search_rules', {
     query: 'Long Jump',
+    format: 'pages',
     edition: '2024',
     limit: 4,
   });
   assert.ok(jumping.hits.some((h) => h.page === 184 || h.page === 185));
   const potions = await service.execute('search_rules', {
     query: 'Potion of Healing',
+    format: 'pages',
     edition: '2024',
     limit: 5,
   });
@@ -474,4 +478,95 @@ test('Briar Ford reviewed potion resolves actual dice with inventory and scene p
     ),
   );
   assert.match(after.scene.progress.at(-1), /bonus action/);
+});
+
+test('section citations survive replay, export and exact retries; invalid new citations do not write', async (t) => {
+  const { service, store, parent } = await setup(t);
+  await prepare(service);
+  const search = await service.execute('search_rules', { query: 'Ability Checks' });
+  const hit = search.hits[0];
+  const cited = {
+    ...ruling,
+    citations: [
+      {
+        source: search.source.id,
+        reference: hit.title,
+        sectionId: hit.id,
+        corpusRevision: hit.corpusRevision,
+      },
+    ],
+  };
+  const input = {
+    operationId: randomUUID(),
+    expectedRevision: (await store.read()).state.revision,
+    reason: 'Section reference',
+    actionId: 'action',
+    ruling: cited,
+  };
+  await service.execute('record_action_ruling', input);
+  assert.equal((await service.execute('record_action_ruling', input)).duplicate, true);
+  const events = await store.events();
+  await assert.rejects(
+    mutate(service, 'record_action_ruling', {
+      actionId: 'action',
+      ruling: { ...cited, citations: [{ ...cited.citations[0], corpusRevision: 'obsolete' }] },
+    }),
+    { code: 'INVALID_CITATION' },
+  );
+  assert.deepEqual(await store.events(), events);
+  const imported = await importCampaign(
+    join(parent, 'section-restore'),
+    await exportCampaign(store),
+  );
+  assert.deepEqual(await imported.events(), events);
+  const fresh = new CampaignService(await CampaignStore.open(imported.root), service.journal);
+  const resumed = await fresh.execute('get_action', { actionId: 'action' });
+  assert.deepEqual(resumed.action.ruling.citations, cited.citations);
+  await mutate(fresh, 'amend_action_rolls', {
+    actionId: 'action',
+    rolls: [
+      { id: 'extra', expression: '1d20', purpose: 'Extra test', when: 'Optional', optional: true },
+    ],
+    referee,
+    citations: cited.citations,
+  });
+  await roll(fresh);
+  await mutate(fresh, 'approve_action_effects', {
+    actionId: 'action',
+    approval: {
+      reasoning: 'Apply cost',
+      referee,
+      citations: cited.citations,
+      changes: effects,
+      skippedRolls: [{ stepId: 'extra', reason: 'Not required' }],
+    },
+  });
+  await mutate(fresh, 'commit_action', {
+    actionId: 'action',
+    publicExplanation: 'Test resolution',
+  });
+  assert.equal((await imported.read()).state.entities.hero.character.resources.slots.current, 1);
+  // A later host can replay and recover a saved operation without its old corpus.
+  const runtime = join(parent, 'runtime');
+  await mkdir(runtime);
+  await cp(resolve('dist'), join(runtime, 'dist'), { recursive: true });
+  await writeFile(join(runtime, 'package.json'), '{"type":"module"}');
+  await symlink(resolve('node_modules'), join(runtime, 'node_modules'), 'dir');
+  const { CampaignService: OfflineService } = await import(
+    pathToFileURL(join(runtime, 'dist/service.js')).href
+  );
+  const offline = new OfflineService(await CampaignStore.open(imported.root), service.journal);
+  assert.equal((await offline.execute('record_action_ruling', input)).duplicate, true);
+  await assert.rejects(offline.execute('read_rules', { sectionId: hit.id }), {
+    code: 'RULES_UNAVAILABLE',
+  });
+  await mkdir(join(runtime, 'rules'));
+  await writeFile(join(runtime, 'rules/srd-5.2.1-sections.json'), '{"sections":[]}');
+  await assert.rejects(offline.execute('search_rules', { query: 'Jump' }), {
+    code: 'RULES_UNAVAILABLE',
+  });
+  assert.deepEqual(
+    (await offline.execute('get_action', { actionId: 'action' })).action.ruling.citations,
+    cited.citations,
+  );
 });
