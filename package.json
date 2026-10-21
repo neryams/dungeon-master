@@ -13,6 +13,7 @@
     "dungeon-master-mcp": "dist/server.js"
   },
   "scripts": {
+    "journal:setup": "node scripts/setup-project-journal.mjs",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test test/*.test.mjs",

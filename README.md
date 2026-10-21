@@ -57,6 +57,8 @@ Embeddings run on the machine through journal-rag. The initial model download ca
 
 ## Verification
 
+For development progress tracking, run `npm run journal:setup` after installing dependencies, then open this repository as a trusted Codex project and start a new session. This installs a project-scoped `project_journal` MCP connection backed by `docs/journal/`. Its machine-specific connection config and retrieval cache are ignored by Git. See [AGENTS.md](AGENTS.md#development-journal) for the read/write workflow. This development journal is separate from campaign memory.
+
 ```bash
 npm run typecheck
 npm test
