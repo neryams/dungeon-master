@@ -1,0 +1,12 @@
+{
+  "name": "dungeon-master-dev",
+  "interface": { "displayName": "Dungeon Master Development" },
+  "plugins": [
+    {
+      "name": "dungeon-master",
+      "source": { "source": "local", "path": "./build/plugin" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dungeon-master",
+  "version": "0.1.0",
+  "description": "Run D&D campaigns with exact bookkeeping and durable journal-backed memory.",
+  "license": "MIT",
+  "keywords": ["tabletop", "campaign", "dnd", "memory"],
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/create-campaign/SKILL.md",
+      "interface": {
+        "displayName": "Dungeon Master",
+        "shortDescription": "D&D play with durable campaign memory",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Resume my campaign.", "Create a new D&D campaign."]
+      }
+    }
+  }
+}

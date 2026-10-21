@@ -1,0 +1,15 @@
+{
+  "opening": "## Arrival\nMara reaches Briar Ford at dusk. Ferryman Oren explains that the guiding lantern across the river has gone dark. He offers 20 silver for its safe return.\n\n## Unresolved\nMara has not yet chosen whether to question Oren, inspect the landing, or cross the river.",
+  "changes": [
+    {"type":"put_entity","entity":{"id":"mara","kind":"character","name":"Mara","character":{"abilities":{"str":12,"dex":16,"con":14,"int":10,"wis":13,"cha":11},"hp":9,"maxHp":12,"ac":14,"resources":{"hit-dice":{"current":1,"max":1},"silver":{"current":10,"max":1000000}}}}},
+    {"type":"put_entity","entity":{"id":"oren","kind":"npc","name":"Oren","description":"A worried ferryman who offered 20 silver for recovering the guiding lantern."}},
+    {"type":"put_entity","entity":{"id":"ford","kind":"location","name":"Briar Ford","description":"A river landing at dusk."}},
+    {"type":"put_entity","entity":{"id":"potion","kind":"item","name":"Healing potion","item":{"quantity":1,"owner":"mara"}}},
+    {"type":"put_entity","entity":{"id":"lantern-quest","kind":"quest","name":"Recover the guiding lantern","status":"open","description":"Oren offers 20 silver for its return."}},
+    {"type":"put_entity","entity":{"id":"lantern-secret","kind":"npc","name":"The stranded keeper","visibility":"dm","knowledge":"plan","description":"The keeper moved the lantern to guide a stranded child. This is a proposed reveal, not established player knowledge."}},
+    {"type":"put_entity","entity":{"id":"ford-map","kind":"map","name":"Briar Ford map","map":{"kind":"graph","nodes":["landing","island","far-bank"],"edges":[["landing","island"],["island","far-bank"]],"tokens":{"mara":{"node":"landing"}},"revealed":["landing"]}}},
+    {"type":"set_session","session":"session-001"},
+    {"type":"set_time","time":"Harvest eve, dusk"},
+    {"type":"set_scene","scene":{"id":"arrival","title":"The dark lantern","location":"ford","present":["mara","oren"],"map":"ford-map","summary":"The guiding lantern has gone dark. Oren offers a reward.","unresolved":["How does Mara investigate?"]}}
+  ]
+}

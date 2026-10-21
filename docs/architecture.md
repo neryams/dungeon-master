@@ -1,0 +1,41 @@
+# Architecture
+
+## Boundaries
+
+`CampaignService` exposes D&D operations without depending on a transport. `createMcpServer` binds those operations to MCP; `serve` supplies local stdio. `CampaignStore` handles validated events and filesystem persistence. `JournalAdapter` converts campaign records/search into calls through the `JournalBackend` interface. `McpJournal` is the implementation using the pinned upstream server, not its private daemon modules.
+
+Each server is bound to one canonical campaign root. Public tools accept entity IDs and `record:<id>` references, not workspace paths. Paths used for journal access are derived from the bound corpus, validated and checked for symlinks. Upstream's unrestricted `get_entry` is never exposed directly.
+
+## Records and invariants
+
+`campaign.json` is schema version 1 configuration. `events/NNNNNNNNNN-<uuid>.json` is authoritative. Events include revision, operation ID, normalized request hash, timestamp, actor/reason, session/scene references and typed payload. The payload contains changes, optional dice, journal records, or a correction target.
+
+All writes take a per-campaign cross-process filesystem lock with heartbeat. The service validates a complete batch against a cloned state before writing a temporary event, fsyncing it, atomically renaming it and syncing the directory. Readers see only complete `.json` files; temporary files are ignored. Event numbering and operation/record uniqueness are checked on replay. The state snapshot is best-effort and never trusted over replay. A failure after commit may produce an uncertain client result; an exact retry recovers the committed event.
+
+Request hashes prevent reusing an operation ID for different input. A repeated identical operation returns the original event and current state/revision. A different new operation with a stale revision fails. Corrections are explicit compensating changes, not rollback of the full campaign.
+
+This is designed for a single local filesystem and one operator. Do not run concurrent writers over Git synchronization, network shares or independently mounted copies. Filesystem locks coordinate processes on the same filesystem; Git is not a distributed transaction coordinator.
+
+## Journal delivery and retrieval
+
+Narrative content is first saved inside an event. The queue is derived by comparing those records to Markdown carrying their IDs; no separate queue database is necessary. Delivery uses the campaign lock, verifies content, and forwards missing records to `write_entry`. Unique IDs lead the title to survive upstream slug truncation. Successful file writes with lost acknowledgements are recognized on retry. Conflicting or partial derived files stop delivery and are reported; they are not silently rewritten.
+
+Journal delivery and event commits are not one distributed transaction. A journal outage leaves game state committed, content recoverable and delivery pending. Resume/checkpoint and the CLI `journal-sync` retry delivery. Search is explicitly unavailable when the backend fails. Upstream may search with BM25 while vectors initialize or fail. Delivery-ready only means Markdown delivery completed; it does not guarantee vector indexing completed.
+
+Search admits only results mapped to known committed records whose current Markdown matches authoritative content. Party search filters DM-only records. `read_campaign_record` first uses the journal when possible and otherwise returns exact content from the event history.
+
+## Model boundary and visibility
+
+The model adjudicates rules, chooses narrative content and decides what to save. Tools cannot guarantee that every spoken sentence or chat turn is captured. Skills require immediate mechanical writes and detailed scene records at boundaries. “Saved” means an actual committed event, not a narrative promise.
+
+Current properties are exact lookups. History retrieval supplies background and evidence; it never recalculates current HP or inventory. Resume packets select party characters, owned items, quests, the current scene/encounter and recent history references. Full entities remain individually readable.
+
+Party views remove DM-only entities, planned entities, their relationships and references, private records and private dice. Graph maps expose revealed nodes and edges only. Grid reveal metadata is descriptive in v1; there is no line-of-sight/fog engine. Put sensitive map images in separate DM-only entities. Descriptions, configuration and scene prose are not automatically redacted: skills must place secrets in separate DM records/entities.
+
+The operator can request audience=dm and inspect local files. Player filtering is not authentication or a secrecy guarantee against that operator. Authenticated player accounts are out of scope.
+
+## Portability and recovery
+
+Export contains validated configuration, ordered events and assets. Import requires a new directory, validates the history and reconstructs it without reusing caches. Markdown can be regenerated by journal-sync. Schema version 1 is the only supported version; unsupported versions fail validation rather than guessing a migration.
+
+No automatic commits, pushes, model calls or cloud deployments. Runtime caches and locks are disposable; authoritative events and assets need durable backups. Git history detects/reviews manual changes, but event files are not cryptographically signed.
