@@ -135,6 +135,20 @@ async function main() {
       edition: values.edition ?? raw.edition ?? '2024',
     });
     const store = await initialize(join(parent, arg), config);
+    await store.transact(
+      {
+        operationId: randomUUID(),
+        expectedRevision: 0,
+        actor: 'setup',
+        reason: 'New campaign setup; enable reviewed play after opening verification',
+      },
+      { kind: 'initial-review-policy' },
+      () => ({
+        changes: [],
+        records: [],
+        review: { type: 'configure', mode: 'setup', reason: 'New campaign setup' },
+      }),
+    );
     git(store.root);
     console.log(JSON.stringify(await setup(store), null, 2));
     return;

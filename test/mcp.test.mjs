@@ -19,7 +19,7 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     await server.close();
   });
   const tools = (await client.listTools()).tools.map((t) => t.name);
-  assert.equal(tools.length, 17);
+  assert.equal(tools.length, 29);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));
   const result = await client.callTool({
@@ -48,6 +48,33 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     arguments: { id: '../../secret' },
   });
   assert.equal(invalid.isError, true);
+  const rules = await client.callTool({ name: 'read_rules', arguments: { page: 6 } });
+  assert.equal(rules.structuredContent.source.id, 'srd-5.2.1');
+  const policy = await client.callTool({
+    name: 'configure_review',
+    arguments: {
+      operationId: 'policy',
+      expectedRevision: 1,
+      reason: 'Enable referee',
+      mode: 'reviewed',
+    },
+  });
+  assert.ok(!policy.isError);
+  const prepared = await client.callTool({
+    name: 'prepare_action',
+    arguments: {
+      operationId: 'prepare',
+      expectedRevision: 2,
+      reason: 'Review an action',
+      actionId: 'action',
+      actors: ['hero'],
+      intent: 'Inspect a door',
+      circumstances: 'A visible ordinary door',
+    },
+  });
+  assert.ok(!prepared.isError);
+  const action = await client.callTool({ name: 'get_action', arguments: { actionId: 'action' } });
+  assert.equal(action.structuredContent.status, 'prepared');
 });
 test('a fresh stdio process resumes exact saved state without prior chat', async (t) => {
   const { store, service } = await fixture(t);

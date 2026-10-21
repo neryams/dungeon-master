@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Change, Entity, Event, Payload, State, Roll } from './schema.js';
 import { z } from 'zod';
+import { validateReview, reduceReview } from './review.js';
 
 export class CampaignError extends Error {
   constructor(
@@ -125,6 +126,7 @@ export function validateState(state: State): void {
   }
 }
 export function applyPayload(before: State, payload: Payload): State {
+  validateReview(before, payload);
   const state = structuredClone(before);
   const entity = (id: string) => state.entities[id] ?? fail(`Unknown entity: ${id}`);
   const character = (id: string) => entity(id).character ?? fail(`No character properties: ${id}`);
@@ -319,6 +321,7 @@ export function applyPayload(before: State, payload: Payload): State {
       }
     }
   }
+  reduceReview(state, payload);
   validateState(state);
   return state;
 }
@@ -395,6 +398,8 @@ export function cellRevealed(map: NonNullable<Entity['map']>, x: number, y: numb
 }
 export function partyState(state: State): State {
   const out = structuredClone(state);
+  delete out.actions;
+  delete out.reviewMode;
   const visible = (id: string) =>
     out.entities[id]?.visibility === 'party' && out.entities[id]?.knowledge !== 'plan';
   for (const [id, e] of Object.entries(out.entities))

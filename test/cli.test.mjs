@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { mkdtemp, rm, readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { CampaignStore } from '../dist/store.js';
 const run = promisify(execFile);
 test('CLI initializes an explicitly bound plugin and portable restore', async (t) => {
   const parent = await mkdtemp(join(tmpdir(), 'dm-cli-'));
@@ -21,6 +22,7 @@ test('CLI initializes an explicitly bound plugin and portable restore', async (t
   const result = JSON.parse(stdout),
     root = result.campaign;
   assert.equal(root, join(parent, 'example'));
+  assert.equal((await (await CampaignStore.open(root)).read()).state.reviewMode, 'setup');
   const mcp = JSON.parse(await readFile(join(root, '.dm/plugin/mcp.json'), 'utf8'));
   assert.deepEqual(mcp.mcpServers['dungeon-master'].args.slice(-2), ['--campaign', root]);
   await access(join(root, '.dm/plugin/skills/run-campaign/SKILL.md'));

@@ -1,0 +1,32 @@
+{
+  "note": "Illustrative referee response for Lantern at Briar Ford. This file is not an independently reviewed live ruling. Confirm the supplied turn budget and ordinary potion identity before use.",
+  "prepare": {
+    "actionId": "mara-drinks-potion",
+    "actors": ["mara"],
+    "targets": ["mara"],
+    "entityIds": ["potion"],
+    "intent": "Mara drinks her ordinary Potion of Healing.",
+    "circumstances": "The DM confirms Mara has an unused bonus action, can drink, and the saved potion is an ordinary SRD Potion of Healing, not a variant. No relevant interference or condition applies."
+  },
+  "ruling": {
+    "verdict": "allowed",
+    "reasoning": "The confirmed ordinary potion can be drunk with the available bonus action. Healing is random; no success check is required.",
+    "citations": [{ "source": "srd-5.2.1", "page": 99, "reference": "Potion of Healing" }],
+    "costs": "One bonus action and one potion.",
+    "procedure": "Roll 2d4+2, consume one potion, and heal Mara by the saved total, capped at maximum HP. Record that the bonus action has been used in the scene's progress; action budgets are not an automatic rules engine.",
+    "success": "The potion heals the rolled amount, capped at maximum HP.",
+    "failure": "Not applicable: there is no success/failure check.",
+    "rolls": [
+      {
+        "id": "healing",
+        "expression": "2d4+2",
+        "mode": "normal",
+        "purpose": "Ordinary Potion of Healing",
+        "visibility": "party",
+        "when": "After the player commits to drinking",
+        "optional": false
+      }
+    ],
+    "referee": { "host": "illustrative fixture", "model": "not a live review" }
+  }
+}

@@ -10,6 +10,7 @@ for (const path of [
   'skills',
   'dist',
   'examples',
+  'rules',
   'README.md',
   'LICENSE',
   'docs',

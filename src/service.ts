@@ -1,3 +1,5 @@
+import { refereeInputs, refereeDescriptions, executeReferee } from './referee-service.js';
+import { actionStatus } from './review.js';
 import { characterSheet, partyOverview } from './sheets.js';
 import { stat } from 'node:fs/promises';
 import sharp from 'sharp';
@@ -24,6 +26,7 @@ import {
 const Audience = z.enum(['dm', 'party']).default('dm');
 const metadata = Mutation.shape;
 export const inputs = {
+  ...refereeInputs,
   get_character_sheet: z
     .object({ characterId: Id, audience: z.enum(['party', 'dm']).default('party') })
     .strict(),
@@ -87,6 +90,8 @@ export const inputs = {
   roll_dice: z
     .object({
       ...metadata,
+      actionId: Id.optional(),
+      stepId: Id.optional(),
       expression: z.string().max(40),
       mode: z.enum(['normal', 'advantage', 'disadvantage', 'reported']).default('normal'),
       reportedTotal: z.number().int().safe().optional(),
@@ -119,6 +124,7 @@ export const inputs = {
 };
 export type ToolName = keyof typeof inputs;
 export const descriptions: Record<ToolName, string> = {
+  ...refereeDescriptions,
   get_character_sheet:
     'Read one character’s exact saved stats, complete visible owned inventory and regional/tactical map placements from one revision. Defaults to party audience. No journal or gameplay writes.',
   get_party_overview:
@@ -152,7 +158,7 @@ export const descriptions: Record<ToolName, string> = {
   checkpoint_session:
     'Save a player-facing recap, separate optional DM notes and unresolved choices. Refresh resume data and retry journal delivery. Do not put secrets in summary or unresolved.',
   correct_campaign_event:
-    'Append a reasoned correction linked to an existing event. Supply explicit compensating changes; this never deletes history or automatically rewinds later actions.',
+    'In reviewed play, mechanical corrections require administer_campaign. Append a reasoned correction linked to an existing event. Supply explicit compensating changes; this never deletes history or automatically rewinds later actions.',
 };
 function mutationResult(result: Awaited<ReturnType<CampaignStore['transact']>>) {
   return {
@@ -173,6 +179,8 @@ export class CampaignService {
     return Mutation.parse(Object.fromEntries(Object.keys(metadata).map((k) => [k, input[k]])));
   }
   async execute(name: ToolName, raw: unknown): Promise<unknown> {
+    if (name in refereeInputs)
+      return executeReferee(this.store, name as keyof typeof refereeInputs, raw);
     switch (name) {
       case 'get_character_sheet': {
         const i = inputs[name].parse(raw);
@@ -307,6 +315,7 @@ export class CampaignService {
           campaign: this.store.config,
           revision: state.revision,
           session: state.session,
+          reviewMode: state.reviewMode ?? 'legacy',
           journal: await this.journal.health(),
         };
       }
@@ -340,7 +349,12 @@ export class CampaignService {
         const result = await this.store.transact(this.meta(i), { name, input: i }, () => ({
           changes: [],
           records: [],
+          ...(i.actionId && i.stepId
+            ? { review: { type: 'roll' as const, actionId: i.actionId, stepId: i.stepId } }
+            : {}),
           roll: {
+            ...(i.actionId ? { actionId: i.actionId } : {}),
+            ...(i.stepId ? { stepId: i.stepId } : {}),
             id: randomUUID(),
             expression: i.expression,
             mode: i.mode,
@@ -545,8 +559,10 @@ export class CampaignService {
         visibility: r.visibility,
       }));
     const rolls = events
-      .flatMap((e) => (e.payload.roll ? [e.payload.roll] : []))
-      .filter((r) => audience === 'dm' || r.visibility === 'party')
+      .flatMap((e) =>
+        e.payload.roll && (audience === 'dm' || !e.payload.review) ? [e.payload.roll] : [],
+      )
+      .filter((r) => audience === 'dm' || (r.visibility === 'party' && !r.actionId))
       .slice(-5);
     return {
       campaign: this.store.config,
@@ -578,6 +594,25 @@ export class CampaignService {
       entities: entities.slice(0, 100),
       entitiesTruncated: entities.length > 100,
       entityCount: Object.keys(state.entities).length,
+      ...(audience === 'dm'
+        ? {
+            reviewMode: state.reviewMode ?? 'legacy',
+            pendingActions: Object.values(state.actions ?? {})
+              .filter((a) => !['resolved', 'cancelled', 'superseded'].includes(a.status))
+              .map((a) => ({
+                id: a.id,
+                intent: a.packet.intent,
+                status: actionStatus(state, a),
+                rolls: a.rolls,
+                nextStep:
+                  a.status === 'approved'
+                    ? 'commit_action'
+                    : a.status === 'prepared'
+                      ? 'record_action_ruling'
+                      : 'roll_dice or approve_action_effects',
+              })),
+          }
+        : {}),
       recentRecords: recent,
       recentRolls: rolls,
     };

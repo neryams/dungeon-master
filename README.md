@@ -14,7 +14,7 @@ node dist/cli.js init my-campaign --name "My Campaign" --edition 2024
 
 This creates `~/Campaigns/my-campaign`, a separate local Git repository, a campaign-bound plugin, and project marketplace configuration. Open that folder as a trusted Codex project. Install **Dungeon Master** from its project marketplace, then start a new conversation and ask it to create your party and opening scene. The generated server connection uses explicit absolute paths; it does not rely on the host's working directory. No GitHub repository is created or pushed.
 
-A new campaign initially has no characters or events. The create-campaign skill collects the party and starting situation and persists them through the domain tools. Pass `--config campaign-options.json` to init for `premise`, `tone`, and `houseRules`; these fields are player-facing.
+A new campaign initially has no characters and has one setup-policy event. The create-campaign skill collects the party and starting situation and persists them through the domain tools. Pass `--config campaign-options.json` to init for `premise`, `tone`, and `houseRules`; these fields are player-facing.
 
 If your client doesn't discover local plugins, use the direct MCP and skill installation instructions in [installation.md](docs/installation.md). Generic portable plugin installations need `npm link` and an explicit `DM_CAMPAIGN_ROOT`; the generated campaign plugin does not.
 
@@ -24,7 +24,7 @@ If your client doesn't discover local plugins, use the direct MCP and skill inst
 - Graph/grid map authoring, atomic subgroup movement, explicit reveal masks and actual PNG tool responses.
 - Cryptographic dice, recorded physical dice, idempotent retries, revision conflicts and explicit corrections.
 - Append-only JSON event history, replayable state, Markdown scene records and journal-backed historical retrieval.
-- Six skills: create, run, close, maintain, player sheets, and optional host-generated artwork.
+- Seven skills: create, run, close, maintain, player sheets, rules referee, and optional host-generated artwork.
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.
 
@@ -90,3 +90,13 @@ Open the complete access link printed in the terminal. The panel shows party she
 The default listens only on this computer, port 4317. Use `--port 4318` if that port is occupied. `--lan` prints candidate network addresses; share a complete LAN link with players. The host must stay on and its firewall must allow that port. VPN or virtual-adapter addresses may not be reachable from another device. Stop with Ctrl+C. Restarting creates new access links.
 
 Everyone with the link sees the same party-visible state, not DM secrets or individual private sheets. LAN mode uses unencrypted HTTP and is intended for a trusted local network, not internet exposure. There are no accounts or cloud services. Public descriptions and scene prose must not contain DM secrets. The panel does not serve original artwork or campaign files.
+
+## Rules referee
+
+New campaigns begin in setup mode and enter reviewed play after their opening is verified. The primary DM delegates a bounded rules check to a host subagent using the same model, records costs and success/failure procedures before rolling, then obtains approval of the exact effects before committing them. Dangerous but legal choices remain the player's choice; impossible actions do not become possible just because a player asks or rolls well.
+
+The tools enforce that workflow and saved-state consistency. They do not supply a complete combat engine or prove that the reviewing agent interpreted the rules correctly. The primary DM can explicitly administer an override, correction or world-preparation change. If the host lacks delegation, it records a clearly marked DM fallback instead of pretending independent review occurred. No model API is called.
+
+Existing campaigns retain legacy behavior until configure_review enables reviewed play. Pending actions survive restarts and exports. See [tool contracts](docs/tools.md#referee-workflow) and [architecture](docs/architecture.md#referee-reviewed-play-050) for the guard boundaries and limitations.
+
+Edition-matched official SRD references are bundled for offline lookup. [Attribution and extraction notes](rules/ATTRIBUTION.md) accompany the pinned text. Non-SRD features require supplied rules or explicit DM judgment.

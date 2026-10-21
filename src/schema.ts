@@ -293,6 +293,8 @@ export type JournalRecord = z.infer<typeof JournalRecord>;
 export const Roll = z
   .object({
     id: Id,
+    actionId: Id.optional(),
+    stepId: Id.optional(),
     expression: z.string(),
     mode: z.enum(['normal', 'advantage', 'disadvantage', 'reported']),
     dice: z.array(Int),
@@ -302,12 +304,132 @@ export const Roll = z
     visibility: Visibility,
   })
   .strict();
+export const ReviewMode = z.enum(['legacy', 'setup', 'reviewed']);
+const RequiredText = z.string().trim().min(1).max(20000);
+export const RuleCitation = z
+  .object({
+    source: z.enum(['srd-5.1', 'srd-5.2.1', 'house-rule', 'supplied-rule']),
+    reference: RequiredText,
+    page: Int.min(1).optional(),
+  })
+  .strict();
+export const RefereeIdentity = z
+  .object({
+    host: RequiredText,
+    model: RequiredText,
+  })
+  .strict();
+export const RollStep = z
+  .object({
+    id: Id,
+    expression: z.string().min(1).max(40),
+    mode: z.enum(['normal', 'advantage', 'disadvantage']).default('normal'),
+    purpose: RequiredText,
+    visibility: Visibility.default('dm'),
+    when: RequiredText,
+    optional: z.boolean().default(false),
+  })
+  .strict();
+export const Ruling = z
+  .object({
+    verdict: z.enum(['allowed', 'needs_clarification', 'not_possible', 'needs_dm_judgment']),
+    reasoning: RequiredText,
+    citations: z.array(RuleCitation).min(1).max(30),
+    missingFacts: z.array(RequiredText).max(30).default([]),
+    costs: RequiredText,
+    procedure: RequiredText,
+    success: RequiredText,
+    failure: RequiredText,
+    rolls: z.array(RollStep).max(30),
+    referee: RefereeIdentity,
+  })
+  .strict();
+export const ReviewPacket = z
+  .object({
+    revision: Nonnegative,
+    edition: z.enum(['2014', '2024']),
+    houseRules: z.array(Text),
+    actors: z.array(Id).min(1).max(30),
+    targets: z.array(Id).max(30),
+    intent: RequiredText,
+    circumstances: RequiredText,
+    entities: z.array(Entity),
+    encounter: Encounter.optional(),
+    scene: Scene.optional(),
+    time: Text.optional(),
+  })
+  .strict();
+export const Approval = z
+  .object({
+    reasoning: RequiredText,
+    referee: RefereeIdentity,
+    citations: z.array(RuleCitation).min(1).max(30),
+    changes: z.array(Change).max(100),
+    skippedRolls: z
+      .array(z.object({ stepId: Id, reason: RequiredText }).strict())
+      .max(30)
+      .default([]),
+  })
+  .strict();
+export const ReviewAction = z
+  .object({
+    id: Id,
+    packet: ReviewPacket,
+    fingerprint: z.string(),
+    status: z.enum(['prepared', 'ruled', 'approved', 'resolved', 'cancelled', 'superseded']),
+    ruling: Ruling.optional(),
+    approval: Approval.optional(),
+    rolls: z.array(Roll).default([]),
+    publicExplanation: Text.default(''),
+  })
+  .strict();
+export type ReviewAction = z.infer<typeof ReviewAction>;
+export const ReviewOperation = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('configure'), mode: ReviewMode, reason: RequiredText }).strict(),
+  z.object({ type: z.literal('prepare'), action: ReviewAction }).strict(),
+  z.object({ type: z.literal('ruling'), actionId: Id, ruling: Ruling }).strict(),
+  z
+    .object({
+      type: z.literal('amend'),
+      actionId: Id,
+      reason: RequiredText,
+      rolls: z.array(RollStep).min(1).max(30),
+      referee: RefereeIdentity,
+      citations: z.array(RuleCitation).min(1).max(30),
+    })
+    .strict(),
+  z.object({ type: z.literal('roll'), actionId: Id, stepId: Id }).strict(),
+  z.object({ type: z.literal('approve'), actionId: Id, approval: Approval }).strict(),
+  z.object({ type: z.literal('commit'), actionId: Id, publicExplanation: Text }).strict(),
+  z.object({ type: z.literal('cancel'), actionId: Id, reason: RequiredText }).strict(),
+  z
+    .object({
+      type: z.literal('supersede'),
+      actionId: Id,
+      replacementId: Id,
+      reason: RequiredText,
+      packet: ReviewPacket,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('admin'),
+      actionId: Id.optional(),
+      purpose: z.enum(['override', 'delegation_unavailable', 'world_preparation', 'correction']),
+      closeAction: z.boolean().default(true),
+      reason: RequiredText,
+      ruling: RequiredText,
+      publicExplanation: Text,
+    })
+    .strict(),
+]);
 export const Payload = z
   .object({
     changes: z.array(Change).max(100).default([]),
     records: z.array(JournalRecord).max(10).default([]),
     roll: Roll.optional(),
     corrects: Id.optional(),
+    review: ReviewOperation.optional(),
   })
   .strict();
 export type Payload = z.infer<typeof Payload>;
@@ -341,6 +463,8 @@ export const CampaignConfig = z
 export type CampaignConfig = z.infer<typeof CampaignConfig>;
 export interface State {
   revision: number;
+  reviewMode?: z.infer<typeof ReviewMode>;
+  actions?: Record<string, ReviewAction>;
   focus?: z.infer<typeof Focus>;
   party?: string[];
   pressures?: Record<string, z.infer<typeof Pressure>>;
