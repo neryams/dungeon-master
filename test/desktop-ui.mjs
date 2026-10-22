@@ -103,6 +103,9 @@ test(
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.waitForSelector('#create-form');
+    await page.locator('#provider').selectOption('codex');
+    await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
+    assert.equal(await page.locator('#provider-command').innerText(), 'codex login');
     await page.screenshot({ path: join(artifacts, 'setup.png') });
     const security = await app.evaluate(({ BrowserWindow }) => {
       const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();

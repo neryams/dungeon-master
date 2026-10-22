@@ -48,14 +48,19 @@ server.registerTool(
   'import_generated_map_art',
   {
     description:
-      'Copy a native Antigravity generated PNG/JPEG/WebP from this connected conversation into campaign assets. File handling only; then register_map_art with the returned path, source revision and reference extent. No shell or API calls.',
+      'Copy a native host-generated PNG/JPEG/WebP from this connected conversation into campaign assets. File handling only; then register_map_art with the returned path, source revision and reference extent. No shell or API calls.',
     inputSchema: { sourcePath: z.string().min(1).max(4096) },
     annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   async ({ sourcePath }) => {
     try {
       await checkOwner();
-      const result = await importGeneratedArt(store, sourcePath);
+      const result = await importGeneratedArt(
+        store,
+        sourcePath,
+        undefined,
+        process.env.DM_DESKTOP_PROVIDER === 'codex' ? { ownerToken: token! } : undefined,
+      );
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     } catch {
       return {
@@ -63,7 +68,7 @@ server.registerTool(
         content: [
           {
             type: 'text',
-            text: 'Could not import image. Use a valid generated raster image from this connected Antigravity conversation; do not use shell or invent paths.',
+            text: 'Could not import image. Use a valid generated raster image from this connected provider conversation; do not use shell or invent paths.',
           },
         ],
       };

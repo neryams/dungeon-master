@@ -9,6 +9,7 @@ function invoke<K extends keyof DesktopApi>(
 }
 const api: DesktopApi = {
   preferences: () => invoke('preferences'),
+  selectProvider: (provider) => invoke('selectProvider', provider),
   detect: (path) => invoke('detect', path),
   chooseExecutable: () => invoke('chooseExecutable'),
   chooseParent: () => invoke('chooseParent'),

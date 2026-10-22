@@ -47,8 +47,15 @@ export const LanAdminInput = z.discriminatedUnion('action', [
   z.object({ action: z.literal('resolve') }).strict(),
   z.object({ action: z.literal('continue') }).strict(),
 ]);
+export const Provider = z.enum(['antigravity', 'codex']);
+export type Provider = z.infer<typeof Provider>;
 export const Preferences = z
-  .object({ executable: z.string().optional(), recent: z.string().optional() })
+  .object({
+    executable: z.string().optional(),
+    codexExecutable: z.string().optional(),
+    provider: Provider.optional(),
+    recent: z.string().optional(),
+  })
   .strict();
 export type Preferences = z.infer<typeof Preferences>;
 export type SubmitInput = z.infer<typeof SubmitInput>;
@@ -93,12 +100,13 @@ export type LanSnapshot = PlayerView & {
   required: string[];
 };
 export interface WorkerApi {
-  detect(path?: string): Promise<{ path: string; version: string }>;
+  detect(path?: string, provider?: Provider): Promise<{ path: string; version: string }>;
   create(input: CreateInput): Promise<DesktopSnapshot>;
   open(root: string): Promise<DesktopSnapshot>;
   connect(
     executable?: string,
     fresh?: boolean,
+    provider?: Provider,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
   snapshot(): Promise<DesktopSnapshot>;
@@ -109,8 +117,10 @@ export interface WorkerApi {
   lanStatus(): Promise<LanStatus | null>;
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
-export interface DesktopApi extends Omit<WorkerApi, 'connect'> {
+export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect'> {
+  detect(path?: string): Promise<{ path: string; version: string }>;
   preferences(): Promise<Preferences>;
+  selectProvider(provider: Provider): Promise<void>;
   chooseExecutable(): Promise<string | null>;
   chooseParent(): Promise<string | null>;
   chooseCampaign(): Promise<string | null>;
@@ -163,7 +173,15 @@ export async function dispatchWorker(
 ): Promise<unknown> {
   switch (method) {
     case 'detect':
-      return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
+      return api.detect(
+        ...z
+          .union([
+            z.tuple([]),
+            z.tuple([OptionalWireString]),
+            z.tuple([OptionalWireString, Provider.optional()]),
+          ])
+          .parse(raw),
+      );
     case 'create':
       return api.create(...z.tuple([CreateInput]).parse(raw));
     case 'open':
@@ -174,9 +192,10 @@ export async function dispatchWorker(
           z.tuple([]),
           z.tuple([OptionalWireString]),
           z.tuple([OptionalWireString, OptionalWireBoolean]),
+          z.tuple([OptionalWireString, OptionalWireBoolean, Provider]),
         ])
         .parse(raw);
-      return api.connect(args[0], args[1]);
+      return api.connect(args[0], args[1], args[2]);
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
@@ -210,6 +229,10 @@ export async function dispatchDesktop(
 ): Promise<unknown> {
   if (typeof method !== 'string') throw new Error('Invalid desktop method');
   switch (method) {
+    case 'detect':
+      return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
+    case 'selectProvider':
+      return api.selectProvider(...z.tuple([Provider]).parse(raw));
     case 'preferences':
       z.tuple([]).parse(raw);
       return api.preferences();

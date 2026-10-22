@@ -36,7 +36,7 @@ test('typed bridge validates methods, argument arity and administration payloads
   assert.deepEqual(calls, [
     ['connect'],
     ['connect', true],
-    ['connect', undefined, true],
+    ['connect', undefined, true, undefined],
     ['detect', undefined],
   ]);
   for (const [method, args] of [

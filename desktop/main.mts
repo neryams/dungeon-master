@@ -89,7 +89,7 @@ else {
           const timer = setTimeout(() => {
             pending.delete(id);
             reject(new Error('Request timed out. Check saved state before trying again.'));
-          }, 330000);
+          }, 660000);
           pending.set(id, { resolve, reject, timer });
           worker.send({ id, method, args });
         }) as ReturnType<WorkerApi[K]>;
@@ -106,15 +106,29 @@ else {
       }
       const actions: DesktopApi = {
         preferences: async () => prefs,
+        selectProvider: async (provider) => {
+          await call('stop');
+          prefs.provider = provider;
+          await savePrefs();
+        },
         detect: async (path) => {
-          const found = await call('detect', path);
-          prefs.executable = found.path;
+          const provider = prefs.provider ?? 'antigravity';
+          const found = await call(
+            'detect',
+            path ?? (provider === 'codex' ? prefs.codexExecutable : prefs.executable),
+            provider,
+          );
+          if (provider === 'codex') prefs.codexExecutable = found.path;
+          else prefs.executable = found.path;
           await savePrefs();
           return found;
         },
         chooseExecutable: async () => {
           const r = await dialog.showOpenDialog(window, {
-            title: 'Choose Antigravity CLI (agy)',
+            title:
+              prefs.provider === 'codex'
+                ? 'Choose Codex CLI (codex)'
+                : 'Choose Antigravity CLI (agy)',
             properties: ['openFile'],
           });
           return r.canceled ? null : (r.filePaths[0] ?? null);
@@ -145,7 +159,13 @@ else {
           await savePrefs();
           return state;
         },
-        connect: (fresh = false) => call('connect', prefs.executable, fresh),
+        connect: (fresh = false) =>
+          call(
+            'connect',
+            prefs.provider === 'codex' ? prefs.codexExecutable : prefs.executable,
+            fresh,
+            prefs.provider ?? 'antigravity',
+          ),
         submit: (input) => call('submit', input),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),

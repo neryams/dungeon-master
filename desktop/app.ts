@@ -34,6 +34,8 @@ const tags = {
   'join-close': 'button',
   welcome: 'main',
   'provider-status': 'span',
+  provider: 'select',
+  'provider-command': 'code',
   'check-provider': 'button',
   'choose-cli': 'button',
   'open-campaign': 'button',
@@ -438,15 +440,23 @@ async function checkProvider(path?: string) {
   $('provider-status').textContent = 'Checking installation…';
   try {
     const found = await api.detect(path);
-    $('provider-status').textContent = `Detected · v${found.version}`;
+    $('provider-status').textContent = `Detected · ${found.version}`;
   } catch (e) {
-    $('provider-status').textContent = 'Not ready · Install or choose agy below';
+    $('provider-status').textContent = 'Not ready · Install or choose the selected CLI below';
     throw e;
   }
 }
 on('dismiss', () => {
   $('notice').hidden = true;
 });
+$('provider').onchange = () => {
+  void (async () => {
+    const provider = $('provider').value === 'codex' ? 'codex' : 'antigravity';
+    await api.selectProvider(provider);
+    $('provider-command').textContent = provider === 'codex' ? 'codex login' : 'agy';
+    await checkProvider();
+  })().catch(notice);
+};
 on('check-provider', () => checkProvider());
 on('choose-cli', async () => {
   const path = await api.chooseExecutable();
@@ -604,7 +614,9 @@ async function start() {
   const preferences = await api.preferences();
   recent = preferences.recent;
   $('recent').hidden = !recent;
-  await checkProvider(preferences.executable);
+  $('provider').value = preferences.provider ?? 'antigravity';
+  $('provider-command').textContent = preferences.provider === 'codex' ? 'codex login' : 'agy';
+  await checkProvider();
 }
 void start().catch(notice);
 setInterval(() => {

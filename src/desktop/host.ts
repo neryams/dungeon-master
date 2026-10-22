@@ -19,6 +19,8 @@ import {
   grantCampaignPermission,
 } from './antigravity.js';
 
+import { CodexSession, detectCodex } from './codex.js';
+import { Provider } from './contracts.js';
 import { LanGame } from './lan.js';
 
 const execute = promisify(execFile);
@@ -36,7 +38,8 @@ export class DesktopHost {
   private changing = false;
   private generation = 0;
   private stage: Stage = 'disconnected';
-  private detail = 'Connect Antigravity to start playing.';
+  private detail = 'Connect a DM provider to start playing.';
+  private provider: Provider = 'antigravity';
   private conversationId?: string;
   private mapCache?: { key: string; image: string; warnings: string[] };
   private mapping = false;
@@ -53,8 +56,9 @@ export class DesktopHost {
     },
   ) {}
 
-  async detect(path?: string) {
-    return (this.options.probe ?? detectAntigravity)(path);
+  async detect(path?: string, provider: Provider = 'antigravity') {
+    Provider.parse(provider);
+    return (this.options.probe ?? (provider === 'codex' ? detectCodex : detectAntigravity))(path);
   }
   private async outsideSource(path: string) {
     const source = await realpath(this.options.source);
@@ -140,19 +144,7 @@ export class DesktopHost {
         await safePath(store.root, '.dm/hotseat/owner.json', false),
         JSON.stringify({ pid: process.pid, token: this.ownerToken }),
       );
-      this.sessionFile = await safePath(store.root, '.dm/hotseat/session.json', false);
-      this.conversationId = undefined;
-      try {
-        const cache = JSON.parse(await readFile(this.sessionFile, 'utf8'));
-        if (
-          cache.campaignRoot === store.root &&
-          typeof cache.conversationId === 'string' &&
-          /^[a-zA-Z0-9_-]{1,100}$/.test(cache.conversationId)
-        )
-          this.conversationId = cache.conversationId;
-      } catch {
-        /* Agent context is optional; campaign events are authoritative. */
-      }
+      await this.loadSession('antigravity');
       for (const turn of (await store.read()).state.table ?? [])
         if (turn.status === 'pending')
           await this.change(
@@ -160,7 +152,7 @@ export class DesktopHost {
             `table-recover-${turn.id}`,
           );
       this.stage = 'disconnected';
-      this.detail = 'Campaign loaded. Connect Antigravity to continue.';
+      this.detail = 'Campaign loaded. Connect a DM provider to continue.';
       return await this.snapshot();
     } catch (error) {
       if (this.store === store) {
@@ -196,7 +188,30 @@ export class DesktopHost {
     }
     throw new Error('Campaign is changing in another client. Try again once it is idle.');
   }
-  async connect(executable?: string, fresh = false) {
+  private async loadSession(provider: Provider) {
+    this.provider = provider;
+    this.sessionFile = await safePath(
+      this.requireStore().root,
+      provider === 'codex' ? '.dm/hotseat/codex-session.json' : '.dm/hotseat/session.json',
+      false,
+    );
+    this.conversationId = undefined;
+    try {
+      const cache = JSON.parse(await readFile(this.sessionFile, 'utf8'));
+      if (
+        cache.campaignRoot === this.requireStore().root &&
+        (cache.provider ?? 'antigravity') === provider &&
+        typeof cache.conversationId === 'string' &&
+        /^[a-zA-Z0-9_-]{1,100}$/.test(cache.conversationId)
+      )
+        this.conversationId = cache.conversationId;
+    } catch {
+      /* Optional provider context; events remain authoritative. */
+    }
+  }
+  async connect(executable?: string, fresh = false, provider: Provider = 'antigravity') {
+    Provider.parse(provider);
+    const label = provider === 'codex' ? 'Codex' : 'Antigravity';
     const store = this.requireStore();
     if (!this.leaseHealthy)
       throw new Error('The campaign session lock was lost. Reopen the campaign.');
@@ -207,22 +222,36 @@ export class DesktopHost {
     };
     this.connecting = true;
     this.stage = 'connecting';
-    this.detail = 'Checking Antigravity and campaign tools…';
+    this.detail = `Checking ${label} and campaign tools…`;
     try {
       await this.agent?.close();
       this.agent = undefined;
-      const found = await this.detect(executable);
+      const found = await this.detect(executable, provider);
       checkActive();
       const workspace = await prepareWorkspace(
         store,
         this.options.source,
         this.options.env,
         this.ownerToken,
+        provider,
       );
       checkActive();
-      await grantCampaignPermission(workspace.serverName, this.options.permissionPath);
+      if (provider === 'antigravity')
+        await grantCampaignPermission(workspace.serverName, this.options.permissionPath);
+      await this.loadSession(provider);
       checkActive();
-      if (fresh) this.conversationId = undefined;
+      if (fresh) {
+        this.conversationId = undefined;
+        await unlink(this.sessionFile!).catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+      }
+      if (provider === 'codex')
+        await atomicWrite(
+          await safePath(store.root, '.dm/hotseat/codex-artifacts.json', false),
+          JSON.stringify({ ownerToken: this.ownerToken, paths: [] }),
+        );
+      const imagePaths = new Set<string>();
       const config = {
         executable: found.path,
         cwd: workspace.dir,
@@ -231,23 +260,38 @@ export class DesktopHost {
         progress: (text: string) => {
           this.detail = text;
         },
-        onConversation: (id: string) => {
+        onConversation: async (id: string) => {
+          checkActive();
           this.conversationId = id;
+          await this.saveSession();
+        },
+        serverName: workspace.serverName,
+        server: workspace.server,
+        onImage: async (path: string) => {
+          checkActive();
+          imagePaths.add(path);
+          await atomicWrite(
+            await safePath(store.root, '.dm/hotseat/codex-artifacts.json', false),
+            JSON.stringify({ ownerToken: this.ownerToken, paths: [...imagePaths].slice(-200) }),
+          );
         },
       };
-      this.agent = this.options.driver?.(config) ?? new AntigravitySession(config);
+      checkActive();
+      this.agent =
+        this.options.driver?.(config) ??
+        (provider === 'codex' ? new CodexSession(config) : new AntigravitySession(config));
       const check = await this.agent.run(
         `Connection check only. Use the ${workspace.serverName} campaign_status tool now. Verify campaign id ${JSON.stringify(store.config.id)}. Do not change any campaign state, resume any pending action, publish messages, or use other servers. Return only READY if the tool succeeds. This is a hotseat application; later player responses MUST use publish_table_message with the supplied requestId. Raw assistant text is private and not shown to players.`,
       );
       checkActive();
       if (!check.campaignIds.includes(store.config.id))
         throw new Error(
-          'The campaign tool check did not confirm this campaign. Check Antigravity sign-in and permission rules, then reconnect.',
+          `The campaign tool check did not confirm this campaign. Check ${label} sign-in and permission rules, then reconnect.`,
         );
       await this.saveSession();
       checkActive();
       this.stage = 'ready';
-      this.detail = `Antigravity ${found.version} connected. Your table is ready.`;
+      this.detail = `${label} ${found.version} connected. Your table is ready.`;
       return { ...found, connected: true };
     } catch (e) {
       await this.agent?.close();
@@ -265,6 +309,7 @@ export class DesktopHost {
         this.sessionFile,
         JSON.stringify({
           campaignRoot: this.requireStore().root,
+          provider: this.provider,
           conversationId: this.conversationId,
         }),
       );
