@@ -90,7 +90,7 @@ npm run desktop
 
 The app detects the CLI, guides campaign creation or opening, and connects the DM. Choose a character, type an action, and pass the seat to the next player. Public DM narration appears beside the revealed map, exact character sheets, inventory, resources and quests. Campaign state and the table transcript survive restarts. Interrupted actions are never automatically replayed.
 
-This MVP uses one computer and Antigravity. It requires Node 22.12+ and Git; it is launched from this checkout, with no signed installer yet. The existing ChatGPT/Codex plugin and read-only LAN panel remain available. New campaigns created in the desktop also receive the standard campaign-bound ChatGPT/Codex plugin configuration.
+The app supports hotseat and browser-based LAN multiplayer using one host’s Antigravity CLI. Choose **Host LAN game** to share a QR code/link with phones on the same network. Players claim characters, prepare shared intentions, and confirm group submissions; combat follows saved initiative and the DM can request targeted decisions/reactions. It requires Node 22.12+ and Git; it is launched from this checkout, with no signed installer yet. The existing ChatGPT/Codex plugin and read-only LAN panel remain available. New campaigns created in the desktop also receive the standard campaign-bound ChatGPT/Codex plugin configuration.
 
 Connecting creates an app workspace under the campaign's `.dm/hotseat` directory and adds one exact campaign-server MCP permission to Antigravity's settings. It preserves unrelated settings, existing deny/ask rules and CLI credentials. See [desktop setup, recovery and testing](docs/desktop.md).
 

@@ -18,11 +18,42 @@
       <div id="campaign-heading">Campaigns</div>
       <div class="top-actions">
         <span id="revision"></span>
+        <button id="lan-host" class="quiet" hidden>Host LAN game</button>
+        <button id="lan-join" class="quiet">Join LAN</button>
         <button id="campaigns" class="quiet" hidden>Campaigns</button>
         <button id="connection" class="secondary" hidden>Connect DM</button>
         <button id="stop" class="quiet" hidden>Stop DM</button>
       </div>
     </header>
+    <dialog id="lan-dialog">
+      <h2>LAN game</h2>
+      <p id="lan-help">
+        Phones join on the same Wi-Fi. Keep this computer awake; allow the displayed port through
+        your firewall. Use a trusted local network.
+      </p>
+      <img id="lan-qr" alt="Scan to join this game" width="200" height="200" />
+      <label>Join link<select id="lan-links"></select></label>
+      <div class="button-row">
+        <button id="lan-copy">Copy link</button><button id="lan-play">Open player seat</button
+        ><button id="lan-rotate">New invite link</button>
+      </div>
+      <div id="lan-players"></div>
+      <div id="lan-required"></div>
+      <div class="button-row">
+        <button id="lan-resolve">Resolve confirmed replies</button
+        ><button id="lan-continue">Continue NPC turn</button
+        ><button id="lan-stop">Stop sharing</button><button id="lan-close">Close</button>
+      </div>
+    </dialog>
+    <dialog id="join-dialog">
+      <h2>Join LAN game</h2>
+      <label
+        >Game link<input id="join-link" type="url" placeholder="http://192.168.1.10:port/#…"
+      /></label>
+      <div class="button-row">
+        <button id="join-open">Join</button><button id="join-close">Cancel</button>
+      </div>
+    </dialog>
     <main id="welcome">
       <section class="connection-setup" aria-label="Connection and campaigns">
         <div class="setup-heading">

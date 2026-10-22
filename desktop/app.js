@@ -225,6 +225,7 @@ function renderState() {
   $('revision').textContent = `Saved · r${state.revision}`;
   $('connection').hidden = false;
   $('campaigns').hidden = false;
+  $('lan-host').hidden = false;
   const busy = state.stage === 'connecting' || state.stage === 'resolving';
   $('stop').hidden = state.stage !== 'resolving' && state.stage !== 'ready';
   $('campaigns').disabled = busy;
@@ -235,9 +236,11 @@ function renderState() {
       : state.stage === 'connecting'
         ? 'Connecting…'
         : 'Connect DM';
-  $('send').disabled = state.stage !== 'ready' || submitting;
-  $('status-text').textContent =
-    state.stage === 'ready'
+  $('send').disabled = state.stage !== 'ready' || submitting || state.lanHosted;
+  $('lan-host').textContent = state.lanHosted ? 'LAN game' : 'Host LAN game';
+  $('status-text').textContent = state.lanHosted
+    ? 'Use LAN game → Open player seat to play.'
+    : state.stage === 'ready'
       ? 'DM connected'
       : state.stage === 'disconnected'
         ? 'Connect DM to send an action.'
@@ -508,3 +511,122 @@ void start().catch(notice);
 setInterval(() => {
   if (!$('play').hidden) void refresh();
 }, 1000);
+
+let lanInfo;
+async function showLan() {
+  lanInfo = await api.lanStatus();
+  if (!lanInfo) {
+    $('lan-dialog').close();
+    return;
+  }
+  const previous = $('lan-links').value;
+  $('lan-links').replaceChildren(
+    ...lanInfo.urls.map((url) => {
+      const o = node('option', url);
+      o.value = url;
+      return o;
+    }),
+  );
+  $('lan-links').value = lanInfo.urls.includes(previous)
+    ? previous
+    : (lanInfo.urls.find((u) => !u.includes('127.0.0.1')) ?? lanInfo.urls[0]);
+  $('lan-qr').src = lanInfo.qrs[lanInfo.urls.indexOf($('lan-links').value)];
+  $('lan-players').replaceChildren();
+  for (const p of lanInfo.players) {
+    const row = node('div', undefined, 'button-row');
+    row.append(
+      node(
+        'span',
+        `${p.name} · ${p.characterId ?? 'No character'}${p.connected ? '' : ' · Offline'}`,
+      ),
+    );
+    for (const action of ['release', 'remove']) {
+      const b = node('button', action === 'release' ? 'Release seat' : 'Remove player');
+      b.onclick = () => api.lanAdmin({ action, clientId: p.id }).then(showLan).catch(notice);
+      row.append(b);
+    }
+    const assignment = node('select');
+    assignment.setAttribute('aria-label', `Assign character to ${p.name}`);
+    const blank = node('option', 'Assign character…');
+    blank.value = '';
+    assignment.append(blank);
+    for (const member of state.party?.members ?? []) {
+      if (lanInfo.players.some((other) => other.id !== p.id && other.characterId === member.id))
+        continue;
+      const option = node('option', member.name);
+      option.value = member.id;
+      assignment.append(option);
+    }
+    assignment.onchange = () => {
+      if (assignment.value)
+        void api
+          .lanAdmin({ action: 'assign', clientId: p.id, characterId: assignment.value })
+          .then(showLan)
+          .catch(notice);
+    };
+    row.append(assignment);
+    $('lan-players').append(row);
+  }
+  const snapshot = await api.snapshot();
+  const g = snapshot.gathering;
+  const required =
+    g?.request?.characterIds ??
+    (snapshot.encounter
+      ? snapshot.encounter.activeId
+        ? [snapshot.encounter.activeId]
+        : []
+      : (g?.seats ?? []));
+  $('lan-required').replaceChildren();
+  for (const id of required) {
+    const b = node(
+      'button',
+      `Pass for ${snapshot.party.members.find((p) => p.id === id)?.name ?? id}`,
+    );
+    b.disabled = snapshot.stage !== 'ready';
+    b.onclick = () => api.lanAdmin({ action: 'skip', characterId: id }).then(showLan).catch(notice);
+    $('lan-required').append(b);
+  }
+  $('lan-resolve').disabled = snapshot.stage !== 'ready';
+  $('lan-continue').disabled =
+    snapshot.stage !== 'ready' ||
+    !snapshot.encounter ||
+    !!g?.request ||
+    snapshot.party.members.some((p) => p.id === snapshot.encounter?.activeId);
+}
+on('lan-host', async () => {
+  await api.startLan();
+  await showLan();
+  $('lan-dialog').showModal();
+});
+on('lan-close', () => $('lan-dialog').close());
+on('lan-stop', async () => {
+  await api.stopLan();
+  await showLan();
+});
+on('lan-copy', () => navigator.clipboard.writeText($('lan-links').value));
+on('lan-play', () => api.joinLan(lanInfo.urls[0]));
+on('lan-rotate', async () => {
+  await api.lanAdmin({ action: 'rotate' });
+  await showLan();
+});
+on('lan-resolve', async () => {
+  await api.lanAdmin({ action: 'resolve' });
+  await showLan();
+});
+on('lan-continue', async () => {
+  await api.lanAdmin({ action: 'continue' });
+  await showLan();
+});
+on('lan-join', () => $('join-dialog').showModal());
+on('join-close', () => $('join-dialog').close());
+on('join-open', async () => {
+  await api.joinLan($('join-link').value);
+  $('join-dialog').close();
+});
+setInterval(() => {
+  if ($('lan-dialog').open) void showLan().catch(notice);
+}, 3000);
+
+$('lan-links').onchange = () => {
+  $('lan-qr').src = lanInfo.qrs[lanInfo.urls.indexOf($('lan-links').value)];
+};

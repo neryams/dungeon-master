@@ -1,1 +1,22 @@
 @import url('./theme.css');
+
+dialog {
+  color: var(--text, #e6e1cf);
+  background: #252e27;
+  border: 1px solid #697052;
+  border-radius: 12px;
+  max-width: min(700px, 90vw);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+}
+dialog::backdrop {
+  background: #0009;
+}
+#lan-links {
+  width: 100%;
+}
+#lan-players,
+#lan-required {
+  margin: 16px 0;
+}

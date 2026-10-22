@@ -458,11 +458,59 @@ export const ReviewOperation = z.discriminatedUnion('type', [
     .strict(),
 ]);
 // Optional hotseat conversation events preserve existing campaign histories.
+export const ResponseRequest = z
+  .object({
+    characterIds: z
+      .array(Id)
+      .min(1)
+      .max(20)
+      .refine((ids) => new Set(ids).size === ids.length, 'Choose each character once'),
+    prompt: RequiredText,
+    kind: z.enum(['decision', 'reaction']).default('decision'),
+  })
+  .strict();
+export const GroupAction = z
+  .object({
+    characterId: Id,
+    text: z.string().max(20000),
+    confirmed: z.boolean(),
+    pass: z.boolean(),
+  })
+  .strict();
+export interface Gathering {
+  epoch: number;
+  seats: string[];
+  actions: Record<string, z.infer<typeof GroupAction>>;
+  request?: z.infer<typeof ResponseRequest>;
+}
 export const TableOperation = z.discriminatedUnion('type', [
   z
-    .object({ type: z.literal('submit'), id: Id, characterId: Id.optional(), text: RequiredText })
+    .object({
+      type: z.literal('submit'),
+      id: Id,
+      characterId: Id.optional(),
+      text: RequiredText,
+      actions: z.array(GroupAction).max(20).optional(),
+      groupEpoch: z.number().int().nonnegative().optional(),
+    })
     .strict(),
-  z.object({ type: z.literal('publish'), requestId: Id, text: RequiredText }).strict(),
+  z
+    .object({
+      type: z.literal('publish'),
+      requestId: Id,
+      text: RequiredText,
+      responseRequest: ResponseRequest.optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal('seats'), characterIds: z.array(Id).max(20) }).strict(),
+  z
+    .object({
+      type: z.literal('intent'),
+      epoch: z.number().int().nonnegative(),
+      action: GroupAction,
+    })
+    .strict(),
+  z.object({ type: z.literal('reset_intents') }).strict(),
   z
     .object({
       type: z.literal('finish'),
@@ -479,6 +527,8 @@ export interface TableTurn {
   revision: number;
   status: 'pending' | 'completed' | 'interrupted';
   messages: { text: string; revision: number }[];
+  actions?: z.infer<typeof GroupAction>[];
+  responseRequest?: z.infer<typeof ResponseRequest>;
 }
 export const Payload = z
   .object({
@@ -522,6 +572,7 @@ export type CampaignConfig = z.infer<typeof CampaignConfig>;
 export interface State {
   revision: number;
   table?: TableTurn[];
+  gathering?: Gathering;
   reviewMode?: z.infer<typeof ReviewMode>;
   actions?: Record<string, ReviewAction>;
   focus?: z.infer<typeof Focus>;
