@@ -55,7 +55,29 @@ test(
       expectedRevision: 4,
       reason: 'UI fixture',
       requestId: 'ui-turn',
-      text: 'The boards creak beneath your boots. Below, the river carries the last light of dusk toward the island. Oren raises his lantern from the landing.\n\nA weathered sign points toward the tollhouse. Tess waits at your shoulder. Which way do you go?\n\n<script>window.UNSAFE = true</script>',
+      text: `The boards creak beneath your boots. Below, the river carries the last light of dusk toward the island. Oren raises his lantern from the landing.
+
+## The Tollhouse
+
+A weathered sign points toward the tollhouse. Tess **waits** at your *shoulder*. Which way do you go?
+
+- The lantern flickers.
+- The river runs below.
+
+1. Inspect the sign.
+2. Cross the bridge.
+
+The worn words read \`old bridge\`.
+
+\`\`\`text
+The boards creak.
+\`\`\`
+
+<script>window.UNSAFE = true</script>
+<img src="https://example.invalid/hostile.png" onerror="window.UNSAFE = true">
+<div onclick="window.UNSAFE = true">raw HTML stays text</div>
+![remote image](https://example.invalid/markdown.png)
+[unsafe link](javascript:window.UNSAFE = true)`,
     });
     const background = join(store.root, 'assets/ui-background.png');
     await writeFile(
@@ -166,6 +188,24 @@ test(
     await page.waitForFunction(() => document.getElementById('map-image').naturalWidth > 0);
     assert.match(await page.locator('#transcript').innerText(), /boards creak/);
     assert.match(await page.locator('#transcript').innerText(), /Turn interrupted/);
+    const narration = page.locator('#transcript .message-markdown:has(h2)');
+    assert.equal(await narration.locator('h2').count(), 1);
+    assert.equal(await narration.locator('strong').innerText(), 'waits');
+    assert.equal(await narration.locator('em').innerText(), 'shoulder');
+    assert.equal(await narration.locator('ul li').count(), 2);
+    assert.equal(await narration.locator('ol li').count(), 2);
+    assert.equal(await narration.locator('code').count(), 2);
+    assert.equal(await narration.locator('pre code').count(), 1);
+    assert.equal(
+      await page.locator('#transcript script, #transcript img, #transcript a').count(),
+      0,
+    );
+    assert.match(
+      await page.locator('#transcript').innerText(),
+      /<script>window\.UNSAFE = true<\/script>/,
+    );
+    assert.match(await page.locator('#transcript').innerText(), /<img src=/);
+    assert.match(await page.locator('#transcript').innerText(), /unsafe link/);
     assert.equal(await page.evaluate(() => window.UNSAFE), undefined);
     assert.doesNotMatch(await page.locator('body').innerText(), /stranded keeper|stranded child/);
     await page.locator('#party button').first().click();

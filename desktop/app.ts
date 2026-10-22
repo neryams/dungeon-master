@@ -8,6 +8,7 @@ import type {
   LocalSettings,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
+import { markdownMessage } from './markdown.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -263,7 +264,9 @@ function renderTranscript() {
     const article = node('article', undefined, `message${player ? ' player' : ''}`);
     const label = node('div', undefined, 'message-label');
     label.append(node('span', speaker.toUpperCase()), node('small', `r${revision}`));
-    article.append(label, node('div', text, 'message-text'));
+    const body = markdownMessage(text);
+    body.classList.add('message-text');
+    article.append(label, body);
     log.append(article);
     return article;
   }

@@ -1,4 +1,5 @@
 @import url('./theme.css');
+@import url('./markdown.css');
 
 dialog {
   color: var(--text, #e6e1cf);

@@ -8,7 +8,14 @@
     "types": [],
     "declaration": true
   },
-  "include": ["desktop/app.ts", "desktop/lan.ts", "desktop/dom.ts", "desktop/globals.d.ts"],
+  "include": [
+    "desktop/app.ts",
+    "desktop/lan.ts",
+    "desktop/dom.ts",
+    "desktop/markdown.ts",
+    "desktop/globals.d.ts",
+    "desktop/vendor/*.d.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.json"

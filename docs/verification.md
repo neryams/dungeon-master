@@ -40,7 +40,7 @@ One pending action is supported at a time. The server trusts supplied referee re
 
 ## Electron hotseat
 
-The hotseat implementation adds offline event/protocol/coordinator tests to `npm test`. `npm run test:desktop` launches Electron and checks setup, renderer isolation, literal public text, secret filtering, party/map display, seat switching, state refresh, restart and campaign creation retaining the ChatGPT/Codex plugin configuration. Screenshot paths are printed for visual inspection.
+The hotseat implementation adds offline event/protocol/coordinator tests to `npm test`. `npm run test:desktop` launches Electron and checks setup, renderer isolation, formatted public messages with escaped HTML, secret filtering, party/map display, seat switching, state refresh, restart and campaign creation retaining the ChatGPT/Codex plugin configuration. Desktop and LAN UI checks cover Markdown headings, emphasis, lists and code while asserting that scripts, images and links never become message DOM elements. Screenshot paths are printed for visual inspection.
 
 Campaign setup has offline coverage for an idempotent introductory request, concurrent starts, interruption/reopen without replay, explicit continuation and legacy/reviewed campaigns. The Electron smoke checks the focused creation layout at the supported minimum window size, saved party/map progress, reopening unfinished setup and transition to the play layout. `npm run test:setup` opts into a live Codex guided-creation scenario with a temporary campaign and private journal runtime; it uses the host account and skips artwork.
 

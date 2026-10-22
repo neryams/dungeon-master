@@ -55,7 +55,15 @@ export class LanGame {
     ];
     const assets = new Map(
       await Promise.all(
-        ['lan.html', 'lan.js', 'lan.css', 'dom.js'].map(
+        [
+          'lan.html',
+          'lan.js',
+          'lan.css',
+          'dom.js',
+          'markdown.js',
+          'markdown.css',
+          'vendor/markdown-it.js',
+        ].map(
           async (file) =>
             [
               file === 'lan.html' ? '/' : `/${file}`,
