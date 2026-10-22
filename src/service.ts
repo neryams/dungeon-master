@@ -1,9 +1,11 @@
 import { refereeInputs, refereeDescriptions, executeReferee } from './referee-service.js';
 import { actionStatus } from './review.js';
 import { characterSheet, partyOverview } from './sheets.js';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import sharp from 'sharp';
-import { prepareMap, renderMap, schematic } from './maps.js';
+import { prepareMap, renderMap, schematic, type RenderMode } from './maps.js';
+import { geometryFingerprint } from './map-art.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CampaignStore, atomicWrite, safePath } from './store.js';
@@ -58,6 +60,7 @@ export const inputs = {
       audience: Audience,
       revision: z.number().int().min(0).optional(),
       viewport: Viewport.optional(),
+      mode: z.enum(['map', 'reference']).default('map'),
     })
     .strict(),
   set_map_reveal: z
@@ -135,11 +138,11 @@ export const descriptions: Record<ToolName, string> = {
   update_map_positions:
     'Atomically set listed positions or move an explicitly selected roster group; omitted markers stay. Same-level transfers remove old placements. Save before rendering and return original-revision PNG on exact retry.',
   render_location_map:
-    'Render saved state as PNG pixels without gameplay changes. Optional revision enables render-only recovery. Player audience filters hidden geometry and markers.',
+    'Render saved state as PNG pixels without gameplay changes. Choose map (schematic with artwork overlay) or reference (clean layout guide without markers or labels, intended for image generation). Optional revision enables render-only recovery. Player audience filters hidden geometry and markers.',
   set_map_reveal:
     'Explicitly reveal or conceal nodes, cells, regions and features, then render. No automatic line of sight.',
   register_map_art:
-    'Register existing campaign-local assets with purpose, source map revision and explicit visibility. Artwork is displayed separately from schematic grids.',
+    'Register an existing campaign-local image with purpose, source map revision and explicit visibility. Optionally align it as a map background by providing its cell extent; the saved background is tied to the map geometry and exact image bytes.',
   campaign_status:
     'Inspect the bound campaign identity, current revision, active session and journal delivery health. No arbitrary workspace paths.',
   resume_campaign:
@@ -207,7 +210,7 @@ export class CampaignService {
       }
       case 'render_location_map': {
         const i = inputs[name].parse(raw);
-        return this.renderAt(i.mapId, i.audience, i.revision, i.viewport);
+        return this.renderAt(i.mapId, i.audience, i.revision, i.viewport, i.mode);
       }
       case 'create_location_map': {
         const i = inputs[name].parse(raw);
@@ -286,6 +289,7 @@ export class CampaignService {
       }
       case 'register_map_art': {
         const i = inputs[name].parse(raw);
+        let registeredArt = i.art;
         const { events } = await this.store.read();
         // Exact retries do not depend on a derived or moved asset still existing.
         if (!events.some((e) => e.operationId === i.operationId)) {
@@ -294,19 +298,55 @@ export class CampaignService {
           if (!file.isFile() || file.size > 50 * 1024 * 1024)
             throw new CampaignError('INVALID_ART', 'Expected an asset file up to 50 MiB');
           try {
-            await sharp(assetPath).metadata();
+            const bytes = await readFile(assetPath);
+            if (bytes.byteLength > 50 * 1024 * 1024) throw new Error('Asset exceeds size limit');
+            const metadata = await sharp(bytes, { limitInputPixels: 40_000_000 }).metadata();
+            if (
+              !metadata.width ||
+              !metadata.height ||
+              metadata.width * metadata.height > 40_000_000
+            )
+              throw new Error('Image exceeds decoded pixel limit');
+            if (i.art.background) {
+              await sharp(bytes, { limitInputPixels: 40_000_000 }).resize(1, 1).toBuffer();
+              registeredArt = {
+                ...i.art,
+                sha256: createHash('sha256').update(bytes).digest('hex'),
+              };
+            }
           } catch {
             throw new CampaignError('INVALID_ART', 'Asset is not a supported image');
           }
-          const source = replay(events.slice(0, i.art.sourceRevision));
-          if (!source.entities[i.mapId]?.map || source.revision !== i.art.sourceRevision)
-            throw new CampaignError('INVALID_ART', 'Source revision must contain this map');
         }
         return mutationResult(
-          await this.store.transact(this.meta(i), { name, input: i }, () => ({
-            changes: [{ type: 'register_art', map: i.mapId, art: i.art }],
-            records: [],
-          })),
+          await this.store.transact(this.meta(i), { name, input: i }, (state, currentEvents) => {
+            const source = replay(currentEvents.slice(0, i.art.sourceRevision));
+            const sourceMap = source.entities[i.mapId]?.map;
+            const currentMap = state.entities[i.mapId]?.map;
+            if (!sourceMap || source.revision !== i.art.sourceRevision || !currentMap)
+              throw new CampaignError('INVALID_ART', 'Source revision must contain this map');
+            if (i.art.background) {
+              const geometryHash = geometryFingerprint(sourceMap);
+              if (geometryHash !== geometryFingerprint(currentMap))
+                throw new CampaignError(
+                  'INVALID_ART',
+                  'Map geometry changed since the artwork source revision',
+                );
+              if (i.art.background.geometryHash && i.art.background.geometryHash !== geometryHash)
+                throw new CampaignError(
+                  'INVALID_ART',
+                  'Artwork geometry hash does not match source map',
+                );
+              registeredArt = {
+                ...registeredArt,
+                background: { ...i.art.background, geometryHash },
+              };
+            }
+            return {
+              changes: [{ type: 'register_art', map: i.mapId, art: registeredArt }],
+              records: [],
+            };
+          }),
         );
       }
       case 'campaign_status': {
@@ -473,12 +513,13 @@ export class CampaignService {
     audience: 'dm' | 'party',
     revision?: number,
     viewport?: z.infer<typeof Viewport>,
+    mode: RenderMode = 'map',
   ) {
     const { events, state } = await this.store.read();
     if (revision !== undefined && revision > state.revision)
       throw new CampaignError('NOT_FOUND', 'Revision not found');
     const source = revision === undefined ? state : replay(events.slice(0, revision));
-    return this.renderer(this.store.root, source, mapId, audience, viewport);
+    return this.renderer(this.store.root, source, mapId, audience, viewport, mode);
   }
   private async renderMutation(
     result: Awaited<ReturnType<CampaignStore['transact']>>,

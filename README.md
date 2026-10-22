@@ -16,15 +16,17 @@ This creates `~/Campaigns/my-campaign`, a separate local Git repository, a campa
 
 A new campaign initially has no characters and has one setup-policy event. The create-campaign skill collects the party and starting situation and persists them through the domain tools. Pass `--config campaign-options.json` to init for `premise`, `tone`, and `houseRules`; these fields are player-facing.
 
+When the host supports built-in image generation, campaign setup can create an illustrated background for the starting map. The renderer keeps map positions and topology authoritative, overlays live map details, and preserves player reveal masking. Artwork generation is optional; the schematic remains available if generation or registration fails. The plugin makes no model API calls.
+
 If your client doesn't discover local plugins, use the direct MCP and skill installation instructions in [installation.md](docs/installation.md). Generic portable plugin installations need `npm link` and an explicit `DM_CAMPAIGN_ROOT`; the generated campaign plugin does not.
 
 ## What is included
 
 - Exact characters, HP/temp HP, inventory, resources, conditions, initiative, world time, story progress, party roster and map positions.
-- Graph/grid map authoring, atomic subgroup movement, explicit reveal masks and actual PNG tool responses.
+- Graph/grid map authoring, atomic subgroup movement, explicit reveal masks, illustrated backgrounds aligned to saved map geometry and PNG tool responses.
 - Cryptographic dice, recorded physical dice, idempotent retries, revision conflicts and explicit corrections.
 - Append-only JSON event history, replayable state, Markdown scene records and journal-backed historical retrieval.
-- Seven skills: create, run, close, maintain, player sheets, rules referee, and optional host-generated artwork.
+- Seven campaign skills: create, run, close, maintain, player sheets, rules referee and optional host-generated map artwork.
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.
 

@@ -453,7 +453,9 @@ async function map() {
     if (seq !== imageRequest || data.revision !== rev) return;
     $('image').hidden = false;
     imageKey = key;
-    $('map-status').textContent = 'Saved revision ' + rev + ' · Player view';
+    const warnings = JSON.parse(decodeURIComponent(r.headers.get('X-Map-Warnings') || '%5B%5D'));
+    $('map-status').textContent = 'Saved revision ' + rev + ' · Player view' +
+      (warnings.length ? ' · ' + warnings.join(' ') : '');
   } catch (e) {
     if (seq === imageRequest)
       $('map-status').textContent = 'Map unavailable: ' + e.message;

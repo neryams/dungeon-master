@@ -1,11 +1,10 @@
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
-import sharp from 'sharp';
 import { CampaignStore } from './store.js';
 import { partyState } from './domain.js';
 import { characterSheet, partyOverview } from './sheets.js';
-import { schematic } from './maps.js';
+import { renderMapImage } from './maps.js';
 import { Id, Viewport } from './schema.js';
 import { html, script, css } from './panel-ui.js';
 
@@ -16,7 +15,7 @@ export async function startPanel(root: string, options: { lan?: boolean; port?: 
     (entries ?? []).filter((e) => e.family === 'IPv4' && !e.internal).map((e) => e.address),
   );
   const hosts = new Set(['localhost', '127.0.0.1', ...(options.lan ? addresses : [])]);
-  const cache = new Map<string, Buffer>();
+  const cache = new Map<string, { png: Buffer; warnings: string[] }>();
   let cachedRevision = -1;
   let rendering = false;
   const server = createServer(async (req, res) => {
@@ -120,16 +119,21 @@ export async function startPanel(root: string, options: { lan?: boolean; port?: 
         cachedRevision = state.revision;
       }
       const key = JSON.stringify([state.revision, id, viewport]);
-      let png = cache.get(key);
-      if (!png) {
+      let rendered = cache.get(key);
+      if (!rendered) {
         if (rendering) return send(503, '{"error":"Map renderer busy; retry"}');
         rendering = true;
         try {
-          png = await sharp(Buffer.from(schematic(original, id, 'party', viewport).svg))
-            .png()
-            .toBuffer();
+          const { png, warnings } = await renderMapImage(
+            store.root,
+            original,
+            id,
+            'party',
+            viewport,
+          );
+          rendered = { png, warnings };
           if (cache.size >= 8) cache.delete(cache.keys().next().value!);
-          cache.set(key, png);
+          cache.set(key, rendered);
         } finally {
           rendering = false;
         }
@@ -138,7 +142,9 @@ export async function startPanel(root: string, options: { lan?: boolean; port?: 
       if ((await store.read()).state.revision !== state.revision)
         return send(409, '{"error":"Refresh state"}');
       res.setHeader('X-Campaign-Revision', String(state.revision));
-      return send(200, png, 'image/png');
+      if (rendered.warnings.length)
+        res.setHeader('X-Map-Warnings', encodeURIComponent(JSON.stringify(rendered.warnings)));
+      return send(200, rendered.png, 'image/png');
     } catch (error) {
       const invalid = error instanceof Error && error.name === 'ZodError';
       send(

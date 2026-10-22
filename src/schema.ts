@@ -88,6 +88,18 @@ export const Region = z
 export const Viewport = z
   .object({ x: Int, y: Int, width: Int.min(1).max(40), height: Int.min(1).max(40) })
   .strict();
+const ArtExtent = Viewport.superRefine((extent, ctx) => {
+  if (!Number.isSafeInteger(extent.x + extent.width))
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Extent x boundary must be a safe integer',
+    });
+  if (!Number.isSafeInteger(extent.y + extent.height))
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Extent y boundary must be a safe integer',
+    });
+});
 export const MapArt = z
   .object({
     path: z
@@ -97,6 +109,20 @@ export const MapArt = z
     purpose: Text,
     sourceRevision: Nonnegative,
     visibility: Visibility,
+    background: z
+      .object({
+        extent: ArtExtent,
+        geometryHash: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    sha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
   })
   .strict();
 export const MapData = z
