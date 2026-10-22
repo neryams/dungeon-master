@@ -6,6 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { resolve } from 'node:path';
 import { fixture, hero, apply } from './helpers.mjs';
 import { createMcpServer } from '../dist/server.js';
+import { MapEdge } from '../dist/schema.js';
 
 test('MCP exposes only domain tools, validates input and reports revision conflicts', async (t) => {
   const { service } = await fixture(t);
@@ -18,7 +19,18 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     await client.close();
     await server.close();
   });
-  const tools = (await client.listTools()).tools.map((t) => t.name);
+  const advertised = (await client.listTools()).tools;
+  // MCP hosts validating against JSON Schema 2020-12 reject draft-07 tuple items.
+  function checkItems(schema) {
+    if (!schema || typeof schema !== 'object') return;
+    if (!Array.isArray(schema)) assert.ok(!Array.isArray(schema.items), 'array-valued items');
+    for (const value of Object.values(schema)) checkItems(value);
+  }
+  for (const tool of advertised) checkItems(tool.inputSchema);
+  assert.deepEqual(MapEdge.parse(['from', 'to']), ['from', 'to']);
+  for (const edge of [[], ['from'], ['from', 'to', 'extra'], ['from', '../invalid']])
+    assert.equal(MapEdge.safeParse(edge).success, false);
+  const tools = advertised.map((t) => t.name);
   assert.equal(tools.length, 30);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));

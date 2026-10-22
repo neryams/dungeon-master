@@ -21,6 +21,7 @@ import {
   Cell,
   Region,
   MapArt,
+  MapEdge,
 } from './schema.js';
 
 const Audience = z.enum(['dm', 'party']).default('dm');
@@ -65,7 +66,7 @@ export const inputs = {
       mapId: Id,
       revealed: z.boolean(),
       nodes: z.array(Id).default([]),
-      edges: z.array(z.tuple([Id, Id])).default([]),
+      edges: z.array(MapEdge).default([]),
       cells: z.array(Cell).max(10000).default([]),
       regions: z.array(Region).max(1000).default([]),
       features: z.array(Id).default([]),

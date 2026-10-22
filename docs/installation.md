@@ -28,6 +28,31 @@ Merge this into the campaign's `.codex/config.toml`. Do not enable both the gene
 
 For another MCP client, use its equivalent stdio settings. Only the DM server is registered; its journal MCP connection remains internal.
 
+## Antigravity CLI (`agy`)
+
+Initialize a campaign with the commands above. Antigravity's native plugin loader
+uses `mcp_config.json` instead of `mcp.json`. In the generated campaign folder, run:
+
+```bash
+cp .dm/plugin/mcp.json .dm/plugin/mcp_config.json
+agy plugin validate .dm/plugin
+agy plugin install .dm/plugin
+```
+
+The native loader may warn that the per-server `type` field is ignored; `command`
+already selects stdio. You can remove that field from `mcp_config.json` to silence
+the warning. The generated copy binds the server to this campaign using absolute
+paths. Check `campaign_status` before play. Do not install the unbound source
+directory as the campaign plugin: its generic server command needs separate
+configuration, and its SRD `rules/` directory is not Antigravity agent rules.
+
+For automated `agy -p` runs, MCP calls need permission rules because headless mode
+cannot prompt. Allow only the installed campaign server's tools as needed; native
+plugin server names are prefixed (for example,
+`mcp(dungeon-master_dungeon-master/*)` in `permissions.allow` in
+`~/.gemini/antigravity-cli/settings.json`). Interactive sessions can prompt instead.
+The read-only player panel remains a separate optional process.
+
 ## Portable plugin package
 
 `npm run package:plugin` creates a portable folder and archive. Extract it, install dependencies with `npm ci`, build, and run `npm link` if using its generic `mcp.json`, whose command is `dungeon-master-mcp`. The command reads `--campaign`, then `DM_CAMPAIGN_ROOT`, then searches upward from cwd for `campaign.json`. Never rely on cwd when the client cannot guarantee it. The explicit generated campaign plugin is preferred for multiple campaigns.

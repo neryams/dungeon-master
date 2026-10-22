@@ -9,6 +9,12 @@ export const Id = z
 const Text = z.string().max(20000);
 const Int = z.number().int().safe();
 const Nonnegative = Int.min(0);
+// Homogeneous fixed-length arrays work in both draft-07 and 2020-12 JSON Schema.
+// Zod tuples emit draft-07 array-valued `items`, rejected by stricter MCP hosts.
+export const MapEdge = z
+  .array(Id)
+  .length(2)
+  .transform((edge): [string, string] => [edge[0], edge[1]]);
 export const Visibility = z.enum(['party', 'dm']);
 export const Resource = z.object({ current: Nonnegative, max: Nonnegative }).strict();
 export const Character = z
@@ -126,8 +132,8 @@ export const MapData = z
     art: z.array(MapArt).optional(),
     scale: z.string().max(100).default('5 feet'),
     nodes: z.array(Id).default([]),
-    edges: z.array(z.tuple([Id, Id])).default([]),
-    revealedEdges: z.array(z.tuple([Id, Id])).optional(),
+    edges: z.array(MapEdge).default([]),
+    revealedEdges: z.array(MapEdge).optional(),
     tokens: z
       .record(
         Id,
@@ -230,7 +236,7 @@ export const Change = z.discriminatedUnion('type', [
       map: Id,
       revealed: z.boolean(),
       nodes: z.array(Id).default([]),
-      edges: z.array(z.tuple([Id, Id])).default([]),
+      edges: z.array(MapEdge).default([]),
       cells: z.array(Cell).max(10000).default([]),
       regions: z.array(Region).max(1000).default([]),
       features: z.array(Id).default([]),
