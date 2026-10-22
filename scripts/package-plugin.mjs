@@ -21,6 +21,8 @@ for (const path of [
   'scripts',
   'desktop',
   'tsconfig.json',
+  'tsconfig.desktop.json',
+  'tsconfig.ui.json',
   'AGENTS.md',
   '.prettierrc.json',
   '.prettierignore',
@@ -29,6 +31,7 @@ for (const path of [
   '.github',
 ])
   await cp(path, join(root, path), { recursive: true });
+await cp('build/desktop', join(root, 'build/desktop'), { recursive: true });
 execFileSync('tar', [
   '-czf',
   resolve('build/dungeon-master-plugin.tgz'),

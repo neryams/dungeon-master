@@ -92,7 +92,7 @@ test(
         executablePath: electron,
         args: [
           ...(process.platform === 'linux' ? ['--ozone-platform=x11'] : []),
-          resolve('desktop/main.mjs'),
+          resolve('build/desktop/main.mjs'),
         ],
         env,
         timeout: 20000,
@@ -117,13 +117,8 @@ test(
     // Exercise the same bridge and renderer used by the file-picker path, without opening a native dialog or invoking a model.
     const load = async (page) =>
       page.evaluate(async (root) => {
-        state = await window.table.open(root);
-        shownRevision = -1;
-        transcriptKey = '';
-        mapKey = '';
-        document.getElementById('welcome').hidden = true;
-        document.getElementById('play').hidden = false;
-        renderState();
+        const { showCampaign } = await import('./app.js');
+        showCampaign(await window.table.open(root));
       }, store.root);
     await load(page);
     await page.waitForFunction(() => document.getElementById('map-image').naturalWidth > 0);
@@ -144,10 +139,13 @@ test(
         !document.getElementById('map-image').hidden &&
         document.getElementById('map-status').textContent.startsWith('r'),
     );
-    const viewport = await page.evaluate(() => ({
-      ...offset,
-      ...mapDimensions(state.maps.find((m) => m.id === selectedMap)),
-    }));
+    assert.equal(await page.locator('#map-size').inputValue(), 'auto');
+    const viewport = {
+      x: 0,
+      y: 0,
+      width: Math.min(40, example.bridgeMap.map.bounds.width),
+      height: Math.min(40, example.bridgeMap.map.bounds.height),
+    };
     const expected = await renderMapImage(
       store.root,
       (await store.read()).state,
@@ -211,6 +209,22 @@ test(
     assert.ok(sendBounds.y + sendBounds.height <= (await page.evaluate(() => innerHeight)));
     await page.screenshot({ path: join(artifacts, 'compact.png') });
 
+    await page.locator('#lan-host').click();
+    await page.locator('#lan-dialog[open]').waitFor();
+    await page.waitForFunction(() => document.querySelector('#lan-qr').naturalWidth > 0);
+    const sharing = await page.evaluate(() => window.table.lanStatus());
+    assert.match(sharing.urls[0], /^http:\/\/127\.0\.0\.1:/);
+    await page.locator('#lan-play').click();
+    for (let i = 0; i < 50 && app.windows().length < 2; i++) await page.waitForTimeout(50);
+    const player = app.windows().find((p) => p !== page);
+    assert.ok(player);
+    await player.locator('#name').fill('Local host');
+    await player.getByRole('button', { name: 'Join game', exact: true }).click();
+    await player.locator('#game').waitFor();
+    assert.equal(await player.evaluate(() => typeof window.require), 'undefined');
+    await player.close();
+    await page.locator('#lan-stop').click();
+    await page.waitForFunction(() => !document.querySelector('#lan-dialog').open);
     const revision = (await store.read()).state.revision;
     await unlink(background);
     await apply(service, [{ type: 'damage', id: 'mara', amount: 2 }]);

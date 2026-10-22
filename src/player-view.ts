@@ -1,5 +1,5 @@
 import { partyState } from './domain.js';
-import { State, CampaignConfig } from './schema.js';
+import { State, CampaignConfig, Entity } from './schema.js';
 import { characterSheet, partyOverview } from './sheets.js';
 
 // Shared by the read-only web panel and desktop. Never return the original snapshot.
@@ -14,7 +14,9 @@ export function playerView(original: State, config: CampaignConfig) {
     sheets: overview.members.map((m) => characterSheet(state, m.id)),
     focus: state.focus,
     scene: state.scene,
-    quests: Object.values(state.entities).filter((e) => e.quest?.status === 'active'),
+    quests: Object.values(state.entities).filter(
+      (e): e is Entity & { quest: NonNullable<Entity['quest']> } => e.quest?.status === 'active',
+    ),
     maps: Object.values(state.entities)
       .filter((e) => e.map)
       .map((e) => ({ id: e.id, name: e.name, kind: e.map!.kind, bounds: e.map!.bounds })),

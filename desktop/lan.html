@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dungeon Master · LAN table</title>
+    <link rel="stylesheet" href="/lan.css" />
+  </head>
+  <body>
+    <header>
+      <strong id="title">Dungeon Master</strong><span id="status">Join the table</span>
+    </header>
+    <p id="notice" role="alert" hidden></p>
+    <form id="join">
+      <h1>Join the table</h1>
+      <label>Your name<input id="name" maxlength="40" autocomplete="nickname" required /></label
+      ><button>Join game</button>
+    </form>
+    <main id="game" hidden>
+      <section id="seats">
+        <h2>Your character</h2>
+        <div id="characters"></div>
+      </section>
+      <nav aria-label="Table views">
+        <button data-tab="table" aria-pressed="true">Table</button
+        ><button data-tab="map" aria-pressed="false">Map</button
+        ><button data-tab="sheet" aria-pressed="false">Character</button>
+      </nav>
+      <section id="table" class="view">
+        <p id="turn"></p>
+        <div id="transcript" aria-live="polite"></div>
+        <section class="holding">
+          <h2>Group intentions</h2>
+          <div id="intentions"></div>
+        </section>
+        <form id="compose">
+          <label id="acting" for="text">Your intention</label
+          ><textarea id="text" maxlength="10000" rows="4"></textarea>
+          <div class="buttons">
+            <button type="button" id="save">Save draft</button
+            ><button id="confirm">Confirm intention</button
+            ><button type="button" id="pass">Pass</button
+            ><button type="button" id="now">Send now</button
+            ><button type="button" id="withdraw">Withdraw</button>
+            <button type="button" id="retry" hidden>Retry saved request</button>
+          </div>
+        </form>
+      </section>
+      <section id="map" class="view" hidden>
+        <label>Map<select id="maps"></select></label>
+        <div class="buttons">
+          <button id="left" aria-label="Pan west">←</button
+          ><button id="up" aria-label="Pan north">↑</button
+          ><button id="down" aria-label="Pan south">↓</button
+          ><button id="right" aria-label="Pan east">→</button><button id="fit">Fit map</button
+          ><label
+            >View
+            <select id="map-size">
+              <option value="8">8 × 8</option>
+              <option value="12">12 × 12</option>
+              <option value="20" selected>20 × 20</option>
+              <option value="30">30 × 30</option>
+              <option value="40">40 × 40</option>
+            </select></label
+          >
+        </div>
+        <p id="map-notice"></p>
+        <img id="map-image" alt="Revealed campaign map" />
+      </section>
+      <section id="sheet" class="view" hidden>
+        <label>Character<select id="sheet-select"></select></label>
+        <div id="sheet-content"></div>
+        <h2>Journal</h2>
+        <div id="journal"></div>
+      </section>
+    </main>
+    <script type="module" src="/lan.js"></script>
+  </body>
+</html>

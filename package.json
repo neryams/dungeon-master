@@ -14,9 +14,9 @@
   },
   "scripts": {
     "journal:setup": "node scripts/setup-project-journal.mjs",
-    "build": "tsc",
+    "build": "tsc -b tsconfig.json tsconfig.desktop.json tsconfig.ui.json && node scripts/build-desktop.mjs",
     "rules:build": "node scripts/build-rule-sections.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b tsconfig.json tsconfig.desktop.json tsconfig.ui.json",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:journal": "npm run build && node --test test/integration/real-journal.mjs",
     "example": "node dist/cli.js demo",
@@ -25,13 +25,15 @@
     "format:check": "prettier --check src test scripts desktop docs skills *.json *.md .agents .github",
     "desktop": "npm run build && node scripts/start-desktop.mjs",
     "test:desktop": "npm run build && node --test test/desktop-ui.mjs",
-    "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs"
+    "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs",
+    "test:lan": "npm run build && node --test test/lan-ui.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "markdown-it": "^15.0.3",
     "parse5": "^8.0.1",
     "proper-lockfile": "^4.1.2",
+    "qrcode": "^1.5.4",
     "sharp": "0.35.5",
     "zod": "^3.23.8"
   },
@@ -41,9 +43,16 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/proper-lockfile": "^4.1.4",
+    "@types/qrcode": "^1.5.6",
     "electron": "45.0.0",
     "playwright-core": "1.64.1",
     "prettier": "^3.9.10",
     "typescript": "^5.6.0"
+  },
+  "imports": {
+    "#desktop/contracts": {
+      "types": "./src/desktop/contracts.ts",
+      "default": "./dist/desktop/contracts.js"
+    }
   }
 }

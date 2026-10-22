@@ -8,12 +8,13 @@ import { initialize, atomicWrite } from '../../dist/store.js';
 import { DesktopHost } from '../../dist/desktop/host.js';
 import { renderMapImage, schematic } from '../../dist/maps.js';
 import sharp from 'sharp';
+import { randomUUID } from 'node:crypto';
 import { settingsFile } from '../../dist/desktop/antigravity.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
 test(
   'authenticated Antigravity hotseat connects, publishes, changes exact state and resumes without duplication',
-  { timeout: 900000 },
+  { timeout: 1500000 },
   async () => {
     const parent = await mkdtemp(join(tmpdir(), 'dm-hotseat-agy-'));
     const ipc = join(parent, 'ipc'),
@@ -105,7 +106,7 @@ test(
         after = await readFile(permissionPath, 'utf8');
       }
       const waitForTurn = async () => {
-        for (let i = 0; i < 3000; i++) {
+        for (let i = 0; i < 6500; i++) {
           const view = await host.snapshot();
           if (view.stage !== 'resolving') return view;
           await delay(100);
@@ -129,13 +130,68 @@ test(
         (await host.map({ mapId: 'courtyard', revision: view.revision })).image,
         /^data:image\/png;base64,/,
       );
+      console.log('Live CLI mechanics and public narration passed.');
       const revision = view.revision;
       assert.equal((await host.submit(request)).duplicate, true);
       assert.equal((await host.snapshot()).revision, revision);
-      await host.submit({
-        id: 'smoke-art',
-        text: 'Create and register an illustrated party-safe background for courtyard now using the create-map-art workflow and native generate_image. Use a clean reference at viewport x=0,y=0,width=8,height=8, preserve its square layout, draw a weathered stone courtyard with moss at its edges, no writing or character tokens. Use referencePath for conditioning and import_generated_map_art to save the generated artifact before register_map_art. Inspect the composite and publish the outcome. Do not change geometry, HP, positions, or review policy. Do not pretend generation succeeded if unavailable.',
-      });
+      const lan = await host.startLan();
+      const lanUrl = new URL(lan.urls[0]);
+      async function lanCall(path, data, token) {
+        const response = await fetch(`${lanUrl.origin}/api/${path}`, {
+          method: data === undefined ? 'GET' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
+          body: data === undefined ? undefined : JSON.stringify(data),
+        });
+        const result = await response.json();
+        assert.equal(response.status, 200, JSON.stringify(result));
+        return result;
+      }
+      const alice = await lanCall('join', { name: 'Alice', invitation: lanUrl.hash.slice(1) });
+      const bob = await lanCall('join', { name: 'Bob', invitation: lanUrl.hash.slice(1) });
+      await lanCall('claim', { characterId: 'mira' }, alice.token);
+      await lanCall('claim', { characterId: 'tess' }, bob.token);
+      async function lanIntent(token, text, sendNow = false) {
+        const state = await lanCall('state', undefined, token);
+        return lanCall(
+          'intent',
+          {
+            id: randomUUID(),
+            epoch: state.gathering.epoch,
+            text,
+            confirmed: true,
+            pass: false,
+            sendNow,
+          },
+          token,
+        );
+      }
+      await lanIntent(
+        alice.token,
+        'I wait at the courtyard. This is a transport integration check: do not change gameplay. Ask Tess alone whether to inspect the north wall. Publish a responseRequest with characterIds ["tess"], prompt "Tess, inspect the north wall?", kind "decision". Stop and wait for her reply.',
+      );
+      assert.equal((await host.snapshot()).table.length, 1, 'First player must wait for the group');
+      await lanIntent(
+        bob.token,
+        'I listen. Please ask the targeted question specified by Mira and wait for my next response.',
+      );
+      const group = await waitForTurn();
+      assert.equal(group.stage, 'ready', group.detail);
+      assert.equal(group.table.at(-1).actions.length, 2);
+      assert.deepEqual(group.gathering.request.characterIds, ['tess']);
+      console.log('LAN group submission and targeted prompt passed.');
+      await lanIntent(
+        bob.token,
+        'No, I stay here. Acknowledge my answer without changing mechanics, and return to normal group input without another responseRequest.',
+      );
+      const answer = await waitForTurn();
+      assert.equal(answer.stage, 'ready', answer.detail);
+      assert.equal(answer.gathering.request, undefined);
+      console.log('Targeted reply passed; starting native image generation through LAN Send now.');
+      await lanIntent(
+        alice.token,
+        'Create and register an illustrated party-safe background for courtyard now using the create-map-art workflow and native generate_image. Use a clean reference at viewport x=0,y=0,width=8,height=8, preserve its square layout, draw a weathered stone courtyard with moss at its edges, no writing or character tokens. Use referencePath for conditioning and import_generated_map_art to save the generated artifact before register_map_art. Inspect the composite and publish the outcome. Do not change geometry, HP, positions, or review policy. Do not pretend generation succeeded if unavailable.',
+        true,
+      );
       const illustrated = await waitForTurn();
       assert.equal(illustrated.stage, 'ready', illustrated.detail);
       const artState = (await store.read()).state;
@@ -149,6 +205,12 @@ test(
         revision: illustrated.revision,
         viewport,
       });
+      const remoteImage = await lanCall(
+        'map',
+        { mapId: 'courtyard', revision: illustrated.revision, viewport },
+        alice.token,
+      );
+      assert.equal(remoteImage.image, desktopImage.image);
       const composite = await renderMapImage(store.root, artState, 'courtyard', 'party', viewport);
       assert.deepEqual(desktopImage.warnings, []);
       assert.equal(desktopImage.image, `data:image/png;base64,${composite.png.toString('base64')}`);
@@ -182,15 +244,15 @@ test(
       });
       const resumed = await waitForTurn();
       assert.equal(resumed.stage, 'ready', resumed.detail);
-      assert.equal(resumed.table.length, 3);
-      assert.equal(resumed.table[2].speaker, 'Tess');
+      assert.equal(resumed.table.length, 5);
+      assert.equal(resumed.table[4].speaker, 'Tess');
       assert.equal(resumed.party.members.find((p) => p.id === 'mira').hp, 8);
       assert.equal(
         (await store.events()).filter((e) => e.operationId === 'smoke-damage').length,
         1,
       );
       console.log(
-        `Authenticated hotseat smoke passed at revision ${resumed.revision}; three public turns, native image generation, registered composite and resume verified.`,
+        `Authenticated hotseat smoke passed at revision ${resumed.revision}; five public turns, LAN group/targeted/Send now input, native image generation, registered composite and resume verified.`,
       );
     } finally {
       await host?.close();

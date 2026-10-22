@@ -1,34 +1,20 @@
+import { WorkerEnvelope, dispatchWorker } from './contracts.js';
 import { fileURLToPath } from 'node:url';
 import { DesktopHost } from './host.js';
 
 const host = new DesktopHost({ source: fileURLToPath(new URL('../..', import.meta.url)) });
-const methods = new Set([
-  'detect',
-  'create',
-  'open',
-  'connect',
-  'submit',
-  'snapshot',
-  'map',
-  'stop',
-]);
-process.on('message', async (message: any) => {
-  if (
-    !message ||
-    !Number.isSafeInteger(message.id) ||
-    !methods.has(message.method) ||
-    !Array.isArray(message.args)
-  )
-    return;
+process.on('message', async (raw: unknown) => {
+  const parsed = WorkerEnvelope.safeParse(raw);
+  if (!parsed.success) return;
+  const message = parsed.data;
   try {
-    const result = await (host[message.method as keyof DesktopHost] as Function).apply(
-      host,
-      message.args,
-    );
+    const result = await dispatchWorker(host, message.method, message.args);
     process.send?.({ id: message.id, result });
   } catch (error) {
-    const text = error instanceof Error ? error.message : 'Unable to complete the request';
-    process.send?.({ id: message.id, error: text });
+    process.send?.({
+      id: message.id,
+      error: error instanceof Error ? error.message : 'Unable to complete the request',
+    });
   }
 });
 let closing = false;

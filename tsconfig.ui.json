@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "desktop",
+    "outDir": "build/desktop",
+    "tsBuildInfoFile": "build/ui.tsbuildinfo",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "declaration": true
+  },
+  "include": ["desktop/app.ts", "desktop/lan.ts", "desktop/dom.ts", "desktop/globals.d.ts"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { CampaignError, mapLevel } from './domain.js';
-import { State } from './schema.js';
+import { State, Entity } from './schema.js';
 
 // Callers supply an audience-filtered snapshot. Never join back to unfiltered state.
 export function characterSheet(state: State, characterId: string) {
@@ -7,7 +7,10 @@ export function characterSheet(state: State, characterId: string) {
   if (!entity || entity.kind !== 'character' || !entity.character)
     throw new CampaignError('NOT_FOUND', 'Character not found');
   const inventory = Object.values(state.entities)
-    .filter((e) => e.kind === 'item' && e.item?.owner === characterId)
+    .filter(
+      (e): e is Entity & { item: NonNullable<Entity['item']> } =>
+        e.kind === 'item' && e.item?.owner === characterId,
+    )
     .sort((a, b) => a.id.localeCompare(b.id));
   const placements = Object.values(state.entities)
     .filter((e) => e.map?.tokens[characterId])
@@ -30,7 +33,7 @@ export function characterSheet(state: State, characterId: string) {
         ...(location ? { location: { id: location.id, name: location.name } } : {}),
       };
     });
-  return { character: entity, inventory, placements };
+  return { character: { ...entity, character: entity.character }, inventory, placements };
 }
 
 export function partyOverview(state: State) {
@@ -43,7 +46,7 @@ export function partyOverview(state: State) {
       .sort();
   const members = ids.map((id) => {
     const sheet = characterSheet(state, id),
-      character = sheet.character.character!;
+      character = sheet.character.character;
     return {
       id,
       name: sheet.character.name,

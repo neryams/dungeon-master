@@ -4,7 +4,7 @@ const args =
   process.platform === 'linux' && (process.env.DISPLAY || process.env.DM_DESKTOP_OZONE)
     ? [`--ozone-platform=${process.env.DM_DESKTOP_OZONE ?? 'x11'}`]
     : [];
-const child = spawn(electron, [...args, 'desktop/main.mjs'], {
+const child = spawn(electron, [...args, 'build/desktop/main.mjs'], {
   stdio: 'inherit',
   env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined, DM_DESKTOP_NODE: process.execPath },
 });

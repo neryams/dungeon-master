@@ -59,3 +59,27 @@ npm run package:plugin
 Implemented: source-launched Electron app, guided Antigravity connection, new/open campaigns, public transcript, hotseat selection, exact party information, maps and interruption recovery. Antigravity 1.4.4 on Linux was exercised. Other operating systems are not yet verified.
 
 Not implemented: signed installers/auto-updates, bundled standalone Node runtime, LAN player input/discovery, individual player accounts, other CLI adapters, streamed public text or a complete rules engine. The existing optional LAN panel remains read-only and retains its prior behavior.
+
+## LAN multiplayer
+
+Open a campaign, connect Antigravity, and choose **Host LAN game**. Scan the QR code on a phone connected to the same network, or copy the join link. Select the reachable network interface when several are listed. The host chooses an available port automatically; allow that port through the local firewall. Wi-Fi client isolation can prevent devices from reaching one another. HTTP hosting is for a trusted LAN, not internet exposure.
+
+Players enter a name and claim an available character. **Open player seat** lets the host participate in a separate sandboxed window; open additional seats for local hotseat players. **Join LAN** also lets another Electron installation connect by link without its own CLI. The host can assign/release characters, remove a player, rotate invitations, pass for missing characters, or resolve the confirmed replies. Closing the main host app or changing campaigns stops sharing. Stopping sharing leaves the CLI and ordinary desktop usable.
+
+Outside combat, assigned characters save shared, editable intentions and choose **Confirm intention** or **Pass**. The host dispatches the group when every active seat confirms. A disconnected seat remains required until the host handles it. **Send now** dispatches only that player's intention while idle; remaining intentions become drafts and require confirmation afterward. A client can prepare drafts while the DM works, but cannot confirm until the response finishes. Changes to gameplay also invalidate confirmations.
+
+In combat, only the saved active character can confirm; other players can draft. The host uses **Continue NPC turn** when no player character is active. A structured DM decision/reaction request temporarily takes precedence over initiative and waits for the specified characters. During that request, other players cannot submit and Send now is disabled. Holding an intention does not perform the D&D Ready action. The agent is instructed to pause before committing an outcome that needs a reaction/decision; this is agent-guided adjudication, not a complete automatic reaction/rules engine.
+
+Accepted intentions, grouped submissions, public prompts, and narration survive restart through campaign events. A browser retains its session credential and uncertain request ID in session storage so reload/retry does not rerun a saved action. Restarting hosting invalidates credentials, clears seat assignments, and resets confirmations; players rejoin and review drafts. Interrupted CLI work is never automatically replayed. An invitation can be reused until the host rotates it, so rotate it as well as removing a player if they should not rejoin.
+
+All players see the same party-visible information and public holding area. There are no private sheets, separate chat channel, automatic network discovery, or cloud accounts. LAN clients cannot open campaigns, change CLI settings, invoke arbitrary MCP tools, retrieve campaign files, or read private CLI output. The independent read-only panel and ChatGPT/Codex plugin remain available.
+
+`npm run test:lan` exercises phone/desktop browser layouts and reconnect/retry behavior using installed Chrome (`DM_CHROME` overrides its path). `npm run test:antigravity` now also exercises real LAN group input, a targeted reply, Send now, and native map generation with the host's authenticated account. It uses isolated temporary campaign/journal workspaces and restores its permission change if no concurrent settings edit occurred.
+
+CLI turns allow up to ten minutes for native image generation and tool work. The host can stop an active turn at any time; timeout/stop preserves committed state and never automatically retries the CLI request.
+
+## Developing the desktop
+
+Edit `desktop/main.mts`, `desktop/preload.cts`, `desktop/app.ts`, and `desktop/lan.ts`; generated JavaScript belongs in `build/desktop/`. Run `npm run build` after edits, or `npm run desktop` to build and launch. Shared IPC/LAN interfaces and runtime request schemas live in `src/desktop/contracts.ts`. Keep privileged imports out of the browser UI and keep the sandboxed preload self-contained. No bundler or frontend framework is required.
+
+`npm run typecheck` covers the core, Electron, and browser projects and refreshes ignored build outputs through TypeScript project references. `npm test` includes malformed IPC contract checks. `npm run test:desktop` and `npm run test:lan` exercise the emitted application rather than source JavaScript. Campaign files and the ChatGPT/Codex plugin entry points retain their existing locations and formats.
