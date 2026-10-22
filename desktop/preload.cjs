@@ -12,6 +12,11 @@ const methods = [
   'snapshot',
   'map',
   'stop',
+  'startLan',
+  'stopLan',
+  'lanStatus',
+  'lanAdmin',
+  'joinLan',
 ];
 contextBridge.exposeInMainWorld(
   'table',

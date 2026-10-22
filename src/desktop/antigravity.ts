@@ -164,7 +164,7 @@ export class AntigravitySession implements AgentDriver {
           ),
         );
         void this.close();
-      }, this.options.timeoutMs ?? 300000);
+      }, this.options.timeoutMs ?? 600000);
       this.pending = { resolve, reject, timer, tools: new Set(), campaignIds: new Set() };
       this.child!.stdin.write(
         JSON.stringify({ event: 'user', message: { content: prompt } }) + '\n',

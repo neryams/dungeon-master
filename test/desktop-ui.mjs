@@ -211,6 +211,22 @@ test(
     assert.ok(sendBounds.y + sendBounds.height <= (await page.evaluate(() => innerHeight)));
     await page.screenshot({ path: join(artifacts, 'compact.png') });
 
+    await page.locator('#lan-host').click();
+    await page.locator('#lan-dialog[open]').waitFor();
+    await page.waitForFunction(() => document.querySelector('#lan-qr').naturalWidth > 0);
+    const sharing = await page.evaluate(() => window.table.lanStatus());
+    assert.match(sharing.urls[0], /^http:\/\/127\.0\.0\.1:/);
+    await page.locator('#lan-play').click();
+    for (let i = 0; i < 50 && app.windows().length < 2; i++) await page.waitForTimeout(50);
+    const player = app.windows().find((p) => p !== page);
+    assert.ok(player);
+    await player.locator('#name').fill('Local host');
+    await player.getByRole('button', { name: 'Join game', exact: true }).click();
+    await player.locator('#game').waitFor();
+    assert.equal(await player.evaluate(() => typeof window.require), 'undefined');
+    await player.close();
+    await page.locator('#lan-stop').click();
+    await page.waitForFunction(() => !document.querySelector('#lan-dialog').open);
     const revision = (await store.read()).state.revision;
     await unlink(background);
     await apply(service, [{ type: 'damage', id: 'mara', amount: 2 }]);

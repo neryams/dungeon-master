@@ -11,6 +11,10 @@ const methods = new Set([
   'snapshot',
   'map',
   'stop',
+  'startLan',
+  'stopLan',
+  'lanStatus',
+  'lanAdmin',
 ]);
 process.on('message', async (message: any) => {
   if (

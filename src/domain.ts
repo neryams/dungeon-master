@@ -404,6 +404,7 @@ export function partyState(state: State): State {
   delete out.reviewMode;
   // Conversation is exposed explicitly by the hotseat projection, not generic party tools.
   delete out.table;
+  delete out.gathering;
   const visible = (id: string) =>
     out.entities[id]?.visibility === 'party' && out.entities[id]?.knowledge !== 'plan';
   for (const [id, e] of Object.entries(out.entities))

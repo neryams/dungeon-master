@@ -131,6 +131,39 @@ else {
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),
         stop: () => call('stop'),
+        startLan: () => call('startLan'),
+        stopLan: () => call('stopLan'),
+        lanStatus: () => call('lanStatus'),
+        lanAdmin: (input) => call('lanAdmin', input),
+        joinLan: async (link) => {
+          const url = new URL(link);
+          if (
+            url.protocol !== 'http:' ||
+            url.username ||
+            url.password ||
+            !url.port ||
+            url.pathname !== '/' ||
+            url.search ||
+            !/^#[a-f0-9]{64}$/.test(url.hash)
+          )
+            throw new Error('Paste a complete LAN game link.');
+          const player = new BrowserWindow({
+            title: 'Dungeon Master — LAN player',
+            width: 1100,
+            height: 850,
+            backgroundColor: '#151b18',
+            webPreferences: {
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true,
+              webSecurity: true,
+            },
+          });
+          player.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+          player.webContents.on('will-navigate', (event) => event.preventDefault());
+          player.webContents.on('will-attach-webview', (event) => event.preventDefault());
+          await player.loadURL(url.href);
+        },
       };
       ipcMain.handle('table:call', async (event, method, args) => {
         if (
@@ -166,6 +199,7 @@ else {
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       window.webContents.on('will-navigate', (event) => event.preventDefault());
       window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+      window.on('closed', () => app.quit());
       await window.loadFile(index);
       app.on('window-all-closed', () => app.quit());
       app.on('before-quit', (event) => {
