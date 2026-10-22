@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { z } from 'zod';
 import lockfile from 'proper-lockfile';
 import { CampaignStore, atomicWrite, safePath } from '../store.js';
-import { GroupAction, Id, TableOperation, Viewport } from '../schema.js';
+import { TableOperation } from '../schema.js';
 import { CampaignError } from '../domain.js';
 import { playerView } from '../player-view.js';
 import { renderMapImage } from '../maps.js';
@@ -22,24 +22,8 @@ import {
 import { LanGame } from './lan.js';
 
 const execute = promisify(execFile);
-const Submit = z
-  .object({
-    id: Id,
-    characterId: Id.optional(),
-    text: z.string().trim().min(1).max(20000),
-    actions: z.array(GroupAction).max(20).optional(),
-    groupEpoch: z.number().int().nonnegative().optional(),
-  })
-  .strict();
-const Create = z
-  .object({
-    parent: z.string().min(1).optional(),
-    slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/),
-    name: z.string().trim().min(1).max(200),
-    edition: z.enum(['2014', '2024']),
-  })
-  .strict();
-type Stage = 'disconnected' | 'connecting' | 'ready' | 'resolving' | 'attention';
+import { SubmitInput as Submit, CreateInput as Create, MapInput } from './contracts.js';
+import type { DesktopSnapshot, MapResult, Stage } from './contracts.js';
 
 export class DesktopHost {
   private store?: CampaignStore;
@@ -80,7 +64,7 @@ export class DesktopHost {
         'Keep campaigns outside the source/application folder. Choose a folder under your home directory.',
       );
   }
-  async create(raw: unknown) {
+  async create(raw: z.input<typeof Create>) {
     if (this.changing || this.working || this.connecting)
       throw new Error('Finish the current desktop operation first.');
     this.changing = true;
@@ -285,7 +269,7 @@ export class DesktopHost {
         }),
       );
   }
-  async submit(raw: unknown, fromLan = false) {
+  async submit(raw: z.input<typeof Submit>, fromLan = false) {
     if (this.lan && !fromLan)
       throw new Error('Use the LAN table while hosting so character turns stay coordinated.');
     const input = Submit.parse(raw);
@@ -366,7 +350,7 @@ export class DesktopHost {
       await this.saveSession().catch(() => {});
     }
   }
-  async snapshot() {
+  async snapshot(): Promise<DesktopSnapshot> {
     if (!this.store) return { stage: this.stage, detail: this.detail, campaign: null, table: [] };
     const { state } = await this.store.read();
     return {
@@ -380,16 +364,8 @@ export class DesktopHost {
       reviewMode: state.reviewMode ?? 'legacy',
     };
   }
-  async map(raw: unknown) {
-    const input = z
-      .object({
-        mapId: Id,
-        revision: z.number().int().nonnegative(),
-        viewport: Viewport.optional(),
-        details: z.boolean().default(true),
-      })
-      .strict()
-      .parse(raw);
+  async map(raw: MapInput): Promise<MapResult> {
+    const input = MapInput.parse(raw);
     if (
       input.viewport &&
       (!Number.isSafeInteger(input.viewport.x + input.viewport.width) ||
@@ -414,7 +390,7 @@ export class DesktopHost {
           'party',
           input.viewport,
           'map',
-          input.details ? 'document' : 'canvas',
+          input.details !== false ? 'document' : 'canvas',
         );
         rendered = { key, image: `data:image/png;base64,${png.toString('base64')}`, warnings };
       }

@@ -92,7 +92,7 @@ test(
         executablePath: electron,
         args: [
           ...(process.platform === 'linux' ? ['--ozone-platform=x11'] : []),
-          resolve('desktop/main.mjs'),
+          resolve('build/desktop/main.mjs'),
         ],
         env,
         timeout: 20000,
@@ -117,13 +117,8 @@ test(
     // Exercise the same bridge and renderer used by the file-picker path, without opening a native dialog or invoking a model.
     const load = async (page) =>
       page.evaluate(async (root) => {
-        state = await window.table.open(root);
-        shownRevision = -1;
-        transcriptKey = '';
-        mapKey = '';
-        document.getElementById('welcome').hidden = true;
-        document.getElementById('play').hidden = false;
-        renderState();
+        const { showCampaign } = await import('./app.js');
+        showCampaign(await window.table.open(root));
       }, store.root);
     await load(page);
     await page.waitForFunction(() => document.getElementById('map-image').naturalWidth > 0);
@@ -144,10 +139,13 @@ test(
         !document.getElementById('map-image').hidden &&
         document.getElementById('map-status').textContent.startsWith('r'),
     );
-    const viewport = await page.evaluate(() => ({
-      ...offset,
-      ...mapDimensions(state.maps.find((m) => m.id === selectedMap)),
-    }));
+    assert.equal(await page.locator('#map-size').inputValue(), 'auto');
+    const viewport = {
+      x: 0,
+      y: 0,
+      width: Math.min(40, example.bridgeMap.map.bounds.width),
+      height: Math.min(40, example.bridgeMap.map.bounds.height),
+    };
     const expected = await renderMapImage(
       store.root,
       (await store.read()).state,

@@ -1,17 +1,27 @@
+import { Preferences, WorkerReply, dispatchDesktop } from '#desktop/contracts';
+import type { DesktopApi, WorkerApi } from '#desktop/contracts';
+import type { ChildProcess } from 'node:child_process';
 import { app, BrowserWindow, ipcMain, dialog, session } from 'electron';
 import { fork } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const index = join(root, 'desktop/index.html');
+const root = fileURLToPath(new URL('../..', import.meta.url));
+const index = join(root, 'build/desktop/index.html');
 const indexUrl = pathToFileURL(index).href;
-let window,
-  worker,
+let window: BrowserWindow,
+  worker: ChildProcess,
   quitting = false,
   counter = 0;
-const pending = new Map();
+const pending = new Map<
+  number,
+  {
+    resolve: (value: unknown) => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }
+>();
 const nodePath = process.env.DM_DESKTOP_NODE;
 // XWayland works on desktops where Chromium's native Wayland startup stalls.
 // A native Wayland session can opt in with DM_DESKTOP_OZONE=wayland.
@@ -35,11 +45,16 @@ else {
     .then(async () => {
       worker = fork(join(root, 'dist/desktop/worker.js'), [], {
         execPath: nodePath,
+        // JSON IPC is portable across Electron's and the external Node worker's V8 versions.
+        serialization: 'json',
         stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
         env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined },
       });
-      worker.stderr.on('data', () => {});
-      worker.on('message', ({ id, result, error }) => {
+      worker.stderr?.on('data', () => {});
+      worker.on('message', (raw: unknown) => {
+        const parsed = WorkerReply.safeParse(raw);
+        if (!parsed.success) return;
+        const { id, result, error } = parsed.data;
         const call = pending.get(id);
         if (!call) return;
         pending.delete(id);
@@ -62,8 +77,12 @@ else {
           call.reject(new Error('Could not start the campaign runtime.'));
         pending.clear();
       });
-      function call(method, ...args) {
-        return new Promise((resolve, reject) => {
+      function call<K extends keyof WorkerApi>(
+        method: K,
+        ...args: Parameters<WorkerApi[K]>
+      ): ReturnType<WorkerApi[K]> {
+        // Replies cross a trusted worker boundary; request handlers are checked against WorkerApi.
+        return new Promise<unknown>((resolve, reject) => {
           if (!worker.connected)
             return reject(new Error('The campaign runtime is unavailable. Restart the app.'));
           const id = ++counter;
@@ -73,19 +92,19 @@ else {
           }, 330000);
           pending.set(id, { resolve, reject, timer });
           worker.send({ id, method, args });
-        });
+        }) as ReturnType<WorkerApi[K]>;
       }
       const prefsPath = join(app.getPath('userData'), 'table-preferences.json');
-      let prefs = {};
+      let prefs: Preferences = {};
       try {
-        prefs = JSON.parse(await readFile(prefsPath, 'utf8'));
+        prefs = Preferences.parse(JSON.parse(await readFile(prefsPath, 'utf8')));
       } catch {}
       async function savePrefs() {
         await mkdir(app.getPath('userData'), { recursive: true });
         await writeFile(prefsPath + '.tmp', JSON.stringify(prefs), { mode: 0o600 });
         await rename(prefsPath + '.tmp', prefsPath);
       }
-      const actions = {
+      const actions: DesktopApi = {
         preferences: async () => prefs,
         detect: async (path) => {
           const found = await call('detect', path);
@@ -98,31 +117,31 @@ else {
             title: 'Choose Antigravity CLI (agy)',
             properties: ['openFile'],
           });
-          return r.canceled ? null : r.filePaths[0];
+          return r.canceled ? null : (r.filePaths[0] ?? null);
         },
         chooseParent: async () => {
           const r = await dialog.showOpenDialog(window, {
             title: 'Choose a home for your campaigns',
             properties: ['openDirectory', 'createDirectory'],
           });
-          return r.canceled ? null : r.filePaths[0];
+          return r.canceled ? null : (r.filePaths[0] ?? null);
         },
         chooseCampaign: async () => {
           const r = await dialog.showOpenDialog(window, {
             title: 'Open a campaign folder',
             properties: ['openDirectory'],
           });
-          return r.canceled ? null : r.filePaths[0];
+          return r.canceled ? null : (r.filePaths[0] ?? null);
         },
         open: async (path) => {
           const state = await call('open', path);
-          prefs.recent = state.root;
+          if (state.campaign) prefs.recent = state.root;
           await savePrefs();
           return state;
         },
         create: async (input) => {
           const state = await call('create', input);
-          prefs.recent = state.root;
+          if (state.campaign) prefs.recent = state.root;
           await savePrefs();
           return state;
         },
@@ -165,16 +184,14 @@ else {
           await player.loadURL(url.href);
         },
       };
-      ipcMain.handle('table:call', async (event, method, args) => {
+      ipcMain.handle('table:call', async (event, method: unknown, args: unknown) => {
         if (
           event.sender !== window?.webContents ||
           event.senderFrame !== window.webContents.mainFrame ||
           event.senderFrame.url !== indexUrl
         )
           throw new Error('Untrusted window');
-        if (!Object.hasOwn(actions, method) || !Array.isArray(args) || args.length > 2)
-          throw new Error('Invalid desktop request');
-        return actions[method](...args);
+        return dispatchDesktop(actions, method, args);
       });
       session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
         callback(false),
@@ -189,7 +206,7 @@ else {
         backgroundColor: '#181f22',
         autoHideMenuBar: true,
         webPreferences: {
-          preload: join(root, 'desktop/preload.cjs'),
+          preload: join(root, 'build/desktop/preload.cjs'),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: true,

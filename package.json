@@ -14,9 +14,9 @@
   },
   "scripts": {
     "journal:setup": "node scripts/setup-project-journal.mjs",
-    "build": "tsc",
+    "build": "tsc -b tsconfig.json tsconfig.desktop.json tsconfig.ui.json && node scripts/build-desktop.mjs",
     "rules:build": "node scripts/build-rule-sections.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b tsconfig.json tsconfig.desktop.json tsconfig.ui.json",
     "test": "npm run build && node --test test/*.test.mjs",
     "test:journal": "npm run build && node --test test/integration/real-journal.mjs",
     "example": "node dist/cli.js demo",
@@ -48,5 +48,11 @@
     "playwright-core": "1.64.1",
     "prettier": "^3.9.10",
     "typescript": "^5.6.0"
+  },
+  "imports": {
+    "#desktop/contracts": {
+      "types": "./src/desktop/contracts.ts",
+      "default": "./dist/desktop/contracts.js"
+    }
   }
 }

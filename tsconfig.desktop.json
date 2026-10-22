@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "desktop",
+    "outDir": "build/desktop",
+    "tsBuildInfoFile": "build/desktop.tsbuildinfo",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "declaration": true
+  },
+  "include": ["desktop/main.mts", "desktop/preload.cts"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    }
+  ]
+}

@@ -1,19 +1,91 @@
-const $ = (id) => document.getElementById(id);
+import type {
+  LanRequests,
+  LanResponses,
+  LanSnapshot,
+  IntentInput,
+  MapInput,
+} from '#desktop/contracts';
+import { elements, node, errorMessage } from './dom.js';
+const tags = {
+  title: 'strong',
+  status: 'span',
+  notice: 'p',
+  join: 'form',
+  name: 'input',
+  game: 'main',
+  seats: 'section',
+  characters: 'div',
+  table: 'section',
+  turn: 'p',
+  transcript: 'div',
+  intentions: 'div',
+  compose: 'form',
+  acting: 'label',
+  text: 'textarea',
+  save: 'button',
+  confirm: 'button',
+  pass: 'button',
+  now: 'button',
+  withdraw: 'button',
+  retry: 'button',
+  map: 'section',
+  maps: 'select',
+  left: 'button',
+  up: 'button',
+  down: 'button',
+  right: 'button',
+  fit: 'button',
+  'map-size': 'select',
+  'map-notice': 'p',
+  'map-image': 'img',
+  sheet: 'section',
+  'sheet-select': 'select',
+  'sheet-content': 'div',
+  journal: 'div',
+} as const;
+const $ = elements(tags);
 const key = `dm-lan:${location.host}`;
 let invitation = location.hash.slice(1);
 history.replaceState(null, '', '/');
-let token = sessionStorage.getItem(key),
-  state,
+let token: string | null | undefined = sessionStorage.getItem(key),
+  state: LanSnapshot,
   busy = false,
   polling = false,
   dirty = false,
-  pending,
+  pending: IntentInput | undefined,
   mapKey = '',
   selectedMap = '',
-  inspectedCharacter,
-  viewport;
+  inspectedCharacter: string | undefined,
+  viewport: MapInput['viewport'];
 try {
-  pending = JSON.parse(sessionStorage.getItem(key + ':pending') ?? 'null') ?? undefined;
+  const saved: unknown = JSON.parse(sessionStorage.getItem(key + ':pending') ?? 'null');
+  if (
+    typeof saved === 'object' &&
+    saved !== null &&
+    'id' in saved &&
+    typeof saved.id === 'string' &&
+    'epoch' in saved &&
+    typeof saved.epoch === 'number' &&
+    Number.isSafeInteger(saved.epoch) &&
+    saved.epoch >= 0 &&
+    'text' in saved &&
+    typeof saved.text === 'string' &&
+    'confirmed' in saved &&
+    typeof saved.confirmed === 'boolean' &&
+    'pass' in saved &&
+    typeof saved.pass === 'boolean' &&
+    'sendNow' in saved &&
+    typeof saved.sendNow === 'boolean'
+  ) {
+    pending = {
+      id: saved.id,
+      epoch: saved.epoch,
+      text: saved.text,
+      confirmed: saved.confirmed,
+      pass: saved.pass,
+      sendNow: saved.sendNow,
+    };
+  }
 } catch {}
 if (pending) {
   $('text').value = pending.text;
@@ -32,16 +104,16 @@ function uuid() {
     .map((b, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + b.toString(16).padStart(2, '0'))
     .join('');
 }
-function el(tag, text) {
-  const n = document.createElement(tag);
-  if (text !== undefined) n.textContent = text;
-  return n;
-}
-function error(e) {
-  $('notice').textContent = e.message;
+const el = node;
+function error(e: unknown) {
+  $('notice').textContent = errorMessage(e);
   $('notice').hidden = false;
 }
-async function api(path, data) {
+async function api<K extends keyof LanRequests>(
+  path: K,
+  ...args: LanRequests[K] extends undefined ? [] : [data: LanRequests[K]]
+): Promise<LanResponses[K]> {
+  const data = args[0];
   const r = await fetch(`/api/${path}`, {
     method: data === undefined ? 'GET' : 'POST',
     headers: {
@@ -50,7 +122,7 @@ async function api(path, data) {
     },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
-  const result = await r.json();
+  const result: unknown = await r.json();
   if (!r.ok) {
     if (r.status === 401) {
       token = undefined;
@@ -59,9 +131,17 @@ async function api(path, data) {
       $('join').hidden = false;
       $('game').hidden = true;
     }
-    throw new Error(result.error);
+    throw new Error(
+      typeof result === 'object' &&
+        result !== null &&
+        'error' in result &&
+        typeof result.error === 'string'
+        ? result.error
+        : 'Invalid server response',
+    );
   }
-  return result;
+  // The same server implements LanResponses; assertions stay at this JSON transport boundary.
+  return result as LanResponses[K];
 }
 $('join').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -74,7 +154,7 @@ $('join').addEventListener('submit', async (e) => {
     error(e);
   }
 });
-const nameOf = (id) => state.party.members.find((p) => p.id === id)?.name ?? id;
+const nameOf = (id: string) => state.party.members.find((p) => p.id === id)?.name ?? id;
 function render() {
   $('join').hidden = true;
   $('game').hidden = false;
@@ -130,7 +210,7 @@ function render() {
   if (atBottom) transcript.scrollTop = transcript.scrollHeight;
   $('intentions').replaceChildren();
   for (const id of g?.seats ?? []) {
-    const a = g.actions[id];
+    const a = g?.actions[id];
     const row = el('div');
     row.className = 'intent';
     row.append(
@@ -140,14 +220,14 @@ function render() {
     );
     $('intentions').append(row);
   }
-  if (!dirty && !pending) $('text').value = g?.actions[own]?.text ?? '';
+  if (!dirty && !pending) $('text').value = (own ? g?.actions[own]?.text : '') ?? '';
   const allowed = !!own && (!g?.request || state.required.includes(own));
   $('text').disabled = !allowed || !!pending;
   $('retry').hidden = !pending;
   $('retry').disabled = busy;
   $('acting').textContent = own ? `Playing as ${nameOf(own)}` : 'Claim a character to play';
-  for (const id of ['save', 'withdraw']) $(id).disabled = !allowed || busy || !!pending;
-  for (const id of ['confirm', 'pass'])
+  for (const id of ['save', 'withdraw'] as const) $(id).disabled = !allowed || busy || !!pending;
+  for (const id of ['confirm', 'pass'] as const)
     $(id).disabled =
       !allowed || busy || !!pending || state.stage !== 'ready' || !state.required.includes(own);
   $('now').disabled = $('confirm').disabled || !!g?.request;
@@ -166,7 +246,7 @@ function render() {
   }
   if (!state.maps.some((m) => m.id === selectedMap)) {
     selectedMap = state.maps.some((m) => m.id === state.scene?.map)
-      ? state.scene.map
+      ? (state.scene?.map ?? '')
       : (state.maps[0]?.id ?? '');
     viewport = undefined;
   }
@@ -186,7 +266,7 @@ function render() {
   if (sheet) {
     $('sheet-content').append(el('h2', sheet.character.name));
     const c = sheet.character.character;
-    function section(title, entries) {
+    function section(title: string, entries: [string, string | number][]) {
       $('sheet-content').append(el('h2', title));
       const dl = el('dl');
       for (const [label, value] of entries) dl.append(el('dt', label), el('dd', String(value)));
@@ -241,7 +321,7 @@ async function refresh() {
     polling = false;
   }
 }
-async function send(confirmed, pass = false, sendNow = false, withdraw = false) {
+async function send(confirmed: boolean, pass = false, sendNow = false, withdraw = false) {
   if (busy) return;
   busy = true;
   render();
@@ -285,10 +365,10 @@ $('save').onclick = () => send(false);
 $('pass').onclick = () => send(true, true);
 $('now').onclick = () => send(true, false, true);
 $('withdraw').onclick = () => send(false, false, false, true);
-for (const b of document.querySelectorAll('[data-tab]'))
+for (const b of document.querySelectorAll<HTMLButtonElement>('[data-tab]'))
   b.onclick = () => {
-    for (const v of ['table', 'map', 'sheet']) $(v).hidden = v !== b.dataset.tab;
-    for (const n of document.querySelectorAll('[data-tab]'))
+    for (const v of ['table', 'map', 'sheet'] as const) $(v).hidden = v !== b.dataset.tab;
+    for (const n of document.querySelectorAll<HTMLButtonElement>('[data-tab]'))
       n.setAttribute('aria-pressed', String(n === b));
     void refresh();
   };
@@ -330,7 +410,7 @@ for (const [id, x, y] of [
   ['right', 5, 0],
   ['up', 0, -5],
   ['down', 0, 5],
-])
+] as const)
   $(id).onclick = () => {
     viewport ??= fit();
     viewport = { ...viewport, x: viewport.x + x, y: viewport.y + y };

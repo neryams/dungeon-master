@@ -1,9 +1,97 @@
-const $ = (id) => document.getElementById(id);
+import type {
+  CampaignSnapshot,
+  DesktopSnapshot,
+  SubmitInput,
+  MapInput,
+  PlayerView,
+  LanStatus,
+} from '#desktop/contracts';
+import { elements, node, errorMessage } from './dom.js';
+const tags = {
+  'campaign-heading': 'div',
+  revision: 'span',
+  'lan-host': 'button',
+  'lan-join': 'button',
+  campaigns: 'button',
+  connection: 'button',
+  stop: 'button',
+  'lan-dialog': 'dialog',
+  'lan-help': 'p',
+  'lan-qr': 'img',
+  'lan-links': 'select',
+  'lan-copy': 'button',
+  'lan-play': 'button',
+  'lan-rotate': 'button',
+  'lan-players': 'div',
+  'lan-required': 'div',
+  'lan-resolve': 'button',
+  'lan-continue': 'button',
+  'lan-stop': 'button',
+  'lan-close': 'button',
+  'join-dialog': 'dialog',
+  'join-link': 'input',
+  'join-open': 'button',
+  'join-close': 'button',
+  welcome: 'main',
+  'provider-status': 'span',
+  'check-provider': 'button',
+  'choose-cli': 'button',
+  'open-campaign': 'button',
+  recent: 'button',
+  'new-tab': 'h2',
+  'create-form': 'form',
+  name: 'input',
+  slug: 'input',
+  edition: 'select',
+  'choose-parent': 'button',
+  create: 'button',
+  play: 'main',
+  'party-count': 'span',
+  party: 'div',
+  'table-seat': 'button',
+  pass: 'button',
+  'sheet-tab': 'button',
+  'quest-tab': 'button',
+  sheet: 'div',
+  quests: 'div',
+  'map-select': 'select',
+  'scene-details': 'details',
+  'scene-title': 'summary',
+  'scene-summary': 'p',
+  'map-surface': 'div',
+  'map-empty': 'div',
+  'map-image': 'img',
+  'pan-left': 'button',
+  'pan-up': 'button',
+  'pan-down': 'button',
+  'pan-right': 'button',
+  'center-map': 'button',
+  'map-size': 'select',
+  'map-details': 'button',
+  'map-status': 'span',
+  'review-mode': 'span',
+  encounter: 'div',
+  transcript: 'div',
+  'session-status': 'div',
+  'status-dot': 'span',
+  'status-text': 'span',
+  recovery: 'div',
+  reconnect: 'button',
+  fresh: 'button',
+  'action-form': 'form',
+  'acting-as': 'label',
+  action: 'textarea',
+  send: 'button',
+  notice: 'div',
+  'notice-text': 'span',
+  dismiss: 'button',
+} as const;
+const $ = elements(tags);
 const api = window.table;
-let state,
-  selected,
-  chosenParent,
-  recent,
+let state: CampaignSnapshot,
+  selected: string | undefined,
+  chosenParent: string | undefined,
+  recent: string | undefined,
   shownRevision = -1,
   transcriptKey = '',
   mapKey = '',
@@ -12,29 +100,23 @@ let state,
   offset = { x: 0, y: 0 },
   polling = false,
   submitting = false,
-  pendingSubmission;
-function node(tag, text, className) {
-  const e = document.createElement(tag);
-  if (text !== undefined) e.textContent = text;
-  if (className) e.className = className;
-  return e;
-}
-function notice(error) {
-  $('notice-text').textContent = String(error?.message ?? error).replace(
+  pendingSubmission: SubmitInput | undefined;
+function notice(error: unknown) {
+  $('notice-text').textContent = errorMessage(error).replace(
     /^Error invoking remote method '[^']+': Error: /,
     '',
   );
   $('notice').hidden = false;
 }
-function on(id, fn) {
+function on(id: keyof typeof tags, fn: () => unknown) {
   $(id).addEventListener('click', () => Promise.resolve().then(fn).catch(notice));
 }
-function row(label, value) {
+function row(label: string, value: string | number) {
   const e = node('div', undefined, 'sheet-row');
   e.append(node('span', label), node('small', value));
   return e;
 }
-function section(title, container, content) {
+function section(title: string, container: HTMLElement, content: (element: HTMLElement) => void) {
   const e = node('section', undefined, `sheet-section${title === 'Abilities' ? ' abilities' : ''}`);
   e.append(node('h3', title));
   content(e);
@@ -43,7 +125,7 @@ function section(title, container, content) {
 function members() {
   return state?.party?.members ?? [];
 }
-function seat(id) {
+function seat(id: string | undefined) {
   selected = id;
   renderParty();
   renderSheet();
@@ -127,8 +209,8 @@ function renderSheet() {
 function renderQuests() {
   const container = $('quests');
   container.replaceChildren();
-  if (state.focus?.primaryObjective)
-    section('Objective', container, (e) => e.append(node('p', state.focus.primaryObjective)));
+  const objective = state.focus?.primaryObjective;
+  if (objective) section('Objective', container, (e) => e.append(node('p', objective)));
   for (const q of state.quests ?? [])
     section(q.name, container, (e) => {
       e.append(node('p', q.quest.objective));
@@ -145,7 +227,7 @@ function renderTranscript() {
   const log = $('transcript');
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100;
   log.replaceChildren();
-  function message(speaker, text, revision, player = false) {
+  function message(speaker: string, text: string, revision: number, player = false) {
     const article = node('article', undefined, `message${player ? ' player' : ''}`);
     const label = node('div', undefined, 'message-label');
     label.append(node('span', speaker.toUpperCase()), node('small', `r${revision}`));
@@ -163,7 +245,7 @@ function renderTranscript() {
   }
   if (nearBottom) log.scrollTop = log.scrollHeight;
 }
-function mapDimensions(map) {
+function mapDimensions(map?: PlayerView['maps'][number]) {
   const size = $('map-size').value;
   return size === 'auto'
     ? {
@@ -176,7 +258,14 @@ async function renderMap() {
   const m = state?.maps?.find((m) => m.id === selectedMap);
   $('map-empty').hidden = !!m;
   $('map-image').hidden = !m;
-  for (const id of ['pan-left', 'pan-up', 'pan-down', 'pan-right', 'center-map', 'map-size'])
+  for (const id of [
+    'pan-left',
+    'pan-up',
+    'pan-down',
+    'pan-right',
+    'center-map',
+    'map-size',
+  ] as const)
     $(id).disabled = !m || m.kind !== 'grid';
   if (!m) {
     $('map-image').removeAttribute('src');
@@ -192,7 +281,7 @@ async function renderMap() {
   $('map-size').options[0].textContent =
     m.bounds && m.bounds.width <= 40 && m.bounds.height <= 40 ? 'Fit map' : 'Auto';
   $('map-details').disabled = !m;
-  const input = { mapId: m.id, revision: state.revision, details: mapDetails };
+  const input: MapInput = { mapId: m.id, revision: state.revision, details: mapDetails };
   if (m.kind === 'grid')
     input.viewport = {
       ...offset,
@@ -265,7 +354,7 @@ function renderState() {
     $('scene-details').hidden = !state.scene?.summary;
     if (!state.maps.some((m) => m.id === selectedMap)) {
       selectedMap =
-        state.scene?.map && state.maps.some((m) => m.id === state.scene.map)
+        state.scene?.map && state.maps.some((m) => m.id === state.scene?.map)
           ? state.scene.map
           : (state.maps[0]?.id ?? '');
       offset = { x: 0, y: 0 };
@@ -300,8 +389,11 @@ async function refresh() {
   if (polling) return;
   polling = true;
   try {
-    state = await api.snapshot();
-    renderState();
+    const snapshot = await api.snapshot();
+    if (snapshot.campaign) {
+      state = snapshot;
+      renderState();
+    }
   } catch (e) {
     notice(e);
   } finally {
@@ -317,7 +409,8 @@ async function connect(fresh = false) {
     await refresh();
   }
 }
-async function enter(snapshot) {
+export function showCampaign(snapshot: DesktopSnapshot) {
+  if (!snapshot.campaign) throw new Error('No campaign is open');
   state = snapshot;
   selected = undefined;
   shownRevision = -1;
@@ -336,9 +429,12 @@ async function enter(snapshot) {
     node('p', 'Describe your party or send an action.', 'conversation-empty'),
   );
   renderState();
+}
+async function enter(snapshot: DesktopSnapshot) {
+  showCampaign(snapshot);
   await connect();
 }
-async function checkProvider(path) {
+async function checkProvider(path?: string) {
   $('provider-status').textContent = 'Checking installation…';
   try {
     const found = await api.detect(path);
@@ -418,12 +514,15 @@ $('create-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   $('create').disabled = true;
   try {
+    const edition = $('edition').value;
+    if (edition !== '2014' && edition !== '2024')
+      throw new Error('Choose the 2014 or 2024 edition.');
     await enter(
       await api.create({
         parent: chosenParent,
         slug: $('slug').value,
         name: $('name').value,
-        edition: $('edition').value,
+        edition,
       }),
     );
   } catch (e) {
@@ -484,7 +583,7 @@ for (const [id, dx, dy] of [
   ['pan-right', 5, 0],
   ['pan-up', 0, -5],
   ['pan-down', 0, 5],
-])
+] as const)
   on(id, () => {
     offset = { x: Math.max(0, offset.x + dx), y: Math.max(0, offset.y + dy) };
     return renderMap();
@@ -493,7 +592,7 @@ on('center-map', () => {
   const place = state.sheets
     .find((s) => s.character.id === selected)
     ?.placements.find((p) => p.mapId === selectedMap);
-  if (!place || place.position.x === undefined) return;
+  if (!place || place.position.x === undefined || place.position.y === undefined) return;
   const dimensions = mapDimensions(state.maps.find((m) => m.id === selectedMap));
   offset = {
     x: Math.max(0, Math.floor(place.position.x - dimensions.width / 2)),
@@ -512,7 +611,7 @@ setInterval(() => {
   if (!$('play').hidden) void refresh();
 }, 1000);
 
-let lanInfo;
+let lanInfo: LanStatus | null;
 async function showLan() {
   lanInfo = await api.lanStatus();
   if (!lanInfo) {
@@ -540,7 +639,7 @@ async function showLan() {
         `${p.name} · ${p.characterId ?? 'No character'}${p.connected ? '' : ' · Offline'}`,
       ),
     );
-    for (const action of ['release', 'remove']) {
+    for (const action of ['release', 'remove'] as const) {
       const b = node('button', action === 'release' ? 'Release seat' : 'Remove player');
       b.onclick = () => api.lanAdmin({ action, clientId: p.id }).then(showLan).catch(notice);
       row.append(b);
@@ -568,6 +667,7 @@ async function showLan() {
     $('lan-players').append(row);
   }
   const snapshot = await api.snapshot();
+  if (!snapshot.campaign) return;
   const g = snapshot.gathering;
   const required =
     g?.request?.characterIds ??
@@ -604,7 +704,9 @@ on('lan-stop', async () => {
   await showLan();
 });
 on('lan-copy', () => navigator.clipboard.writeText($('lan-links').value));
-on('lan-play', () => api.joinLan(lanInfo.urls[0]));
+on('lan-play', () => {
+  if (lanInfo) return api.joinLan(lanInfo.urls[0]);
+});
 on('lan-rotate', async () => {
   await api.lanAdmin({ action: 'rotate' });
   await showLan();
@@ -628,5 +730,5 @@ setInterval(() => {
 }, 3000);
 
 $('lan-links').onchange = () => {
-  $('lan-qr').src = lanInfo.qrs[lanInfo.urls.indexOf($('lan-links').value)];
+  if (lanInfo) $('lan-qr').src = lanInfo.qrs[lanInfo.urls.indexOf($('lan-links').value)];
 };

@@ -1,0 +1,241 @@
+import { z } from 'zod';
+import { GroupAction, Id, Viewport } from '../schema.js';
+import type { State, TableTurn } from '../schema.js';
+import type { playerView } from '../player-view.js';
+
+export const SubmitInput = z
+  .object({
+    id: Id,
+    characterId: Id.optional(),
+    text: z.string().trim().min(1).max(20000),
+    actions: z.array(GroupAction).max(20).optional(),
+    groupEpoch: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export const CreateInput = z
+  .object({
+    parent: z.string().min(1).optional(),
+    slug: z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/),
+    name: z.string().trim().min(1).max(200),
+    edition: z.enum(['2014', '2024']),
+  })
+  .strict();
+export const MapInput = z
+  .object({
+    mapId: Id,
+    revision: z.number().int().nonnegative(),
+    viewport: Viewport.optional(),
+    details: z.boolean().optional(),
+  })
+  .strict();
+export const IntentInput = z
+  .object({
+    id: z.string().uuid(),
+    epoch: z.number().int().nonnegative(),
+    text: z.string().trim().max(10000),
+    confirmed: z.boolean(),
+    pass: z.boolean(),
+    sendNow: z.boolean().default(false),
+  })
+  .strict();
+export const LanAdminInput = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('assign'), clientId: z.string(), characterId: Id }).strict(),
+  z.object({ action: z.literal('remove'), clientId: z.string() }).strict(),
+  z.object({ action: z.literal('release'), clientId: z.string() }).strict(),
+  z.object({ action: z.literal('skip'), characterId: Id }).strict(),
+  z.object({ action: z.literal('rotate') }).strict(),
+  z.object({ action: z.literal('resolve') }).strict(),
+  z.object({ action: z.literal('continue') }).strict(),
+]);
+export const Preferences = z
+  .object({ executable: z.string().optional(), recent: z.string().optional() })
+  .strict();
+export type Preferences = z.infer<typeof Preferences>;
+export type SubmitInput = z.infer<typeof SubmitInput>;
+export type CreateInput = z.infer<typeof CreateInput>;
+export type MapInput = z.infer<typeof MapInput>;
+export type IntentInput = z.infer<typeof IntentInput>;
+export type LanAdminInput = z.infer<typeof LanAdminInput>;
+export type Stage = 'disconnected' | 'connecting' | 'ready' | 'resolving' | 'attention';
+export type PlayerView = ReturnType<typeof playerView>;
+export type CampaignSnapshot = PlayerView & {
+  root: string;
+  table: TableTurn[];
+  gathering?: State['gathering'];
+  stage: Stage;
+  detail: string;
+  reviewMode: 'legacy' | 'setup' | 'reviewed';
+  lanHosted: boolean;
+};
+export type DesktopSnapshot =
+  CampaignSnapshot | { campaign: null; stage: Stage; detail: string; table: TableTurn[] };
+export type MapResult =
+  | { stale: true; busy?: never }
+  | { busy: true; stale?: never }
+  | { stale?: never; busy?: never; revision: number; image: string; warnings: string[] };
+export interface Player {
+  id: string;
+  name: string;
+  characterId?: string;
+  connected: boolean;
+}
+export interface LanStatus {
+  urls: string[];
+  qrs: string[];
+  players: Player[];
+}
+export type LanSnapshot = PlayerView & {
+  table: TableTurn[];
+  gathering?: State['gathering'];
+  stage: Stage;
+  players: Player[];
+  self: { id: string; characterId?: string };
+  required: string[];
+};
+export interface WorkerApi {
+  detect(path?: string): Promise<{ path: string; version: string }>;
+  create(input: CreateInput): Promise<DesktopSnapshot>;
+  open(root: string): Promise<DesktopSnapshot>;
+  connect(
+    executable?: string,
+    fresh?: boolean,
+  ): Promise<{ connected: boolean; path: string; version: string }>;
+  submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
+  snapshot(): Promise<DesktopSnapshot>;
+  map(input: MapInput): Promise<MapResult>;
+  stop(): Promise<void>;
+  startLan(): Promise<LanStatus>;
+  stopLan(): Promise<void>;
+  lanStatus(): Promise<LanStatus | null>;
+  lanAdmin(input: LanAdminInput): Promise<LanStatus>;
+}
+export interface DesktopApi extends Omit<WorkerApi, 'connect'> {
+  preferences(): Promise<Preferences>;
+  chooseExecutable(): Promise<string | null>;
+  chooseParent(): Promise<string | null>;
+  chooseCampaign(): Promise<string | null>;
+  connect(fresh?: boolean): Promise<{ connected: boolean; path: string; version: string }>;
+  joinLan(link: string): Promise<void>;
+}
+export const LanJoinInput = z
+  .object({ invitation: z.string(), name: z.string().trim().min(1).max(40) })
+  .strict();
+export const LanClaimInput = z.object({ characterId: Id }).strict();
+export interface LanRequests {
+  join: z.infer<typeof LanJoinInput>;
+  state: undefined;
+  map: MapInput;
+  claim: z.infer<typeof LanClaimInput>;
+  intent: IntentInput;
+}
+export interface LanResponses {
+  join: { token: string; clientId: string };
+  state: LanSnapshot;
+  map: MapResult;
+  claim: { ok: boolean };
+  intent: { ok: boolean; duplicate?: boolean };
+}
+export const WorkerEnvelope = z
+  .object({ id: z.number().int().safe(), method: z.string(), args: z.array(z.unknown()) })
+  .strict();
+export const WorkerReply = z
+  .object({
+    id: z.number().int().safe(),
+    result: z.unknown().optional(),
+    error: z.string().optional(),
+  })
+  .strict();
+
+const OptionalWireString = z
+  .string()
+  .nullish()
+  .transform((value) => value ?? undefined);
+const OptionalWireBoolean = z
+  .boolean()
+  .nullish()
+  .transform((value) => value ?? undefined);
+
+// Dispatch parses unknown transport input before calling a typed handler. No method lookup casts.
+export async function dispatchWorker(
+  api: WorkerApi,
+  method: string,
+  raw: unknown,
+): Promise<unknown> {
+  switch (method) {
+    case 'detect':
+      return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
+    case 'create':
+      return api.create(...z.tuple([CreateInput]).parse(raw));
+    case 'open':
+      return api.open(...z.tuple([z.string().min(1)]).parse(raw));
+    case 'connect': {
+      const args = z
+        .union([
+          z.tuple([]),
+          z.tuple([OptionalWireString]),
+          z.tuple([OptionalWireString, OptionalWireBoolean]),
+        ])
+        .parse(raw);
+      return api.connect(args[0], args[1]);
+    }
+    case 'submit':
+      return api.submit(...z.tuple([SubmitInput]).parse(raw));
+    case 'map':
+      return api.map(...z.tuple([MapInput]).parse(raw));
+    case 'lanAdmin':
+      return api.lanAdmin(...z.tuple([LanAdminInput]).parse(raw));
+    case 'snapshot':
+      z.tuple([]).parse(raw);
+      return api.snapshot();
+    case 'stop':
+      z.tuple([]).parse(raw);
+      return api.stop();
+    case 'startLan':
+      z.tuple([]).parse(raw);
+      return api.startLan();
+    case 'stopLan':
+      z.tuple([]).parse(raw);
+      return api.stopLan();
+    case 'lanStatus':
+      z.tuple([]).parse(raw);
+      return api.lanStatus();
+    default:
+      throw new Error('Invalid worker method');
+  }
+}
+export async function dispatchDesktop(
+  api: DesktopApi,
+  method: unknown,
+  raw: unknown,
+): Promise<unknown> {
+  if (typeof method !== 'string') throw new Error('Invalid desktop method');
+  switch (method) {
+    case 'preferences':
+      z.tuple([]).parse(raw);
+      return api.preferences();
+    case 'chooseExecutable':
+      z.tuple([]).parse(raw);
+      return api.chooseExecutable();
+    case 'chooseParent':
+      z.tuple([]).parse(raw);
+      return api.chooseParent();
+    case 'chooseCampaign':
+      z.tuple([]).parse(raw);
+      return api.chooseCampaign();
+    case 'joinLan':
+      return api.joinLan(...z.tuple([z.string().url()]).parse(raw));
+    case 'connect':
+      return api.connect(...z.union([z.tuple([]), z.tuple([z.boolean().optional()])]).parse(raw));
+    default:
+      return dispatchWorker(
+        {
+          ...api,
+          connect: async () => {
+            throw new Error('Invalid desktop method');
+          },
+        },
+        method,
+        raw,
+      );
+  }
+}

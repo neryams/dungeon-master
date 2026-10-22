@@ -77,3 +77,9 @@ All players see the same party-visible information and public holding area. Ther
 `npm run test:lan` exercises phone/desktop browser layouts and reconnect/retry behavior using installed Chrome (`DM_CHROME` overrides its path). `npm run test:antigravity` now also exercises real LAN group input, a targeted reply, Send now, and native map generation with the host's authenticated account. It uses isolated temporary campaign/journal workspaces and restores its permission change if no concurrent settings edit occurred.
 
 CLI turns allow up to ten minutes for native image generation and tool work. The host can stop an active turn at any time; timeout/stop preserves committed state and never automatically retries the CLI request.
+
+## Developing the desktop
+
+Edit `desktop/main.mts`, `desktop/preload.cts`, `desktop/app.ts`, and `desktop/lan.ts`; generated JavaScript belongs in `build/desktop/`. Run `npm run build` after edits, or `npm run desktop` to build and launch. Shared IPC/LAN interfaces and runtime request schemas live in `src/desktop/contracts.ts`. Keep privileged imports out of the browser UI and keep the sandboxed preload self-contained. No bundler or frontend framework is required.
+
+`npm run typecheck` covers the core, Electron, and browser projects and refreshes ignored build outputs through TypeScript project references. `npm test` includes malformed IPC contract checks. `npm run test:desktop` and `npm run test:lan` exercise the emitted application rather than source JavaScript. Campaign files and the ChatGPT/Codex plugin entry points retain their existing locations and formats.

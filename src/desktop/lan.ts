@@ -4,21 +4,17 @@ import { networkInterfaces } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import QRCode from 'qrcode';
-import { z } from 'zod';
-import { Id } from '../schema.js';
+import {
+  IntentInput as Intent,
+  LanAdminInput,
+  MapInput,
+  LanJoinInput,
+  LanClaimInput,
+} from './contracts.js';
+import type { LanSnapshot, LanStatus, LanResponses } from './contracts.js';
 import type { DesktopHost } from './host.js';
 
 const secret = () => randomBytes(32).toString('hex');
-const Intent = z
-  .object({
-    id: z.string().uuid(),
-    epoch: z.number().int().nonnegative(),
-    text: z.string().trim().max(10000),
-    confirmed: z.boolean(),
-    pass: z.boolean(),
-    sendNow: z.boolean().default(false),
-  })
-  .strict();
 type Client = { id: string; name: string; characterId?: string; seen: number };
 
 // Sessions are disposable access credentials. All accepted game intentions are event-backed.
@@ -59,11 +55,11 @@ export class LanGame {
     ];
     const assets = new Map(
       await Promise.all(
-        ['lan.html', 'lan.js', 'lan.css'].map(
+        ['lan.html', 'lan.js', 'lan.css', 'dom.js'].map(
           async (file) =>
             [
               file === 'lan.html' ? '/' : `/${file}`,
-              await readFile(join(this.source, 'desktop', file)),
+              await readFile(join(this.source, 'build/desktop', file)),
             ] as const,
         ),
       ),
@@ -108,10 +104,7 @@ export class LanGame {
                 : 'text/css; charset=utf-8',
           );
         if (path === '/api/join' && req.method === 'POST') {
-          const input = z
-            .object({ invitation: z.string(), name: z.string().trim().min(1).max(40) })
-            .strict()
-            .parse(await body(req));
+          const input = LanJoinInput.parse(await body(req));
           if (input.invitation !== this.invitation)
             return send(401, { error: 'Ask the host for a new join link' });
           return send(
@@ -132,7 +125,7 @@ export class LanGame {
           return send(200, await this.snapshot(client));
         if (req.method !== 'POST') return send(405, { error: 'Unsupported request' });
         const input = await body(req);
-        if (path === '/api/map') return send(200, await this.host.map(input));
+        if (path === '/api/map') return send(200, await this.host.map(MapInput.parse(input)));
         if (path === '/api/claim')
           return send(200, await this.serial(() => this.claim(client, input)));
         if (path === '/api/intent')
@@ -165,7 +158,7 @@ export class LanGame {
       connected: Date.now() - c.seen < 15000,
     }));
   }
-  async status() {
+  async status(): Promise<LanStatus> {
     const urls = this.addresses.map((a) => `http://${a}:${this.port}/#${this.invitation}`);
     return {
       urls,
@@ -173,7 +166,7 @@ export class LanGame {
       players: this.players(),
     };
   }
-  private async snapshot(client: Client) {
+  private async snapshot(client: Client): Promise<LanSnapshot> {
     const s = await this.host.snapshot();
     if (!s.campaign) throw new Error('No campaign');
     return {
@@ -214,9 +207,9 @@ export class LanGame {
       `lan-seats-${randomUUID()}`,
     );
   }
-  private async claim(client: Client, raw: unknown) {
+  private async claim(client: Client, raw: unknown): Promise<LanResponses['claim']> {
     if (![...this.clients.values()].includes(client)) throw new Error('Session revoked');
-    const { characterId } = z.object({ characterId: Id }).strict().parse(raw);
+    const { characterId } = LanClaimInput.parse(raw);
     const s = await this.host.snapshot();
     if (!s.campaign || !s.party.members.some((p) => p.id === characterId))
       throw new Error('Unavailable character');
@@ -234,7 +227,7 @@ export class LanGame {
     }
     return { ok: true };
   }
-  private async intent(client: Client, raw: unknown) {
+  private async intent(client: Client, raw: unknown): Promise<LanResponses['intent']> {
     if (![...this.clients.values()].includes(client)) throw new Error('Session revoked');
     const i = Intent.parse(raw);
     const s = await this.host.snapshot();
@@ -277,7 +270,7 @@ export class LanGame {
     const required = this.required(s);
     const actions = (only ? [only] : required)
       .map((id) => s.gathering?.actions[id])
-      .filter((a) => a?.confirmed);
+      .filter((a): a is NonNullable<typeof a> => a?.confirmed === true);
     if (!actions.length || (!only && !override && actions.length !== required.length)) return;
     const text = s.gathering?.request
       ? 'These are the requested player replies. Resume the pending decision without repeating saved effects.'
@@ -290,14 +283,7 @@ export class LanGame {
     );
   }
   async admin(raw: unknown) {
-    const i = z
-      .object({
-        action: z.enum(['remove', 'release', 'assign', 'rotate', 'resolve', 'skip', 'continue']),
-        clientId: z.string().optional(),
-        characterId: Id.optional(),
-      })
-      .strict()
-      .parse(raw);
+    const i = LanAdminInput.parse(raw);
     return this.serial(async () => {
       if (i.action === 'rotate') this.invitation = secret();
       else if (i.action === 'resolve') await this.dispatch(undefined, true);
