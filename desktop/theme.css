@@ -169,6 +169,14 @@ textarea {
   padding: 10px 12px;
   max-width: 100%;
 }
+select {
+  appearance: none;
+  padding-right: 36px;
+  text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23eee9d9' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
 input {
   width: 100%;
 }
@@ -252,6 +260,13 @@ summary {
   background: #151e1966;
   border: 1px solid var(--line);
   border-radius: 5px;
+}
+.provider-card > div {
+  flex: 1;
+  min-width: 0;
+}
+.provider-card select {
+  width: 100%;
 }
 .provider-card strong {
   font-size: 13px;
@@ -490,10 +505,10 @@ summary {
 }
 .map-heading select {
   font-size: 12px;
-  background: #424d34;
+  background-color: #424d34;
   border-color: #79845b;
   max-width: 55%;
-  padding: 7px 10px;
+  padding: 7px 36px 7px 10px;
 }
 #scene-details {
   min-width: 0;
@@ -593,8 +608,8 @@ summary {
   font-size: 11px;
 }
 .map-controls select {
-  padding: 6px;
-  background: #1d281f;
+  padding: 6px 36px 6px 6px;
+  background-color: #1d281f;
   font-size: 11px;
 }
 .map-footer {
