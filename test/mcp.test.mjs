@@ -31,7 +31,7 @@ test('MCP exposes only domain tools, validates input and reports revision confli
   for (const edge of [[], ['from'], ['from', 'to', 'extra'], ['from', '../invalid']])
     assert.equal(MapEdge.safeParse(edge).success, false);
   const tools = advertised.map((t) => t.name);
-  assert.equal(tools.length, 30);
+  assert.equal(tools.length, 31);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));
   const result = await client.callTool({

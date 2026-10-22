@@ -30,6 +30,9 @@ const Audience = z.enum(['dm', 'party']).default('dm');
 const metadata = Mutation.shape;
 export const inputs = {
   ...refereeInputs,
+  publish_table_message: z
+    .object({ ...metadata, requestId: Id, text: z.string().trim().min(1).max(20000) })
+    .strict(),
   get_character_sheet: z
     .object({ characterId: Id, audience: z.enum(['party', 'dm']).default('party') })
     .strict(),
@@ -129,6 +132,8 @@ export const inputs = {
 export type ToolName = keyof typeof inputs;
 export const descriptions: Record<ToolName, string> = {
   ...refereeDescriptions,
+  publish_table_message:
+    'Publish public narration or a question to an active desktop hotseat request. Only use when the host supplies requestId. Save mechanical outcomes first; never include DM secrets, tool logs or private referee details. Reuse operationId and identical input on retry. Chat-only clients do not need this tool.',
   get_character_sheet:
     'Read one character’s exact saved stats, complete visible owned inventory and regional/tactical map placements from one revision. Defaults to party audience. No journal or gameplay writes.',
   get_party_overview:
@@ -186,6 +191,16 @@ export class CampaignService {
     if (name in refereeInputs)
       return executeReferee(this.store, name as keyof typeof refereeInputs, raw);
     switch (name) {
+      case 'publish_table_message': {
+        const i = inputs[name].parse(raw);
+        return mutationResult(
+          await this.store.transact(this.meta(i), { name, input: i }, () => ({
+            changes: [],
+            records: [],
+            table: { type: 'publish', requestId: i.requestId, text: i.text },
+          })),
+        );
+      }
       case 'get_character_sheet': {
         const i = inputs[name].parse(raw);
         const { state: original } = await this.store.read();

@@ -1,0 +1,36 @@
+import { mkdir, readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
+import { isAbsolute, join, relative } from 'node:path';
+import sharp from 'sharp';
+import { CampaignStore, atomicWrite, safePath } from '../store.js';
+
+/** File handling only: registration still goes through the normal typed campaign tool. */
+export async function importGeneratedArt(
+  store: CampaignStore,
+  sourcePath: string,
+  brain = join(homedir(), '.gemini/antigravity-cli/brain'),
+) {
+  const session = JSON.parse(
+    await readFile(await safePath(store.root, '.dm/hotseat/session.json'), 'utf8'),
+  );
+  if (session.campaignRoot !== store.root || !/^[a-zA-Z0-9_-]{1,100}$/.test(session.conversationId))
+    throw new Error('Connect the campaign before importing artwork');
+  const conversation = await safePath(brain, session.conversationId);
+  if (!isAbsolute(sourcePath)) throw new Error('Expected an absolute generated image path');
+  const source = await safePath(conversation, relative(conversation, sourcePath));
+  const file = await stat(source);
+  if (!file.isFile() || file.size > 50 * 1024 * 1024)
+    throw new Error('Expected a generated image up to 50 MiB');
+  const bytes = await readFile(source);
+  if (bytes.length > 50 * 1024 * 1024) throw new Error('Image is too large');
+  const meta = await sharp(bytes, { limitInputPixels: 40_000_000 }).metadata();
+  if (!['png', 'jpeg', 'webp'].includes(meta.format ?? ''))
+    throw new Error('Expected a PNG, JPEG or WebP generated image');
+  await sharp(bytes, { limitInputPixels: 40_000_000 }).resize(1, 1).toBuffer();
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  const path = `assets/generated-${hash}.${meta.format === 'jpeg' ? 'jpg' : meta.format}`;
+  await mkdir(await safePath(store.root, 'assets', false), { recursive: true });
+  await atomicWrite(await safePath(store.root, path, false), bytes);
+  return { path, sha256: hash };
+}

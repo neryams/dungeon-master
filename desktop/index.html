@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Dungeon Master — The Table</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="sigil" aria-hidden="true">◇</span>
+        <div>DUNGEON MASTER<small>THE TABLE · HOTSEAT</small></div>
+      </div>
+      <div id="campaign-heading"><span class="muted">Your next story starts here.</span></div>
+      <div class="top-actions">
+        <span id="revision"></span><button id="campaigns" class="quiet" hidden>Campaigns</button
+        ><button id="connection" class="quiet" hidden>Connect DM</button
+        ><button id="stop" class="quiet" hidden>Stop DM</button>
+      </div>
+    </header>
+
+    <main id="welcome">
+      <section class="welcome-art" aria-label="Welcome to your table">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="compass">✧</div>
+        <span class="eyebrow">ONE TABLE. MANY POSSIBILITIES.</span>
+        <h1>A world awaits.<br />Pull up a chair.</h1>
+        <p>
+          Your party, your choices, your story.<br />An AI Dungeon Master brings the adventure to
+          life.<br />Your campaign stays on this computer.
+        </p>
+        <div class="welcome-foot">
+          <span>01 &nbsp; Connect your DM</span><span>02 &nbsp; Choose a campaign</span
+          ><span>03 &nbsp; Take your seat</span>
+        </div>
+      </section>
+      <section class="setup">
+        <span class="eyebrow">SET YOUR TABLE</span>
+        <h2>Let’s begin.</h2>
+        <div class="provider-card">
+          <div>
+            <strong>Antigravity CLI</strong><span id="provider-status">Checking installation…</span>
+          </div>
+          <span class="provider-icon">A</span>
+        </div>
+        <p class="help">
+          Uses your existing CLI sign-in. If needed, run <code>agy</code> in your terminal and sign
+          in, then check again.
+        </p>
+        <div class="button-row">
+          <button id="check-provider" class="secondary">Check again</button
+          ><button id="choose-cli" class="quiet">Choose executable</button>
+        </div>
+        <hr />
+        <div class="button-row">
+          <button id="new-tab" class="tab active">New campaign</button
+          ><button id="open-campaign" class="tab">Open existing…</button>
+        </div>
+        <form id="create-form">
+          <label for="name">Campaign name</label
+          ><input id="name" placeholder="The Lantern at Briar Ford" maxlength="200" required />
+          <div class="form-row">
+            <div>
+              <label for="slug">Folder name</label
+              ><input
+                id="slug"
+                placeholder="lantern-at-briar-ford"
+                pattern="[a-z0-9][a-z0-9-]{0,79}"
+                required
+              />
+            </div>
+            <div>
+              <label for="edition">Rules edition</label
+              ><select id="edition">
+                <option value="2024">5e · 2024</option>
+                <option value="2014">5e · 2014</option>
+              </select>
+            </div>
+          </div>
+          <button type="button" id="choose-parent" class="path-button">
+            Save in ~/Campaigns · Change
+          </button>
+          <button id="create" class="primary wide">Create campaign <span>→</span></button>
+        </form>
+        <button id="recent" class="secondary wide" hidden>Reopen last campaign</button>
+        <p class="help permission-note">
+          Connecting enables only this campaign’s tools in Antigravity’s permission settings.
+          Existing deny rules and other settings are preserved. The connection check uses a small
+          CLI turn.
+        </p>
+      </section>
+    </main>
+
+    <main id="play" hidden>
+      <aside class="party-pane">
+        <div class="pane-title">
+          <span class="eyebrow">YOUR PARTY</span><span id="party-count"></span>
+        </div>
+        <div id="party"></div>
+        <button id="table-seat" class="quiet wide">Speak for the table</button>
+        <button id="pass" class="secondary wide">Pass the seat →</button>
+        <div class="sheet-tabs">
+          <button id="sheet-tab" class="tab active">Character</button
+          ><button id="quest-tab" class="tab">Journal</button>
+        </div>
+        <div id="sheet"></div>
+        <div id="quests" hidden></div>
+      </aside>
+      <section class="map-pane">
+        <div class="map-heading">
+          <div>
+            <span class="eyebrow">THE WORLD BEFORE YOU</span>
+            <h2 id="scene-title">An unwritten adventure</h2>
+          </div>
+          <select id="map-select" aria-label="Current map"></select>
+        </div>
+        <p id="scene-summary"></p>
+        <div id="map-surface">
+          <div id="map-empty">
+            <span class="empty-symbol">⌖</span>
+            <h3>Beyond the edge of the map</h3>
+            <p>
+              Introduce your party to the DM.<br />Your surroundings will appear as the story
+              unfolds.
+            </p>
+          </div>
+          <img id="map-image" alt="Revealed player map" hidden />
+        </div>
+        <div class="map-controls">
+          <button id="pan-left" class="quiet" aria-label="Pan map left">←</button
+          ><button id="pan-up" class="quiet" aria-label="Pan map up">↑</button
+          ><button id="pan-down" class="quiet" aria-label="Pan map down">↓</button
+          ><button id="pan-right" class="quiet" aria-label="Pan map right">→</button
+          ><button id="center-map" class="quiet">Center on character</button
+          ><label
+            >View
+            <select id="map-size">
+              <option value="12">12 × 12</option>
+              <option value="20" selected>20 × 20</option>
+              <option value="40">40 × 40</option>
+            </select></label
+          ><span id="map-status"></span>
+        </div>
+        <div id="encounter"></div>
+        <div class="scene-footer">
+          <span class="small-dot"></span>Revealed map · Saved campaign state<span
+            id="review-mode"
+          ></span>
+        </div>
+      </section>
+      <section class="conversation-pane">
+        <div class="conversation-title">
+          <span class="eyebrow">AT THE TABLE</span><span class="live-label">LOCAL SESSION</span>
+        </div>
+        <div id="transcript" role="log" aria-label="Public table conversation">
+          <div class="conversation-empty">
+            <h3>Every adventure starts<br />with a conversation.</h3>
+            <p>Tell your DM who is playing and what kind of adventure you have in mind.</p>
+          </div>
+        </div>
+        <div id="session-status" role="status">
+          <span id="status-dot" class="small-dot"></span
+          ><span id="status-text">Connect your DM to begin.</span>
+        </div>
+        <div id="recovery" hidden>
+          <p>
+            Saved outcomes are preserved. Check your map and sheet before continuing; interrupted
+            actions are never replayed automatically.
+          </p>
+          <button id="reconnect" class="secondary">Reconnect DM</button
+          ><button id="fresh" class="quiet">Start fresh DM context</button>
+        </div>
+        <form id="action-form">
+          <label for="action" id="acting-as">SPEAKING FOR THE TABLE</label
+          ><textarea
+            id="action"
+            maxlength="20000"
+            rows="3"
+            placeholder="What do you do?"
+            required
+          ></textarea>
+          <div class="composer-footer">
+            <span>Ctrl / ⌘ + Enter to send</span
+            ><button id="send" class="primary" disabled>Tell the DM ↑</button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <div id="notice" role="alert" hidden>
+      <span id="notice-text"></span><button id="dismiss" aria-label="Dismiss notice">×</button>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -14,7 +14,13 @@ function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 export function gameplayFingerprint(state: State): string {
-  const { revision: _revision, actions: _actions, reviewMode: _mode, ...gameplay } = state;
+  const {
+    revision: _revision,
+    actions: _actions,
+    reviewMode: _mode,
+    table: _table,
+    ...gameplay
+  } = state;
   return createHash('sha256').update(canonical(gameplay)).digest('hex');
 }
 export function actionStatus(state: State, action: ReviewAction): string {

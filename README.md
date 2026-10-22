@@ -79,6 +79,21 @@ The real journal integration test uses private temporary IPC/log directories and
 
 See [architecture](docs/architecture.md), [tool interfaces](docs/tools.md), and [cloud connection guidance](docs/cloud.md). The package archive is generated at `build/dungeon-master-plugin.tgz`; no artifacts are published automatically.
 
+## Play in the Electron hotseat app
+
+With Antigravity CLI (`agy`) installed and signed in:
+
+```bash
+npm ci
+npm run desktop
+```
+
+The app detects the CLI, guides campaign creation or opening, and connects the DM. Choose a character, type an action, and pass the seat to the next player. Public DM narration appears beside the revealed map, exact character sheets, inventory, resources and quests. Campaign state and the table transcript survive restarts. Interrupted actions are never automatically replayed.
+
+This MVP uses one computer and Antigravity. It requires Node 22.12+ and Git; it is launched from this checkout, with no signed installer yet. The existing ChatGPT/Codex plugin and read-only LAN panel remain available. New campaigns created in the desktop also receive the standard campaign-bound ChatGPT/Codex plugin configuration.
+
+Connecting creates an app workspace under the campaign's `.dm/hotseat` directory and adds one exact campaign-server MCP permission to Antigravity's settings. It preserves unrelated settings, existing deny/ask rules and CLI credentials. See [desktop setup, recovery and testing](docs/desktop.md).
+
 ## Open the player dashboard
 
 ```bash

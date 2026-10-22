@@ -19,6 +19,7 @@ for (const path of [
   'src',
   'test',
   'scripts',
+  'desktop',
   'tsconfig.json',
   'AGENTS.md',
   '.prettierrc.json',

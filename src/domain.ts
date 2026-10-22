@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Change, Entity, Event, Payload, State, Roll } from './schema.js';
 import { z } from 'zod';
 import { validateReview, reduceReview } from './review.js';
+import { reduceTable } from './table.js';
 
 export class CampaignError extends Error {
   constructor(
@@ -322,6 +323,7 @@ export function applyPayload(before: State, payload: Payload): State {
     }
   }
   reduceReview(state, payload);
+  reduceTable(state, payload);
   validateState(state);
   return state;
 }
@@ -400,6 +402,8 @@ export function partyState(state: State): State {
   const out = structuredClone(state);
   delete out.actions;
   delete out.reviewMode;
+  // Conversation is exposed explicitly by the hotseat projection, not generic party tools.
+  delete out.table;
   const visible = (id: string) =>
     out.entities[id]?.visibility === 'party' && out.entities[id]?.knowledge !== 'plan';
   for (const [id, e] of Object.entries(out.entities))
