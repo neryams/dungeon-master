@@ -367,6 +367,7 @@ export class DesktopHost {
         mapId: Id,
         revision: z.number().int().nonnegative(),
         viewport: Viewport.optional(),
+        details: z.boolean().default(true),
       })
       .strict()
       .parse(raw);
@@ -393,6 +394,8 @@ export class DesktopHost {
           input.mapId,
           'party',
           input.viewport,
+          'map',
+          input.details ? 'document' : 'canvas',
         );
         rendered = { key, image: `data:image/png;base64,${png.toString('base64')}`, warnings };
       }

@@ -10,6 +10,8 @@ import { geometryFingerprint } from './map-art.js';
 export type RenderMode = 'map' | 'reference';
 type BackgroundImage = { data: string; extent: z.infer<typeof Viewport> };
 const CELL = 38;
+const DOCUMENT_LEFT = 54;
+const DOCUMENT_TOP = 100;
 
 const esc = (s: unknown) =>
   String(s).replace(
@@ -76,8 +78,8 @@ export function schematic(
   )
     throw new CampaignError('INVALID_MAP', 'Invalid viewport extent');
   const cell = CELL,
-    left = reference ? 0 : 54,
-    top = reference ? 0 : 100,
+    left = reference ? 0 : DOCUMENT_LEFT,
+    top = reference ? 0 : DOCUMENT_TOP,
     w = reference ? viewport.width * cell : Math.max(820, viewport.width * cell + 90),
     gridH = viewport.height * cell;
   const inside = (x: number, y: number) =>
@@ -250,8 +252,10 @@ export async function renderMapImage(
   audience: 'dm' | 'party',
   viewport?: z.infer<typeof Viewport>,
   mode: RenderMode = 'map',
+  framing: 'document' | 'canvas' = 'document',
 ) {
   const base = schematic(state, mapId, audience, viewport, { mode });
+  const pixelRatio = framing === 'canvas' && mode !== 'reference' ? 2 : 1;
   const visible = audience === 'party' ? partyState(state) : state;
   const map = visible.entities[mapId].map!;
   const original = state.entities[mapId].map!;
@@ -303,7 +307,9 @@ export async function renderMapImage(
         // Decode to bounded raster pixels before embedding: no SVG/file references survive.
         const png = await sharp(bytes, { limitInputPixels: 40_000_000 })
           .rotate()
-          .resize(extent.width * CELL, extent.height * CELL, { fit: 'fill' })
+          .resize(extent.width * CELL * pixelRatio, extent.height * CELL * pixelRatio, {
+            fit: 'fill',
+          })
           .png()
           .toBuffer();
         background = { extent, data: png.toString('base64') };
@@ -315,7 +321,16 @@ export async function renderMapImage(
   const { svg, ...data } = background
     ? schematic(state, mapId, audience, viewport, { mode, background })
     : base;
-  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+  let raster = sharp(Buffer.from(svg), { density: 72 * pixelRatio });
+  // Desktop chrome supplies context; keep the document framing for MCP/panel and legend view.
+  if (framing === 'canvas' && mode !== 'reference')
+    raster = raster.extract({
+      left: DOCUMENT_LEFT * pixelRatio,
+      top: DOCUMENT_TOP * pixelRatio,
+      width: data.viewport.width * CELL * pixelRatio,
+      height: data.viewport.height * CELL * pixelRatio,
+    });
+  const png = await raster.png().toBuffer();
   return { ...data, warnings, png };
 }
 

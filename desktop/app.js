@@ -8,6 +8,7 @@ let state,
   transcriptKey = '',
   mapKey = '',
   selectedMap = '',
+  mapDetails = false,
   offset = { x: 0, y: 0 },
   polling = false,
   submitting = false,
@@ -34,7 +35,7 @@ function row(label, value) {
   return e;
 }
 function section(title, container, content) {
-  const e = node('section', undefined, 'sheet-section');
+  const e = node('section', undefined, `sheet-section${title === 'Abilities' ? ' abilities' : ''}`);
   e.append(node('h3', title));
   content(e);
   container.append(e);
@@ -47,25 +48,25 @@ function seat(id) {
   renderParty();
   renderSheet();
   $('acting-as').textContent = selected
-    ? `ACTING AS ${members().find((p) => p.id === selected)?.name ?? 'CHARACTER'}`
-    : 'SPEAKING FOR THE TABLE';
+    ? `Playing as ${members().find((p) => p.id === selected)?.name ?? 'character'}`
+    : 'Table';
 }
 function renderParty() {
   const party = $('party');
   party.replaceChildren();
-  $('party-count').textContent = `${members().length} adventurers`;
-  if (!members().length)
-    party.append(
-      node('p', 'Your party will appear here after the DM creates your characters.', 'help'),
-    );
+  $('party-count').textContent = String(members().length);
+  if (!members().length) party.append(node('p', 'Ask the DM to add characters.', 'help'));
   for (const p of members()) {
     const card = node('button', undefined, `party-card${p.id === selected ? ' selected' : ''}`);
-    if (p.id === selected) card.append(node('span', 'YOUR SEAT', 'seat-tag'));
+    card.setAttribute('aria-pressed', String(p.id === selected));
+    const avatar = node('span', p.name.slice(0, 1).toUpperCase(), 'party-avatar');
+    avatar.setAttribute('aria-hidden', 'true');
+    card.append(avatar);
     card.append(node('strong', p.name));
     const stats = node('div', undefined, 'party-stats');
     stats.append(
       node('span', `${p.hp} / ${p.maxHp} HP${p.tempHp ? ` +${p.tempHp}` : ''}`),
-      node('span', `AC ${p.ac}`),
+      node('span', `AC ${p.ac ?? '—'}`),
     );
     const track = node('div', undefined, 'hp-track');
     const fill = node('div', undefined, 'hp-fill');
@@ -76,20 +77,15 @@ function renderParty() {
     party.append(card);
   }
   $('pass').disabled = !members().length;
-  $('table-seat').textContent = selected ? 'Speak for the table' : 'Speaking for the table';
+  $('table-seat').setAttribute('aria-pressed', String(!selected));
+  $('table-seat').title = 'Speak for the whole table';
 }
 function renderSheet() {
   const container = $('sheet');
   container.replaceChildren();
   const sheet = state?.sheets?.find((s) => s.character.id === selected);
   if (!sheet) {
-    container.append(
-      node(
-        'p',
-        'Choose a character above to see their sheet, or speak for the whole table.',
-        'help',
-      ),
-    );
+    container.append(node('p', 'Select a character to view their sheet.', 'help'));
     return;
   }
   const c = sheet.character.character;
@@ -99,23 +95,23 @@ function renderSheet() {
         'p',
         c.conditions.length
           ? c.conditions.map((x) => x.name + (x.duration ? ` · ${x.duration}` : '')).join(', ')
-          : 'Ready for adventure.',
+          : 'None',
       ),
     ),
   );
   section('Abilities', container, (e) => {
     for (const [key, value] of Object.entries(c.abilities)) e.append(row(key.toUpperCase(), value));
-    if (!Object.keys(c.abilities).length) e.append(node('p', 'Not yet recorded.'));
+    if (!Object.keys(c.abilities).length) e.append(node('p', 'Not recorded'));
   });
   section('Resources', container, (e) => {
     for (const [key, value] of Object.entries(c.resources))
       e.append(row(key, `${value.current} / ${value.max}`));
-    if (!Object.keys(c.resources).length) e.append(node('p', 'No resources recorded.'));
+    if (!Object.keys(c.resources).length) e.append(node('p', 'None recorded'));
   });
   section('Inventory', container, (e) => {
     for (const item of sheet.inventory)
       e.append(row(item.name, `×${item.item.quantity}${item.item.equipped ? ' · equipped' : ''}`));
-    if (!sheet.inventory.length) e.append(node('p', 'Your pack is empty.'));
+    if (!sheet.inventory.length) e.append(node('p', 'Empty'));
   });
   section('Position', container, (e) => {
     for (const place of sheet.placements)
@@ -125,21 +121,21 @@ function renderSheet() {
           `${place.mapName}: ${place.nodeLabel ?? `${place.position.x}, ${place.position.y}`}`,
         ),
       );
-    if (!sheet.placements.length) e.append(node('p', 'Not yet placed on a map.'));
+    if (!sheet.placements.length) e.append(node('p', 'Not placed'));
   });
 }
 function renderQuests() {
   const container = $('quests');
   container.replaceChildren();
   if (state.focus?.primaryObjective)
-    section('Your objective', container, (e) => e.append(node('p', state.focus.primaryObjective)));
+    section('Objective', container, (e) => e.append(node('p', state.focus.primaryObjective)));
   for (const q of state.quests ?? [])
     section(q.name, container, (e) => {
       e.append(node('p', q.quest.objective));
       for (const lead of q.quest.leads) e.append(node('p', `• ${lead}`));
     });
   if (!container.children.length)
-    container.append(node('p', 'Your objectives and active quests will appear here.', 'help'));
+    container.append(node('p', 'Objectives and active quests will appear here.', 'help'));
 }
 function renderTranscript() {
   const key = JSON.stringify(state.table);
@@ -167,6 +163,15 @@ function renderTranscript() {
   }
   if (nearBottom) log.scrollTop = log.scrollHeight;
 }
+function mapDimensions(map) {
+  const size = $('map-size').value;
+  return size === 'auto'
+    ? {
+        width: Math.min(40, map?.bounds?.width ?? 20),
+        height: Math.min(40, map?.bounds?.height ?? 20),
+      }
+    : { width: Number(size), height: Number(size) };
+}
 async function renderMap() {
   const m = state?.maps?.find((m) => m.id === selectedMap);
   $('map-empty').hidden = !!m;
@@ -175,14 +180,23 @@ async function renderMap() {
     $(id).disabled = !m || m.kind !== 'grid';
   if (!m) {
     $('map-image').removeAttribute('src');
+    $('map-status').textContent = '';
+    $('map-details').disabled = true;
     return;
   }
-  const input = { mapId: m.id, revision: state.revision };
+  $('center-map').disabled =
+    m.kind !== 'grid' ||
+    !state.sheets
+      .find((s) => s.character.id === selected)
+      ?.placements.some((p) => p.mapId === m.id && p.position.x !== undefined);
+  $('map-size').options[0].textContent =
+    m.bounds && m.bounds.width <= 40 && m.bounds.height <= 40 ? 'Fit map' : 'Auto';
+  $('map-details').disabled = !m;
+  const input = { mapId: m.id, revision: state.revision, details: mapDetails };
   if (m.kind === 'grid')
     input.viewport = {
       ...offset,
-      width: Number($('map-size').value),
-      height: Number($('map-size').value),
+      ...mapDimensions(m),
     };
   const key = JSON.stringify(input);
   if (key === mapKey) return;
@@ -222,7 +236,13 @@ function renderState() {
         ? 'Connecting…'
         : 'Connect DM';
   $('send').disabled = state.stage !== 'ready' || submitting;
-  $('status-text').textContent = state.detail;
+  $('status-text').textContent =
+    state.stage === 'ready'
+      ? 'DM connected'
+      : state.stage === 'disconnected'
+        ? 'Connect DM to send an action.'
+        : state.detail;
+  $('status-text').title = state.detail;
   $('status-dot').className =
     `small-dot${busy ? ' busy' : state.stage === 'attention' ? ' warning' : ''}`;
   $('recovery').hidden = state.stage !== 'attention';
@@ -237,9 +257,9 @@ function renderState() {
     if (selected && !members().some((m) => m.id === selected)) selected = undefined;
     seat(selected);
     renderQuests();
-    $('scene-title').textContent = state.scene?.title ?? 'An unwritten adventure';
-    $('scene-summary').textContent =
-      state.scene?.summary ?? 'Tell the DM about your party and the adventure you want to play.';
+    $('scene-title').textContent = state.scene?.title ?? 'Scene';
+    $('scene-summary').textContent = state.scene?.summary ?? '';
+    $('scene-details').hidden = !state.scene?.summary;
     if (!state.maps.some((m) => m.id === selectedMap)) {
       selectedMap =
         state.scene?.map && state.maps.some((m) => m.id === state.scene.map)
@@ -301,13 +321,16 @@ async function enter(snapshot) {
   transcriptKey = '';
   mapKey = '';
   selectedMap = '';
+  mapDetails = false;
+  $('map-details').setAttribute('aria-pressed', 'false');
+  $('map-size').value = 'auto';
   pendingSubmission = undefined;
   $('welcome').hidden = true;
   $('play').hidden = false;
   $('action').value = '';
   $('notice').hidden = true;
   $('transcript').replaceChildren(
-    node('div', 'Tell the DM about your party and your adventure.', 'conversation-empty'),
+    node('p', 'Describe your party or send an action.', 'conversation-empty'),
   );
   renderState();
   await connect();
@@ -351,10 +374,11 @@ on('campaigns', async () => {
   $('connection').hidden = true;
   $('stop').hidden = true;
   $('campaigns').hidden = true;
+  $('campaign-heading').textContent = 'Campaigns';
+  $('revision').textContent = '';
   recent = state.root;
   $('recent').hidden = false;
 });
-on('new-tab', () => $('name').focus());
 on('connection', () => connect());
 on('reconnect', () => connect());
 on('fresh', () => connect(true));
@@ -444,7 +468,13 @@ $('map-select').addEventListener('change', () => {
   void renderMap();
 });
 $('map-size').addEventListener('change', () => {
+  if ($('map-size').value === 'auto') offset = { x: 0, y: 0 };
   void renderMap();
+});
+on('map-details', () => {
+  mapDetails = !mapDetails;
+  $('map-details').setAttribute('aria-pressed', String(mapDetails));
+  return renderMap();
 });
 for (const [id, dx, dy] of [
   ['pan-left', -5, 0],
@@ -461,10 +491,10 @@ on('center-map', () => {
     .find((s) => s.character.id === selected)
     ?.placements.find((p) => p.mapId === selectedMap);
   if (!place || place.position.x === undefined) return;
-  const half = Number($('map-size').value) / 2;
+  const dimensions = mapDimensions(state.maps.find((m) => m.id === selectedMap));
   offset = {
-    x: Math.max(0, Math.floor(place.position.x - half)),
-    y: Math.max(0, Math.floor(place.position.y - half)),
+    x: Math.max(0, Math.floor(place.position.x - dimensions.width / 2)),
+    y: Math.max(0, Math.floor(place.position.y - dimensions.height / 2)),
   };
   return renderMap();
 });

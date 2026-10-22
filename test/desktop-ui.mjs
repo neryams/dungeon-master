@@ -146,10 +146,33 @@ test(
     );
     const viewport = await page.evaluate(() => ({
       ...offset,
-      width: Number(document.getElementById('map-size').value),
-      height: Number(document.getElementById('map-size').value),
+      ...mapDimensions(state.maps.find((m) => m.id === selectedMap)),
     }));
     const expected = await renderMapImage(
+      store.root,
+      (await store.read()).state,
+      example.bridgeMap.id,
+      'party',
+      viewport,
+      'map',
+      'canvas',
+    );
+    assert.equal(
+      await page.locator('#map-image').getAttribute('src'),
+      `data:image/png;base64,${expected.png.toString('base64')}`,
+    );
+    await page.screenshot({ path: join(artifacts, 'table.png') });
+    // Canvas framing gives the map space; the document legend remains a functional toggle.
+    const canvas = await page.locator('#map-image').getAttribute('src');
+    await page.locator('#map-details').click();
+    await page.waitForFunction(
+      (previous) =>
+        !document.getElementById('map-image').hidden &&
+        document.getElementById('map-image').src !== previous,
+      canvas,
+    );
+    assert.equal(await page.locator('#map-details').getAttribute('aria-pressed'), 'true');
+    const documentMap = await renderMapImage(
       store.root,
       (await store.read()).state,
       example.bridgeMap.id,
@@ -158,9 +181,36 @@ test(
     );
     assert.equal(
       await page.locator('#map-image').getAttribute('src'),
-      `data:image/png;base64,${expected.png.toString('base64')}`,
+      `data:image/png;base64,${documentMap.png.toString('base64')}`,
     );
-    await page.screenshot({ path: join(artifacts, 'table.png') });
+    await page.locator('#map-details').click();
+    await page.locator('#map-size').selectOption('12');
+    await page.locator('#pan-right').click();
+    await page.waitForFunction(() =>
+      document.getElementById('map-status').textContent.includes('5, 0'),
+    );
+    await page.locator('#map-size').selectOption('auto');
+    await page.waitForFunction(() =>
+      document.getElementById('map-status').textContent.includes('0, 0'),
+    );
+    await page.locator('#scene-title').click();
+    assert.ok(await page.locator('#scene-summary').isVisible());
+    await page.locator('#scene-title').click();
+    // Supported minimum window size keeps the composer and map controls on screen.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 720));
+    await page.waitForTimeout(150);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <= innerWidth &&
+          document.documentElement.scrollHeight <= innerHeight,
+      ),
+      true,
+    );
+    const sendBounds = await page.locator('#send').boundingBox();
+    assert.ok(sendBounds.y + sendBounds.height <= (await page.evaluate(() => innerHeight)));
+    await page.screenshot({ path: join(artifacts, 'compact.png') });
+
     const revision = (await store.read()).state.revision;
     await unlink(background);
     await apply(service, [{ type: 'damage', id: 'mara', amount: 2 }]);
