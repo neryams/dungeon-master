@@ -40,8 +40,11 @@ export async function prepareWorkspace(
   source: string,
   env: Record<string, string> = {},
   ownerToken?: string,
+  provider: 'antigravity' | 'codex' | 'ollama' = 'antigravity',
 ) {
-  const dir = await safePath(store.root, '.dm/hotseat/workspace', false);
+  const workspace =
+    provider === 'antigravity' ? '.dm/hotseat/workspace' : `.dm/hotseat/${provider}-workspace`;
+  const dir = await safePath(store.root, workspace, false);
   const agents = join(dir, '.agents');
   // Do not follow campaign-provided symlinks when regenerating app-owned files.
   for (const path of [
@@ -53,7 +56,7 @@ export async function prepareWorkspace(
       (p) => `.agents/skills/${p.replaceAll('\\', '/')}`,
     ),
   ])
-    await safePath(store.root, `.dm/hotseat/workspace/${path}`, false);
+    await safePath(store.root, `${workspace}/${path}`, false);
   await mkdir(agents, { recursive: true });
   const serverName = `dm-hotseat-${createHash('sha256').update(store.root).digest('hex').slice(0, 12)}`;
   await atomicWrite(
@@ -68,7 +71,11 @@ export async function prepareWorkspace(
               '--campaign',
               store.root,
             ],
-            env: { ...env, ...(ownerToken ? { DM_HOTSEAT_OWNER_TOKEN: ownerToken } : {}) },
+            env: {
+              ...env,
+              ...(ownerToken ? { DM_HOTSEAT_OWNER_TOKEN: ownerToken } : {}),
+              DM_DESKTOP_PROVIDER: provider,
+            },
           },
         },
       },
@@ -79,9 +86,18 @@ export async function prepareWorkspace(
   await cp(join(source, 'skills'), join(agents, 'skills'), { recursive: true, force: true });
   await atomicWrite(
     join(dir, 'AGENTS.md'),
-    `# Dungeon Master hotseat\n\nUse only the ${serverName} MCP server for this campaign. Use the Dungeon Master skills in .agents/skills. Never edit campaign files or invoke raw journal tools. All game changes go through campaign tools. Native image generation is allowed for create-map-art; use referencePath from render_location_map and import_generated_map_art to copy its generated output to campaign assets before register_map_art. Do not use shell for artwork file handling. The desktop shows only publish_table_message calls. Keep all DM secrets, referee deliberations and operational logs out of those messages.\n`,
+    `# Dungeon Master hotseat\n\nUse only the ${serverName} MCP server for this campaign. Use the Dungeon Master skills in .agents/skills. Never edit campaign files or invoke raw journal tools. All game changes go through campaign tools. ${provider === 'ollama' ? 'Native artwork generation is unavailable; use schematic maps. When supported by a future provider,' : 'Native image generation is allowed for create-map-art;'} use referencePath from render_location_map and import_generated_map_art to copy its generated output to campaign assets before register_map_art. Do not use shell for artwork file handling. The desktop shows only publish_table_message calls. Keep all DM secrets, referee deliberations and operational logs out of those messages.\n`,
   );
-  return { dir, serverName };
+  const binding = JSON.parse(await readFile(join(agents, 'mcp_config.json'), 'utf8'));
+  return {
+    dir,
+    serverName,
+    server: binding.mcpServers[serverName] as {
+      command: string;
+      args: string[];
+      env: Record<string, string>;
+    },
+  };
 }
 
 export const settingsFile = () => join(homedir(), '.gemini', 'antigravity-cli', 'settings.json');
@@ -147,7 +163,7 @@ export class AntigravitySession implements AgentDriver {
       env?: NodeJS.ProcessEnv;
       timeoutMs?: number;
       progress?: (text: string) => void;
-      onConversation?: (id: string) => void;
+      onConversation?: (id: string) => void | Promise<void>;
       prefixArgs?: string[]; // Used by protocol contract tests, never exposed through desktop IPC.
     },
   ) {}
@@ -239,7 +255,10 @@ export class AntigravitySession implements AgentDriver {
       event.conversation_id ?? event.init?.conversation_id ?? event.result?.conversation_id;
     if (typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
       this.conversationId = id;
-      this.options.onConversation?.(id);
+      void Promise.resolve(this.options.onConversation?.(id)).catch(() => {
+        this.fail(new Error('Could not save DM conversation context'));
+        void this.close();
+      });
     }
     if (event.event === 'step_update' && event.step_update?.step_type === 'tool') {
       const info = event.step_update.tool_info;

@@ -61,23 +61,64 @@
           <h1>Connect DM</h1>
         </div>
         <div class="provider-card">
-          <span class="provider-icon" aria-hidden="true">A</span>
+          <span class="provider-icon" aria-hidden="true">◇</span>
           <div>
-            <strong>Antigravity CLI</strong><span id="provider-status">Checking installation…</span>
+            <label for="provider">DM provider</label
+            ><select id="provider">
+              <option value="antigravity">Antigravity CLI</option>
+              <option value="codex">Codex CLI</option>
+              <option value="ollama">Local · Ollama + Codex CLI (Experimental)</option></select
+            ><span id="provider-status">Checking installation…</span>
           </div>
         </div>
-        <p class="help">
-          Sign in with <code>agy</code> in your terminal, then check the connection.
+        <p class="help" id="provider-help">
+          Sign in with <code id="provider-command">agy</code> in your terminal, then check the
+          connection.
         </p>
         <div class="button-row">
           <button id="check-provider" class="secondary">Check again</button
           ><button id="choose-cli" class="quiet">Choose executable…</button>
         </div>
+        <div id="local-settings" hidden>
+          <p class="help">
+            Experimental: model reliability varies. Requires Codex CLI and a running Ollama server.
+            No ChatGPT sign-in is needed.
+          </p>
+          <label
+            >Ollama address<input id="local-endpoint" type="url" value="http://127.0.0.1:11434"
+          /></label>
+          <label
+            >Model<input id="local-model" list="local-models" value="qwen3.5:9b" maxlength="200"
+          /></label>
+          <datalist id="local-models"></datalist>
+          <label
+            >Context budget (tokens)<input
+              id="local-context"
+              type="number"
+              min="32768"
+              max="262144"
+              step="1024"
+              value="65536"
+          /></label>
+          <p class="help">
+            Choose any installed model with vision and tool support. Automatic compaction starts at
+            70% of this budget. Configure Ollama with at least the same context. Model downloads are
+            managed in Ollama.
+          </p>
+          <div class="button-row">
+            <button id="local-check" class="secondary">Inspect models &amp; hardware</button
+            ><button id="local-save" class="secondary">Save local settings</button>
+          </div>
+          <p id="local-hardware" class="help"></p>
+          <ul id="local-suggestions"></ul>
+          <p id="local-status" class="help" role="status"></p>
+        </div>
         <details class="connection-details">
           <summary>Connection details</summary>
           <p class="help">
-            Uses your CLI sign-in and usage. Enables this campaign’s tools in Antigravity; existing
-            deny rules and other settings are preserved.
+            Hosted providers use your CLI sign-in and usage. Local mode uses your installed Ollama
+            model. Codex uses a local app-server and campaign-scoped tools. Antigravity adds its
+            campaign permission grant. Existing plugin settings are preserved.
           </p>
         </details>
         <div class="campaign-open">

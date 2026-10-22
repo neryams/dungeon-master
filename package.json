@@ -26,7 +26,9 @@
     "desktop": "npm run build && node scripts/start-desktop.mjs",
     "test:desktop": "npm run build && node --test test/desktop-ui.mjs",
     "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs",
-    "test:lan": "npm run build && node --test test/lan-ui.mjs"
+    "test:lan": "npm run build && node --test test/lan-ui.mjs",
+    "test:codex": "npm run build && node --test test/integration/codex.mjs",
+    "test:local": "npm run build && node --test test/integration/local.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

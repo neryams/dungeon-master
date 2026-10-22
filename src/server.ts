@@ -10,7 +10,10 @@ import { JournalAdapter, McpJournal } from './journal.js';
 import { CampaignService, descriptions, inputs, ToolName } from './service.js';
 import { CampaignError } from './domain.js';
 
-export function createMcpServer(service: CampaignService): McpServer {
+export function createMcpServer(
+  service: CampaignService,
+  options: { imageContentOnly?: boolean } = {},
+): McpServer {
   const server = new McpServer({ name: 'dungeon-master', version: '0.6.0' });
   for (const name of Object.keys(inputs) as ToolName[]) {
     const readOnly = [
@@ -55,7 +58,9 @@ export function createMcpServer(service: CampaignService): McpServer {
             image?: { data: string; mimeType: 'image/png' };
           };
           return {
-            structuredContent: structured,
+            // Some agent clients prefer structuredContent and discard accompanying images.
+            // Local desktop mode keeps the same JSON in text content alongside the PNG.
+            ...(image && options.imageContentOnly ? {} : { structuredContent: structured }),
             content: [
               { type: 'text' as const, text: JSON.stringify(structured) },
               ...(image

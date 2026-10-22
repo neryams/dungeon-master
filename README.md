@@ -81,7 +81,7 @@ See [architecture](docs/architecture.md), [tool interfaces](docs/tools.md), and 
 
 ## Play in the Electron hotseat app
 
-With Antigravity CLI (`agy`) installed and signed in:
+With Codex CLI (`codex login`) or Antigravity CLI (`agy`) installed and signed in:
 
 ```bash
 npm ci
@@ -90,9 +90,11 @@ npm run desktop
 
 The app detects the CLI, guides campaign creation or opening, and connects the DM. Choose a character, type an action, and pass the seat to the next player. Public DM narration appears beside the revealed map, exact character sheets, inventory, resources and quests. Campaign state and the table transcript survive restarts. Interrupted actions are never automatically replayed.
 
-The app supports hotseat and browser-based LAN multiplayer using one host’s Antigravity CLI. Choose **Host LAN game** to share a QR code/link with phones on the same network. Players claim characters, prepare shared intentions, and confirm group submissions; combat follows saved initiative and the DM can request targeted decisions/reactions. It requires Node 22.12+ and Git; it is launched from this checkout, with no signed installer yet. The existing ChatGPT/Codex plugin and read-only LAN panel remain available. New campaigns created in the desktop also receive the standard campaign-bound ChatGPT/Codex plugin configuration.
+The app supports hotseat and browser-based LAN multiplayer using one host’s selected Codex or Antigravity CLI. Select the provider on the connection screen. Choose **Host LAN game** to share a QR code/link with phones on the same network. Players claim characters, prepare shared intentions, and confirm group submissions; combat follows saved initiative and the DM can request targeted decisions/reactions. It requires Node 22.12+ and Git; it is launched from this checkout, with no signed installer yet. The existing ChatGPT/Codex plugin and read-only LAN panel remain available. New campaigns created in the desktop also receive the standard campaign-bound ChatGPT/Codex plugin configuration.
 
-Connecting creates an app workspace under the campaign's `.dm/hotseat` directory and adds one exact campaign-server MCP permission to Antigravity's settings. It preserves unrelated settings, existing deny/ask rules and CLI credentials. See [desktop setup, recovery and testing](docs/desktop.md).
+Connecting creates a provider workspace under the campaign's `.dm/hotseat` directory. Codex uses its local app-server with thread-scoped campaign tools and existing ChatGPT sign-in; Antigravity adds one exact campaign-server MCP permission to its settings. Provider conversations are separate and saved game state is shared. Neither adapter reads or copies CLI credentials. See [desktop setup, recovery and testing](docs/desktop.md).
+
+For a local multimodal DM, select **Local · Ollama + Codex CLI**. The model field accepts any installed vision/tool-capable model and offers hardware-based suggestions, starting with Qwen 3.5. Local mode adds journal continuity checks and automatic context compaction. See [local setup and limitations](docs/desktop.md#local-multimodal-dm-with-ollama).
 
 ## Open the player dashboard
 

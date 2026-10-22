@@ -47,8 +47,52 @@ export const LanAdminInput = z.discriminatedUnion('action', [
   z.object({ action: z.literal('resolve') }).strict(),
   z.object({ action: z.literal('continue') }).strict(),
 ]);
+export const Provider = z.enum(['antigravity', 'codex', 'ollama']);
+export type Provider = z.infer<typeof Provider>;
+// Only local metadata endpoints are contacted here; model inference stays in the CLI.
+export const LocalSettings = z
+  .object({
+    endpoint: z
+      .string()
+      .url()
+      .max(300)
+      .refine((value) => {
+        const u = new URL(value);
+        return (
+          u.protocol === 'http:' &&
+          ['127.0.0.1', '[::1]', 'localhost'].includes(u.hostname) &&
+          !u.username &&
+          !u.password &&
+          !u.search &&
+          !u.hash &&
+          u.pathname === '/'
+        );
+      }, 'Use a loopback Ollama URL, such as http://127.0.0.1:11434'),
+    model: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/),
+    contextTokens: z.number().int().min(32768).max(262144),
+  })
+  .strict();
+export type LocalSettings = z.infer<typeof LocalSettings>;
+export interface LocalModels {
+  hardware: { ramGiB: number; gpu?: string; vramGiB?: number; unifiedMemory: boolean };
+  models: { name: string; sizeGiB: number }[];
+  suggestions: { model: string; reason: string }[];
+  selected?: { capabilities: string[]; maxContext: number; configuredContext?: number };
+  warning?: string;
+}
 export const Preferences = z
-  .object({ executable: z.string().optional(), recent: z.string().optional() })
+  .object({
+    executable: z.string().optional(),
+    codexExecutable: z.string().optional(),
+    local: LocalSettings.optional(),
+    provider: Provider.optional(),
+    recent: z.string().optional(),
+  })
   .strict();
 export type Preferences = z.infer<typeof Preferences>;
 export type SubmitInput = z.infer<typeof SubmitInput>;
@@ -93,12 +137,15 @@ export type LanSnapshot = PlayerView & {
   required: string[];
 };
 export interface WorkerApi {
-  detect(path?: string): Promise<{ path: string; version: string }>;
+  localModels(settings: LocalSettings): Promise<LocalModels>;
+  detect(path?: string, provider?: Provider): Promise<{ path: string; version: string }>;
   create(input: CreateInput): Promise<DesktopSnapshot>;
   open(root: string): Promise<DesktopSnapshot>;
   connect(
     executable?: string,
     fresh?: boolean,
+    provider?: Provider,
+    local?: LocalSettings,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
   snapshot(): Promise<DesktopSnapshot>;
@@ -109,8 +156,11 @@ export interface WorkerApi {
   lanStatus(): Promise<LanStatus | null>;
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
-export interface DesktopApi extends Omit<WorkerApi, 'connect'> {
+export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect'> {
+  detect(path?: string): Promise<{ path: string; version: string }>;
   preferences(): Promise<Preferences>;
+  configureLocal(settings: LocalSettings): Promise<void>;
+  selectProvider(provider: Provider): Promise<void>;
   chooseExecutable(): Promise<string | null>;
   chooseParent(): Promise<string | null>;
   chooseCampaign(): Promise<string | null>;
@@ -163,7 +213,17 @@ export async function dispatchWorker(
 ): Promise<unknown> {
   switch (method) {
     case 'detect':
-      return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
+      return api.detect(
+        ...z
+          .union([
+            z.tuple([]),
+            z.tuple([OptionalWireString]),
+            z.tuple([OptionalWireString, Provider.optional()]),
+          ])
+          .parse(raw),
+      );
+    case 'localModels':
+      return api.localModels(...z.tuple([LocalSettings]).parse(raw));
     case 'create':
       return api.create(...z.tuple([CreateInput]).parse(raw));
     case 'open':
@@ -174,9 +234,18 @@ export async function dispatchWorker(
           z.tuple([]),
           z.tuple([OptionalWireString]),
           z.tuple([OptionalWireString, OptionalWireBoolean]),
+          z.tuple([OptionalWireString, OptionalWireBoolean, Provider]),
+          z.tuple([
+            OptionalWireString,
+            OptionalWireBoolean,
+            Provider,
+            LocalSettings.nullish().transform((value) => value ?? undefined),
+          ]),
         ])
         .parse(raw);
-      return api.connect(args[0], args[1]);
+      return args.length === 4
+        ? api.connect(args[0], args[1], args[2], args[3])
+        : api.connect(args[0], args[1], args[2]);
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
@@ -210,6 +279,12 @@ export async function dispatchDesktop(
 ): Promise<unknown> {
   if (typeof method !== 'string') throw new Error('Invalid desktop method');
   switch (method) {
+    case 'detect':
+      return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
+    case 'configureLocal':
+      return api.configureLocal(...z.tuple([LocalSettings]).parse(raw));
+    case 'selectProvider':
+      return api.selectProvider(...z.tuple([Provider]).parse(raw));
     case 'preferences':
       z.tuple([]).parse(raw);
       return api.preferences();

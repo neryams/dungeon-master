@@ -12,11 +12,12 @@ import { randomUUID } from 'node:crypto';
 import { settingsFile } from '../../dist/desktop/antigravity.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
+const provider = process.env.DM_TEST_PROVIDER === 'codex' ? 'codex' : 'antigravity';
 test(
-  'authenticated Antigravity hotseat connects, publishes, changes exact state and resumes without duplication',
+  `authenticated ${provider} hotseat connects, publishes, changes exact state and resumes without duplication`,
   { timeout: 1500000 },
   async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'dm-hotseat-agy-'));
+    const parent = await mkdtemp(join(tmpdir(), `dm-hotseat-${provider}-`));
     const ipc = join(parent, 'ipc'),
       logs = join(parent, 'logs');
     await mkdir(ipc);
@@ -24,7 +25,7 @@ test(
     const permissionPath = settingsFile();
     let before;
     try {
-      before = await readFile(permissionPath, 'utf8');
+      if (provider === 'antigravity') before = await readFile(permissionPath, 'utf8');
     } catch {}
     let after;
     let host;
@@ -101,9 +102,9 @@ test(
       host = new DesktopHost(options);
       await host.open(store.root);
       try {
-        await host.connect();
+        await host.connect(undefined, false, provider);
       } finally {
-        after = await readFile(permissionPath, 'utf8');
+        if (provider === 'antigravity') after = await readFile(permissionPath, 'utf8');
       }
       const waitForTurn = async () => {
         for (let i = 0; i < 6500; i++) {
@@ -189,7 +190,7 @@ test(
       console.log('Targeted reply passed; starting native image generation through LAN Send now.');
       await lanIntent(
         alice.token,
-        'Create and register an illustrated party-safe background for courtyard now using the create-map-art workflow and native generate_image. Use a clean reference at viewport x=0,y=0,width=8,height=8, preserve its square layout, draw a weathered stone courtyard with moss at its edges, no writing or character tokens. Use referencePath for conditioning and import_generated_map_art to save the generated artifact before register_map_art. Inspect the composite and publish the outcome. Do not change geometry, HP, positions, or review policy. Do not pretend generation succeeded if unavailable.',
+        'Create and register an illustrated party-safe background for courtyard now using the create-map-art workflow and native image generation. Use a clean reference at viewport x=0,y=0,width=8,height=8, preserve its square layout, draw a weathered stone courtyard with moss at its edges, no writing or character tokens. Use referencePath for conditioning and import_generated_map_art to save the generated artifact before register_map_art. Inspect the composite and publish the outcome. Do not change geometry, HP, positions, or review policy. Do not pretend generation succeeded if unavailable.',
         true,
       );
       const illustrated = await waitForTurn();
@@ -236,7 +237,7 @@ test(
       await host.close();
       host = new DesktopHost(options);
       await host.open(store.root);
-      await host.connect();
+      await host.connect(undefined, false, provider);
       await host.submit({
         id: 'smoke-second',
         characterId: 'tess',
