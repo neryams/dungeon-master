@@ -13,6 +13,12 @@ The desktop detects an executable on PATH or under `~/.local/bin`. Choose **Choo
 
 Create a campaign with a name, folder and edition, or choose a folder containing `campaign.json`. Campaigns belong outside the source/application directory; the default is `~/Campaigns`. Creation uses the existing CLI initializer, including its local Git repository, setup review policy and campaign-bound ChatGPT/Codex plugin configuration. Git repositories are not automatically committed or pushed.
 
+After creation, the app connects the selected provider and starts a conversation with the DM in a dedicated campaign setup screen. Describe the adventure in as much or as little detail as you like, or ask to be surprised. Bring existing characters, create them with the DM, or ask the DM to generate the party. The DM follows the same campaign-creation skill as the plugin, asks a few questions at a time, and saves the party, starting map, objective and opening scene through the normal campaign tools. Saved progress appears above the conversation. Once the DM verifies the opening and enables reviewed play, the app shows the party and map and enables LAN hosting.
+
+While the DM works during setup, a prominent spinner explains that generation can take a few minutes. Its message reflects saved party, map and opening progress. It disappears when the turn finishes or needs attention; ordinary play keeps the compact activity indicator. Reduced-motion preferences disable the spinner animation.
+
+If connection fails, the initialized campaign stays available: reconnect to begin setup. Reopening an unfinished setup restores the conversation and saved progress. The introduction is submitted only when the setup has no table history; reconnecting never repeats a saved or interrupted turn. After an interruption, reconnect and ask the DM to recap or continue. Existing legacy and completed campaigns open in their normal play view. Setup works with Codex, Antigravity and the experimental local provider; local model limitations still apply.
+
 An Antigravity connection generates `.dm/hotseat/workspace/.agents/mcp_config.json`, copies the seven campaign skills into that workspace and merges `mcp(dm-hotseat-<campaign-path-hash>/*)` into the CLI's global `permissions.allow` list. Antigravity 1.4 uses global permission rules even for workspace-local servers. Only that exact server grant is added; unrelated settings and deny/ask lists remain intact. No global MCP server or plugin is installed. The CLI starts in this dedicated workspace, with an explicit campaign-bound MCP command.
 
 This permission grant persists after closing the app. Remove the corresponding rule in `~/.gemini/antigravity-cli/settings.json` if retiring a campaign; reconnecting will add it again. A conflicting ask/deny rule can prevent connection and is not overridden. Reconnect after moving the checkout to regenerate desktop runtime paths. Existing ChatGPT plugin paths follow the normal `dungeon-master setup` guidance.
@@ -56,12 +62,15 @@ npm run test:journal
 npm run test:desktop
 npm run test:antigravity
 npm run test:codex
+npm run test:setup
 npm run package:plugin
 ```
 
 `npm test` includes offline hotseat reducer, protocol, coordinator and owner-lifecycle checks alongside existing campaign/MCP/panel tests. `test:desktop` opens the real Electron window with Playwright, uses synthetic campaign events, checks the renderer and bridge, exercises sheets/maps/seat switching/restart, and writes screenshots to a printed temporary directory. It does not invoke a model. It requires a graphical desktop; Playwright adds its own automation launch flags.
 
 `test:antigravity` and `test:codex` are explicit opt-in integration tests against the selected installed, authenticated CLI and consume the host account's usage. Each tests connection, public narration, damage, movement, native image generation, registration, desktop composite rendering, exact duplicate submission and fresh-process conversation resume with a second character. Each creates a synthetic campaign in a temporary directory. Journal IPC/logs are private and embeddings deliberately use keyword fallback. Antigravity's permission-setting change is restored only if no concurrent settings edit occurred; it never stops or reconfigures the user's existing journal daemon. As with the CLI itself, test conversations can remain in the provider's own history. This smoke does not certify full rules adjudication or independent referee delegation.
+
+`test:setup` is a separate opt-in Codex check that consumes account usage. It creates a temporary new campaign, verifies the DM's saved introductory questions, delegates a small adventure and two characters, checks the party/map/objective/opening and reviewed-play transition, and reconnects without repeating setup. It skips illustrated artwork and isolates journal IPC/logs with keyword fallback.
 
 ## Scope
 

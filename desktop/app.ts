@@ -86,6 +86,11 @@ const tags = {
   'review-mode': 'span',
   encounter: 'div',
   transcript: 'div',
+  'conversation-label': 'span',
+  'setup-guide': 'div',
+  'setup-progress': 'p',
+  'setup-activity': 'div',
+  'setup-activity-detail': 'p',
   'session-status': 'div',
   'status-dot': 'span',
   'status-text': 'span',
@@ -140,12 +145,14 @@ function members() {
   return state?.party?.members ?? [];
 }
 function seat(id: string | undefined) {
-  selected = id;
+  selected = state.reviewMode === 'setup' ? undefined : id;
   renderParty();
   renderSheet();
   $('acting-as').textContent = selected
     ? `Playing as ${members().find((p) => p.id === selected)?.name ?? 'character'}`
-    : 'Table';
+    : state.reviewMode === 'setup'
+      ? 'Your campaign preferences'
+      : 'Table';
 }
 function renderParty() {
   const party = $('party');
@@ -237,8 +244,19 @@ function renderTranscript() {
   const key = JSON.stringify(state.table);
   if (key === transcriptKey) return;
   transcriptKey = key;
-  if (!state.table?.length) return;
   const log = $('transcript');
+  if (!state.table?.length) {
+    log.replaceChildren(
+      node(
+        'p',
+        state.reviewMode === 'setup'
+          ? 'The DM will guide you through the adventure, party, and opening scene. Connect to begin.'
+          : 'Describe your party or send an action.',
+        'conversation-empty',
+      ),
+    );
+    return;
+  }
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100;
   log.replaceChildren();
   function message(speaker: string, text: string, revision: number, player = false) {
@@ -324,11 +342,44 @@ async function renderMap() {
 }
 function renderState() {
   if (!state.campaign) return;
+  const settingUp = state.reviewMode === 'setup';
+  const generating = settingUp && state.stage === 'resolving';
+  $('setup-activity').hidden = !generating;
+  if (generating) {
+    const partySaved = members().length > 0;
+    const mapSaved = state.maps.length > 0;
+    const openingSaved = !!(state.scene && state.focus?.primaryObjective);
+    $('setup-activity-detail').textContent =
+      partySaved && mapSaved && openingSaved
+        ? 'Your party, map, and opening are saved. The DM is checking the details and preparing your briefing.'
+        : partySaved && mapSaved
+          ? 'Your party and map are saved. The DM is preparing the opening scene and your first decision.'
+          : partySaved
+            ? 'Your party is saved. The DM is working on the starting map and opening adventure.'
+            : mapSaved
+              ? 'The starting map is saved. The DM is working on your characters and their place in the adventure.'
+              : 'Turning your ideas into characters, places, and the opening adventure.';
+  }
+  $('play').classList.toggle('setup-flow', settingUp);
+  $('setup-guide').hidden = !settingUp;
+  $('conversation-label').textContent = settingUp ? 'Campaign creation' : 'Chat';
+  $('action').placeholder = settingUp
+    ? 'Describe your idea, answer the DM, or ask for suggestions…'
+    : 'Describe an action…';
+  if (settingUp) {
+    $('setup-progress').textContent = [
+      members().length ? `Party saved · ${members().length} characters` : 'Party to create',
+      state.maps.length ? 'Map saved' : 'Map to create',
+      state.scene && state.focus?.primaryObjective ? 'Opening saved' : 'Opening to create',
+    ].join('  /  ');
+  }
   $('campaign-heading').textContent = state.campaign.name;
   $('revision').textContent = `Saved · r${state.revision}`;
   $('connection').hidden = false;
   $('campaigns').hidden = false;
   $('lan-host').hidden = false;
+  $('lan-host').disabled = settingUp;
+  $('lan-host').title = settingUp ? 'Finish campaign setup before inviting players.' : '';
   const busy = state.stage === 'connecting' || state.stage === 'resolving';
   $('stop').hidden = state.stage !== 'resolving' && state.stage !== 'ready';
   $('campaigns').disabled = busy;
@@ -344,7 +395,9 @@ function renderState() {
   $('status-text').textContent = state.lanHosted
     ? 'Use LAN game → Open player seat to play.'
     : state.stage === 'ready'
-      ? 'DM connected'
+      ? settingUp
+        ? 'DM connected · Build your campaign together.'
+        : 'DM connected'
       : state.stage === 'disconnected'
         ? 'Connect DM to send an action.'
         : state.detail;
@@ -420,6 +473,7 @@ async function connect(fresh = false) {
   void refresh();
   try {
     await promise;
+    await api.beginSetup();
   } finally {
     await refresh();
   }
@@ -439,6 +493,7 @@ export function showCampaign(snapshot: DesktopSnapshot) {
   $('welcome').hidden = true;
   $('play').hidden = false;
   $('action').value = '';
+  $('acting-as').textContent = 'Table';
   $('notice').hidden = true;
   $('transcript').replaceChildren(
     node('p', 'Describe your party or send an action.', 'conversation-empty'),

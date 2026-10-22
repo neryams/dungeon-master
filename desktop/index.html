@@ -234,7 +234,26 @@
       </section>
       <section class="conversation-pane">
         <div class="conversation-title">
-          <span class="eyebrow">Chat</span><span class="chat-mark" aria-hidden="true">✦</span>
+          <span class="eyebrow" id="conversation-label">Chat</span
+          ><span class="chat-mark" aria-hidden="true">✦</span>
+        </div>
+        <div id="setup-guide" hidden>
+          <h1>Create your campaign</h1>
+          <p>
+            Tell the DM what kind of adventure you want. A detailed idea, a mood, or “surprise me”
+            is enough. Bring your own characters, build them together, or let the DM create them.
+          </p>
+          <p id="setup-progress" role="status"></p>
+        </div>
+        <div id="setup-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <span class="setup-spinner" aria-hidden="true"></span>
+          <div>
+            <h2>The DM is building your campaign</h2>
+            <p id="setup-activity-detail"></p>
+            <p class="setup-activity-help">
+              This can take a few minutes. Completed steps are saved along the way.
+            </p>
+          </div>
         </div>
         <div id="transcript" role="log" aria-label="Public table conversation">
           <p class="conversation-empty">Describe your party or send an action.</p>

@@ -148,6 +148,7 @@ export interface WorkerApi {
     local?: LocalSettings,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
+  beginSetup(): Promise<void>;
   snapshot(): Promise<DesktopSnapshot>;
   map(input: MapInput): Promise<MapResult>;
   stop(): Promise<void>;
@@ -249,6 +250,9 @@ export async function dispatchWorker(
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
+    case 'beginSetup':
+      z.tuple([]).parse(raw);
+      return api.beginSetup();
     case 'map':
       return api.map(...z.tuple([MapInput]).parse(raw));
     case 'lanAdmin':

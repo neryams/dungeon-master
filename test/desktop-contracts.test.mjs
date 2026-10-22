@@ -28,6 +28,7 @@ test('typed bridge validates methods, argument arity and administration payloads
       calls.push(['snapshot']);
       return { campaign: null };
     },
+    beginSetup: async () => calls.push(['beginSetup']),
   };
   await dispatchDesktop(api, 'connect', []);
   await dispatchDesktop(api, 'connect', [true]);
@@ -39,9 +40,12 @@ test('typed bridge validates methods, argument arity and administration payloads
     ['connect', undefined, true, undefined],
     ['detect', undefined],
   ]);
+  await dispatchDesktop(api, 'beginSetup', []);
+  assert.deepEqual(calls.at(-1), ['beginSetup']);
   for (const [method, args] of [
     ['open', [42]],
     ['snapshot', ['extra']],
+    ['beginSetup', ['extra']],
     ['connect', ['path', true]],
     ['__proto__', []],
     ['tableChange', [{}]],
@@ -50,7 +54,7 @@ test('typed bridge validates methods, argument arity and administration payloads
   ]) {
     await assert.rejects(dispatchDesktop(api, method, args));
   }
-  assert.equal(calls.length, 4, 'Malformed requests must never invoke handlers');
+  assert.equal(calls.length, 5, 'Malformed requests must never invoke handlers');
   assert.equal(WorkerEnvelope.safeParse({ id: 1, method: 'snapshot', args: [] }).success, true);
   assert.equal(WorkerEnvelope.safeParse({ id: '1', method: 'snapshot', args: [] }).success, false);
   assert.equal(LanAdminInput.safeParse({ action: 'skip', characterId: 'hero' }).success, true);

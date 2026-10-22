@@ -28,6 +28,7 @@
     "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs",
     "test:lan": "npm run build && node --test test/lan-ui.mjs",
     "test:codex": "npm run build && node --test test/integration/codex.mjs",
+    "test:setup": "npm run build && node --test test/integration/setup.mjs",
     "test:local": "npm run build && node --test test/integration/local.mjs"
   },
   "dependencies": {

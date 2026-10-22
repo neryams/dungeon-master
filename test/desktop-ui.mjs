@@ -5,7 +5,10 @@ import electron from 'electron';
 import { mkdtemp, mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fixture, apply } from './helpers.mjs';
+import { fixture, apply, FileJournal } from './helpers.mjs';
+import { CampaignStore } from '../dist/store.js';
+import { CampaignService } from '../dist/service.js';
+import { JournalAdapter } from '../dist/journal.js';
 import sharp from 'sharp';
 import { createServer } from 'node:http';
 import { renderMapImage } from '../dist/maps.js';
@@ -305,5 +308,119 @@ test(
       await readFile(join(parent, 'new-table/.dm/plugin/mcp.json'), 'utf8'),
     );
     assert.ok(JSON.stringify(plugin).includes('dist/server.js'));
+
+    // A newly created campaign opens a conversational setup, including after reopening.
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign(await window.table.snapshot());
+    });
+    await page.locator('#setup-guide').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.party-pane').isHidden(), true);
+    assert.equal(await page.locator('.map-pane').isHidden(), true);
+    assert.equal(await page.locator('#lan-host').isDisabled(), true);
+    assert.match(await page.locator('#setup-guide').innerText(), /surprise me/);
+    assert.match(await page.locator('#setup-progress').innerText(), /Party to create/);
+    assert.match(await page.locator('#action').getAttribute('placeholder'), /Describe your idea/);
+    assert.equal(await page.locator('#setup-activity').isHidden(), true);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 720));
+    const setupSend = await page.locator('#send').boundingBox();
+    assert.ok(setupSend.y + setupSend.height <= (await page.evaluate(() => innerHeight)));
+    await page.screenshot({ path: join(artifacts, 'campaign-setup.png') });
+    // Freeze polling while presenting synthetic host stages; no provider/model is invoked.
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now() + 1000));
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign({ ...(await window.table.snapshot()), stage: 'resolving' });
+    });
+    assert.equal(await page.locator('#setup-activity').isVisible(), true);
+    assert.match(await page.locator('#setup-activity-detail').innerText(), /Turning your ideas/);
+    const busySend = await page.locator('#send').boundingBox();
+    assert.ok(busySend.y + busySend.height <= (await page.evaluate(() => innerHeight)));
+    await page.screenshot({ path: join(artifacts, 'campaign-generating.png') });
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign({ ...(await window.table.snapshot()), stage: 'attention' });
+    });
+    assert.equal(await page.locator('#setup-activity').isHidden(), true);
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign({
+        ...(await window.table.snapshot()),
+        reviewMode: 'reviewed',
+        stage: 'resolving',
+      });
+    });
+    assert.equal(
+      await page.locator('#setup-activity').isHidden(),
+      true,
+      'Ordinary play uses its existing activity indicator',
+    );
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign(await window.table.snapshot());
+    });
+    await page.clock.resume();
+
+    const setupStore = await CampaignStore.open(created.root);
+    const setupService = new CampaignService(
+      setupStore,
+      new JournalAdapter(setupStore, new FileJournal(setupStore.root)),
+    );
+    await apply(setupService, example.changes);
+    await setupService.execute('create_location_map', {
+      operationId: 'setup-map',
+      expectedRevision: (await setupStore.read()).state.revision,
+      reason: 'Prepare the starting map',
+      entity: example.bridgeMap,
+    });
+    await page.waitForFunction(() =>
+      document.getElementById('setup-progress').textContent.includes('Map saved'),
+    );
+    assert.match(await page.locator('#setup-progress').innerText(), /Party saved · 2 characters/);
+    await page.clock.pauseAt(new Date(Date.now() + 2000));
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign({ ...(await window.table.snapshot()), stage: 'resolving' });
+    });
+    assert.match(await page.locator('#setup-activity-detail').innerText(), /checking the details/);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(
+      await page.locator('.setup-spinner').evaluate((e) => getComputedStyle(e).animationName),
+      'none',
+    );
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(async () => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign(await window.table.snapshot());
+    });
+    await page.clock.resume();
+    assert.equal(
+      await page.locator('#setup-guide').isVisible(),
+      true,
+      'A party and map alone do not finish setup',
+    );
+    await app.close();
+    app = undefined;
+    page = await launch();
+    await page.evaluate(async (root) => {
+      const { showCampaign } = await import('./app.js');
+      showCampaign(await window.table.open(root));
+    }, created.root);
+    await page.locator('#setup-guide').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#setup-progress').innerText(), /Map saved/);
+    await setupService.execute('configure_review', {
+      operationId: 'setup-verified',
+      expectedRevision: (await setupStore.read()).state.revision,
+      reason: 'Opening verified for the UI fixture',
+      mode: 'reviewed',
+    });
+    await page.locator('#setup-guide').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('.party-pane').isVisible(), true);
+    assert.equal(await page.locator('.map-pane').isVisible(), true);
+    assert.equal(await page.locator('#lan-host').isEnabled(), true);
+    await page.locator('#map-image:not([hidden])').waitFor();
+    assert.match(await page.locator('#party').innerText(), /Mara/);
+    assert.deepEqual(errors, []);
   },
 );

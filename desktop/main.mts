@@ -176,6 +176,7 @@ else {
             prefs.local,
           ),
         submit: (input) => call('submit', input),
+        beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),
         stop: () => call('stop'),
