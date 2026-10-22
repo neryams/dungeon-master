@@ -3,7 +3,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import { CampaignStore } from './store.js';
 import { partyState } from './domain.js';
-import { characterSheet, partyOverview } from './sheets.js';
+import { playerView } from './player-view.js';
 import { renderMapImage } from './maps.js';
 import { Id, Viewport } from './schema.js';
 import { html, script, css } from './panel-ui.js';
@@ -63,33 +63,7 @@ export async function startPanel(root: string, options: { lan?: boolean; port?: 
       const { state: original } = await store.read();
       const state = partyState(original);
       if (url.pathname === '/api/state') {
-        const overview = partyOverview(state);
-        const active = original.encounter?.participants[original.encounter.turn]?.id;
-        return send(
-          200,
-          JSON.stringify({
-            campaign: { id: store.config.id, name: store.config.name },
-            revision: state.revision,
-            party: overview,
-            sheets: overview.members.map((m) => characterSheet(state, m.id)),
-            focus: state.focus,
-            scene: state.scene,
-            quests: Object.values(state.entities).filter((e) => e.quest?.status === 'active'),
-            maps: Object.values(state.entities)
-              .filter((e) => e.map)
-              .map((e) => ({ id: e.id, name: e.name, kind: e.map!.kind, bounds: e.map!.bounds })),
-            encounter: state.encounter
-              ? {
-                  round: state.encounter.round,
-                  activeId: active && state.entities[active] ? active : null,
-                  participants: state.encounter.participants.map((p) => ({
-                    ...p,
-                    name: state.entities[p.id].name,
-                  })),
-                }
-              : null,
-          }),
-        );
+        return send(200, JSON.stringify(playerView(original, store.config)));
       }
       const id = Id.parse(url.searchParams.get('mapId'));
       const revisionText = url.searchParams.get('revision');

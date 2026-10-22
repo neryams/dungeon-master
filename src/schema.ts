@@ -457,6 +457,29 @@ export const ReviewOperation = z.discriminatedUnion('type', [
     })
     .strict(),
 ]);
+// Optional hotseat conversation events preserve existing campaign histories.
+export const TableOperation = z.discriminatedUnion('type', [
+  z
+    .object({ type: z.literal('submit'), id: Id, characterId: Id.optional(), text: RequiredText })
+    .strict(),
+  z.object({ type: z.literal('publish'), requestId: Id, text: RequiredText }).strict(),
+  z
+    .object({
+      type: z.literal('finish'),
+      requestId: Id,
+      status: z.enum(['completed', 'interrupted']),
+    })
+    .strict(),
+]);
+export interface TableTurn {
+  id: string;
+  characterId?: string;
+  speaker: string;
+  text: string;
+  revision: number;
+  status: 'pending' | 'completed' | 'interrupted';
+  messages: { text: string; revision: number }[];
+}
 export const Payload = z
   .object({
     changes: z.array(Change).max(100).default([]),
@@ -464,6 +487,7 @@ export const Payload = z
     roll: Roll.optional(),
     corrects: Id.optional(),
     review: ReviewOperation.optional(),
+    table: TableOperation.optional(),
   })
   .strict();
 export type Payload = z.infer<typeof Payload>;
@@ -497,6 +521,7 @@ export const CampaignConfig = z
 export type CampaignConfig = z.infer<typeof CampaignConfig>;
 export interface State {
   revision: number;
+  table?: TableTurn[];
   reviewMode?: z.infer<typeof ReviewMode>;
   actions?: Record<string, ReviewAction>;
   focus?: z.infer<typeof Focus>;
