@@ -4,9 +4,18 @@ import { access } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { join, delimiter, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
+import type { LocalSettings } from './contracts.js';
 import type { AgentDriver, AgentResult } from './antigravity.js';
 
 const execute = promisify(execFile);
+// Restore only the active request, never repeat the large skill/history preamble.
+function continuationFor(prompt: string | undefined): string {
+  if (!prompt) return '';
+  const marker = '\n\nCurrent player submission: ';
+  const index = prompt.lastIndexOf(marker);
+  return index >= 0 ? prompt.slice(index + 2) : prompt.slice(-12000);
+}
+
 // config/read serializes absent TOML fields as null; TOML overrides cannot contain null.
 function withoutNulls(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -37,7 +46,7 @@ export async function detectCodex(explicit?: string) {
     }
   }
   throw new Error(
-    'Codex CLI with app-server was not found. Install Codex, run codex login, then choose its executable.',
+    'Codex CLI with app-server was not found. Install Codex and choose its executable. ChatGPT mode also requires codex login.',
   );
 }
 
@@ -47,6 +56,9 @@ export interface CodexOptions {
   serverName: string;
   server: { command: string; args: string[]; env: Record<string, string> };
   conversationId?: string;
+  local?: LocalSettings;
+  modelCatalog?: string;
+  localThinking?: boolean;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
   progress?: (text: string) => void;
@@ -65,6 +77,7 @@ export class CodexSession implements AgentDriver {
   private threadId?: string;
   private turnId?: string;
   private imageWrites = Promise.resolve();
+  private continuationWrites = Promise.resolve();
   private requests = new Map<
     number,
     { resolve: (value: any) => void; reject: (error: Error) => void }
@@ -73,12 +86,24 @@ export class CodexSession implements AgentDriver {
     resolve: (value: AgentResult) => void;
     reject: (error: Error) => void;
     timer: NodeJS.Timeout;
+    continuation: string;
+    compacting: boolean;
+    compacted: boolean;
+    toolFailures: number;
     tools: Set<string>;
     campaignIds: Set<string>;
   };
   constructor(private options: CodexOptions) {}
 
   run(prompt: string): Promise<AgentResult> {
+    return this.begin(prompt);
+  }
+  /** Used for explicit context maintenance; automatic compaction uses the same native engine. */
+  compact(): Promise<AgentResult> {
+    if (!this.threadId) return Promise.reject(new Error('Connect before compacting context.'));
+    return this.begin();
+  }
+  private begin(prompt?: string): Promise<AgentResult> {
     if (this.closed)
       return Promise.reject(
         new Error('The Codex session is stopped. Reconnect before continuing.'),
@@ -94,26 +119,46 @@ export class CodexSession implements AgentDriver {
           ),
         this.options.timeoutMs ?? 600000,
       );
-      this.pending = { resolve, reject, timer, tools: new Set(), campaignIds: new Set() };
+      this.pending = {
+        resolve,
+        reject,
+        timer,
+        continuation: continuationFor(prompt),
+        compacting: prompt === undefined,
+        compacted: false,
+        toolFailures: 0,
+        tools: new Set(),
+        campaignIds: new Set(),
+      };
     });
     void this.dispatch(prompt).catch(() =>
       this.abort(
         new Error(
-          'Codex could not start or resume the turn. Check CLI sign-in and limits; use Reset DM context if the saved conversation is unavailable.',
+          this.options.local
+            ? 'Local DM could not start or resume. Check Ollama, model, and context settings; use Reset DM context if needed.'
+            : 'Codex could not start or resume the turn. Check CLI sign-in and limits; use Reset DM context if the saved conversation is unavailable.',
         ),
       ),
     );
     return result;
   }
-  private async dispatch(prompt: string) {
+  private async dispatch(prompt?: string) {
     if (!this.child) {
       this.start();
       await this.request('initialize', {
         clientInfo: { name: 'dungeon_master', title: 'Dungeon Master', version: '0.6.0' },
       });
       this.send({ method: 'initialized' });
-      const auth = await this.request('account/read', { refreshToken: false });
-      if (!auth.account || auth.account.type !== 'chatgpt') {
+      if (this.options.local && this.options.modelCatalog) {
+        const catalog = await this.request('model/list', { includeHidden: true });
+        const selected = catalog.data?.find((m: any) => m.model === this.options.local!.model);
+        if (!selected?.inputModalities?.includes('image'))
+          throw new Error('Local model catalog did not enable images');
+      }
+      const auth = this.options.local
+        ? undefined
+        : await this.request('account/read', { refreshToken: false });
+      if (!this.options.local && (!auth?.account || auth.account.type !== 'chatgpt')) {
         this.abort(new Error('Sign in to Codex with ChatGPT using codex login, then reconnect.'));
         return;
       }
@@ -148,12 +193,36 @@ export class CodexSession implements AgentDriver {
           { ...withoutNulls(value), enabled: false },
         ]),
       );
+      const local = this.options.local;
+      if (local)
+        Object.assign(config, {
+          model: local.model,
+          model_provider: 'dm_ollama',
+          model_providers: {
+            dm_ollama: {
+              name: 'Local Ollama',
+              base_url: new URL('/v1', local.endpoint).href,
+              wire_api: 'responses',
+              requires_openai_auth: false,
+            },
+          },
+          model_context_window: local.contextTokens,
+          model_auto_compact_token_limit: Math.floor(local.contextTokens * 0.7),
+          model_reasoning_effort: this.options.localThinking === false ? 'none' : 'low',
+          compact_prompt:
+            'Summarize this private DM conversation for continuation in at most 400 words. Begin with the ACTIVE request ID and unfinished next steps. Keep references instead of copying whole state snapshots or instructions. Preserve the current table requestId, player intent, pending action IDs, exact operation IDs and saved dice/effects, unresolved choices, and record: references. Separate public facts from DM secrets. Never execute tools or invent outcomes during compaction. Events remain authoritative. On continuation call resume_campaign, search_campaign_history and read_campaign_record before acting; never repeat saved effects. Use record_scene for new continuity notes and publish_table_message for the current request. A summary is not a campaign save.',
+          'features.image_generation': false,
+          'features.view_image': false,
+          'memories.generate_memories': false,
+          'memories.use_memories': false,
+        });
       const params = {
+        ...(local ? { model: local.model, modelProvider: 'dm_ollama' } : {}),
         cwd: this.options.cwd,
         approvalPolicy: 'never',
         sandbox: 'read-only',
         config,
-        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. Native image generation and native delegation of bounded rules-referee checks are allowed. Referees inherit the primary model and use the same campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
+        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. ${local ? 'This is a local multimodal model. In apply_campaign_changes, change.id means the EXISTING entity ID, not an operation ID. Example: changes=[{type:"damage",id:"existing-character-id",amount:2}]. The top-level operationId identifies the transaction. Use exact schema keys, not entityId for damage. Native image generation is unavailable. Existing registered map artwork is supported: render_location_map returns a PNG inline; inspect that image directly, never guess filesystem paths. Use schematic maps when no artwork is registered. Before each gameplay turn call resume_campaign (audience dm), search_campaign_history (audience dm, limit 3), and read_campaign_record for at least one returned hit or recentRecords reference if any exist. These local memory steps are mandatory even for sheet or map questions, overriding generic skill exemptions. Before publishing save a concise record_scene continuity note (aim for under 1500 characters), including decisions, promises and unresolved choices; keep secrets in separate visibility dm records. If retrieval is unavailable say so and use exact saved record references. Context compacts automatically: reload authoritative state and records afterward, preserving request and operation IDs.' : 'Native image generation is allowed.'} Native delegation of bounded rules-referee checks is allowed. Referees inherit the primary model and use the same campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
       };
       const resumed = this.options.conversationId;
       const response = await this.request(
@@ -167,6 +236,10 @@ export class CodexSession implements AgentDriver {
       await this.options.onConversation?.(id);
     }
     this.turnId = undefined;
+    if (prompt === undefined) {
+      await this.request('thread/compact/start', { threadId: this.threadId });
+      return;
+    }
     const response = await this.request('turn/start', {
       threadId: this.threadId,
       input: [{ type: 'text', text: prompt }],
@@ -183,10 +256,30 @@ export class CodexSession implements AgentDriver {
         'stdio://',
         '-c',
         'features.apps=false',
+        ...(this.options.local
+          ? [
+              '-c',
+              'model_provider="dm_ollama"',
+              '-c',
+              'memories.generate_memories=false',
+              '-c',
+              'memories.use_memories=false',
+              '-c',
+              `model_providers.dm_ollama={name="Local Ollama",base_url=${JSON.stringify(new URL('/v1', this.options.local.endpoint).href)},wire_api="responses",requires_openai_auth=false}`,
+              '-c',
+              `model=${JSON.stringify(this.options.local.model)}`,
+              ...(this.options.modelCatalog
+                ? ['-c', `model_catalog_json=${JSON.stringify(this.options.modelCatalog)}`]
+                : []),
+            ]
+          : []),
       ],
       {
         cwd: this.options.cwd,
-        env: this.options.env ?? process.env,
+        env: {
+          ...(this.options.env ?? process.env),
+          ...(this.options.local ? { OLLAMA_NO_CLOUD: '1' } : {}),
+        },
         stdio: ['pipe', 'pipe', 'pipe'],
         detached: process.platform !== 'win32',
         windowsHide: true,
@@ -275,8 +368,50 @@ export class CodexSession implements AgentDriver {
     if (!this.pending || !p || p.threadId !== this.threadId) return;
     if (message.method === 'turn/started' && !this.turnId) this.turnId = p.turn?.id;
     if (!this.turnId || (p.turnId ?? p.turn?.id) !== this.turnId) return;
+    if (message.method === 'item/started' && p.item?.type === 'contextCompaction')
+      this.options.progress?.('Compacting DM context; campaign history stays saved…');
     if (message.method === 'item/completed') {
       const item = p.item;
+      if (
+        this.options.local &&
+        item?.type === 'mcpToolCall' &&
+        item.server === this.options.serverName
+      ) {
+        const failed = item.status === 'failed' || item.error || item.result?.isError;
+        this.pending.toolFailures = failed ? this.pending.toolFailures + 1 : 0;
+        if (this.pending.toolFailures >= 8)
+          return this.abort(
+            new Error(
+              'The local model failed eight consecutive campaign tool calls. Saved effects remain intact; review the table and try a different model or reset DM context. The action was not retried.',
+            ),
+          );
+      }
+      if (item?.type === 'contextCompaction') {
+        this.pending.compacted = true;
+        // Keep the active request visible after native mid-turn compaction. This steers the
+        // same turn; it never resubmits an interrupted turn or repeats a transaction.
+        if (this.options.local && !this.pending.compacting) {
+          const turnId = this.turnId;
+          const text = this.pending.continuation.startsWith('Connection check only.')
+            ? `Continue only this read-only connection check after compaction. Do not resume gameplay or write campaign data.\n${this.pending.continuation}`
+            : `Continue the ACTIVE player request below after compaction. The earlier connection check is finished: do not return READY. First reload resume_campaign and relevant saved records. Do not repeat saved damage, rolls or other effects. Save any missing continuity note and publish_table_message for this requestId.\n${this.pending.continuation}`;
+          this.continuationWrites = this.continuationWrites
+            .then(async () => {
+              await this.request('turn/steer', {
+                threadId: this.threadId,
+                expectedTurnId: turnId,
+                input: [{ type: 'text', text }],
+              });
+            })
+            .catch(() =>
+              this.abort(
+                new Error(
+                  'Could not restore the active request after compaction. Saved effects remain intact; reconnect and review the table.',
+                ),
+              ),
+            );
+        }
+      }
       if (
         item?.type === 'mcpToolCall' &&
         item.server === this.options.serverName &&
@@ -314,6 +449,7 @@ export class CodexSession implements AgentDriver {
         );
       }
       if (
+        !this.options.local &&
         item?.type === 'imageGeneration' &&
         item.status === 'completed' &&
         !item.failure &&
@@ -331,6 +467,12 @@ export class CodexSession implements AgentDriver {
           );
     }
     if (message.method === 'turn/completed') {
+      if (this.pending.compacting && !this.pending.compacted)
+        return this.abort(
+          new Error(
+            'Context compaction did not complete. Reconnect and reload saved campaign memory.',
+          ),
+        );
       if (p.turn.status !== 'completed')
         return this.abort(
           new Error(
@@ -338,7 +480,7 @@ export class CodexSession implements AgentDriver {
           ),
         );
       const pending = this.pending;
-      void this.imageWrites.then(() => {
+      void Promise.all([this.imageWrites, this.continuationWrites]).then(() => {
         if (this.pending !== pending || this.closed) return;
         this.pending = undefined;
         clearTimeout(pending.timer);

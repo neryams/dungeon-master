@@ -94,6 +94,8 @@ The app supports hotseat and browser-based LAN multiplayer using one host’s se
 
 Connecting creates a provider workspace under the campaign's `.dm/hotseat` directory. Codex uses its local app-server with thread-scoped campaign tools and existing ChatGPT sign-in; Antigravity adds one exact campaign-server MCP permission to its settings. Provider conversations are separate and saved game state is shared. Neither adapter reads or copies CLI credentials. See [desktop setup, recovery and testing](docs/desktop.md).
 
+For a local multimodal DM, select **Local · Ollama + Codex CLI**. The model field accepts any installed vision/tool-capable model and offers hardware-based suggestions, starting with Qwen 3.5. Local mode adds journal continuity checks and automatic context compaction. See [local setup and limitations](docs/desktop.md#local-multimodal-dm-with-ollama).
+
 ## Open the player dashboard
 
 ```bash

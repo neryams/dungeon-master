@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fixture, apply } from './helpers.mjs';
 import sharp from 'sharp';
+import { createServer } from 'node:http';
 import { renderMapImage } from '../dist/maps.js';
 
 test(
@@ -107,6 +108,41 @@ test(
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
     assert.equal(await page.locator('#provider-command').innerText(), 'codex login');
     await page.screenshot({ path: join(artifacts, 'setup.png') });
+    const metadata = createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify(
+          req.url === '/api/tags'
+            ? { models: [{ name: 'custom:vision', size: 6 * 1024 ** 3 }] }
+            : { capabilities: ['vision', 'tools'], model_info: { 'custom.context_length': 65536 } },
+        ),
+      );
+    });
+    await new Promise((r) => metadata.listen(0, '127.0.0.1', r));
+    t.after(() => new Promise((r) => metadata.close(r)));
+    await page.locator('#provider').selectOption('ollama');
+    await page.locator('#local-settings').waitFor({ state: 'visible' });
+    await page.locator('#local-model').fill('custom:vision');
+    await page.locator('#local-endpoint').fill(`http://127.0.0.1:${metadata.address().port}`);
+    await page.locator('#local-context').fill('32768');
+    await page.locator('#local-check').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#local-status').textContent.includes('Vision + tools confirmed'),
+    );
+    assert.match(await page.locator('#local-hardware').innerText(), /GiB RAM/);
+    assert.equal(
+      await page.locator('#local-models option').first().getAttribute('value'),
+      'custom:vision',
+    );
+    await page.locator('#local-save').click();
+    await page.waitForFunction(
+      async () => (await window.table.preferences()).local?.model === 'custom:vision',
+    );
+    await page.screenshot({ path: join(artifacts, 'local-setup.png') });
+    await page.locator('#provider').selectOption('codex');
+    await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
+    assert.equal(await page.locator('#local-settings').isHidden(), true);
+
     const security = await app.evaluate(({ BrowserWindow }) => {
       const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
       return {
@@ -242,6 +278,10 @@ test(
     await app.close();
     app = undefined;
     page = await launch();
+    assert.equal(
+      (await page.evaluate(() => window.table.preferences())).local.model,
+      'custom:vision',
+    );
     await load(page);
     assert.match(await page.locator('#transcript').innerText(), /boards creak/);
     assert.match(await page.locator('#party').innerText(), /7 \/ 12 HP/);

@@ -101,3 +101,50 @@ CLI turns allow up to ten minutes for native image generation and tool work. The
 Edit `desktop/main.mts`, `desktop/preload.cts`, `desktop/app.ts`, and `desktop/lan.ts`; generated JavaScript belongs in `build/desktop/`. Run `npm run build` after edits, or `npm run desktop` to build and launch. Shared IPC/LAN interfaces and runtime request schemas live in `src/desktop/contracts.ts`. Keep privileged imports out of the browser UI and keep the sandboxed preload self-contained. No bundler or frontend framework is required.
 
 `npm run typecheck` covers the core, Electron, and browser projects and refreshes ignored build outputs through TypeScript project references. `npm test` includes malformed IPC contract checks. `npm run test:desktop` and `npm run test:lan` exercise the emitted application rather than source JavaScript. Campaign files and the ChatGPT/Codex plugin entry points retain their existing locations and formats.
+
+## Local multimodal DM with Ollama
+
+Local mode is experimental. Qwen 3.5 9B has demonstrated durable recall and image interpretation, but the 32k-context stress runs have also produced malformed tool arguments, incomplete requested effects and repeated compaction. Memory guards enforce retrieval and note-saving steps; they cannot guarantee that a model follows a player request or narrates the saved state accurately. Start with 64k and inspect the authoritative sheet after mechanical actions.
+
+Choose **Local · Ollama + Codex CLI**. This uses Codex as the agent harness and Ollama for local inference; ChatGPT login and API keys are not required. Install both CLIs, download a model, and start Ollama with adequate context. For a manually launched server on Linux/macOS:
+
+```bash
+ollama pull qwen3.5:9b
+OLLAMA_NO_CLOUD=1 OLLAMA_CONTEXT_LENGTH=65536 OLLAMA_NUM_PARALLEL=1 ollama serve
+```
+
+Run the pull against an already running Ollama instance; if none is running, start the server first and pull from a second terminal. For an existing service or Ollama desktop installation, configure those settings in that runtime rather than starting a competing server. Do not restart unrelated services. See [Ollama context configuration](https://docs.ollama.com/context-length) and [local-only mode](https://docs.ollama.com/faq). Models and the journal embedding model require an initial download before offline use.
+
+For a reproducible lower-temperature Qwen trial, save this as a `Modelfile` outside the source repository:
+
+```text
+FROM qwen3.5:9b
+PARAMETER num_ctx 65536
+PARAMETER temperature 0.2
+```
+
+Run `ollama create dm-qwen3.5:9b -f /path/to/Modelfile` and select `dm-qwen3.5:9b` in the app. This creates a separate local configuration using the downloaded weights; it does not replace the original model. Sampling parameters remain under the user's control through Ollama.
+
+In the setup screen, set the loopback address (normally `http://127.0.0.1:11434`), model and context budget. **Inspect models & hardware** lists installed models, checks the selected model, and suggests Qwen 3.5 sizes based on detected RAM and accelerator memory. The model field accepts arbitrary installed model names; suggestions are not an allowlist. Both **vision (image input)** and **tool calling** are required. A generated Codex model catalog carries those capabilities into the harness; without it, an unfamiliar model name can silently lose image inputs. Capability checks do not certify gameplay quality. NVIDIA VRAM and Apple unified memory inform estimates; unrecognized GPUs get a conservative CPU/offload suggestion. Download sizes are not full runtime memory requirements, and larger context consumes additional memory.
+
+The context budget defaults to 65,536 tokens, with a minimum of 32,768 because the campaign schemas and instructions need substantial space. It configures Codex's context accounting and automatic compaction at 70% of the budget. It does **not** change the Ollama server's context allocation. Connection checks inspect the actual running model's context and refuse a smaller allocation. A model-level `num_ctx` below the requested budget is rejected before inference. Start with 64k where practical; smaller budgets can spend more time compacting the campaign tool schemas and instructions. [Codex/Ollama guidance](https://docs.ollama.com/integrations/codex) recommends at least 64k.
+
+Local mode uses an isolated Codex home under `.dm/hotseat/ollama-workspace/codex-home` and a separate `.dm/hotseat/ollama-session.json` locator. The locator includes endpoint, model and context configuration; changing them starts a new conversation from saved campaign memory. It never reuses ChatGPT credentials or falls back to a hosted model. Only loopback metadata endpoints are contacted by the application; model inference remains in the external Codex CLI. For local MCP image results, the server sends PNG plus text JSON without a separate structuredContent field, avoiding clients that prefer structured data and drop the image. The application's existing plugin and Antigravity connections retain their behavior. The app does not install models or reconfigure a running Ollama server.
+
+### Memory and compaction
+
+Before a local DM mutation or public reply, the desktop campaign server requires successful `resume_campaign` with DM audience, `search_campaign_history`, and an exact `read_campaign_record` when references exist. Search uses a small requested result count; if indexing is unavailable, recent references from resume can be read directly from authoritative events. Journal delivery being pending does not mean the game action failed.
+
+Before publishing, a continuity record must have been saved since that player submission and after its most recent mechanics/review event. Instructions ask for concise decisions, promises, discoveries and unresolved choices, with DM secrets in separate private records. Exact retries still use their original operation IDs. These checks enforce use of memory tools, not the factual quality or relevance of a model's notes. The plugin and other desktop providers do not acquire this additional workflow guard.
+
+Native Codex compaction runs through the selected local model. Its summary prompt preserves pending requests/actions, operation IDs, saved rolls and record references, and directs the DM to reload authoritative state and relevant memory afterward. Summaries never replace campaign events. After a mid-turn compaction, the adapter steers that same active turn with a bounded copy of the current request and an explicit reminder to reload state and avoid repeating effects. A failed handoff stops without replay. The UI shows a generic compaction status; private summaries never enter the public transcript. Local mode rejects oversized submissions before saving them (combined text and group intentions are limited to one quarter of the context budget in UTF-8 bytes). Local prompts bound their recent-table excerpt and omit the artwork skill and unnecessary campaign-creation instructions during established play. Interrupted compaction/turns preserve saved effects and are not automatically replayed. Eight consecutive failed campaign-tool calls stop a local turn with an attention message; a successful call resets this failure budget.
+
+Local mode can interpret rendered images and use existing illustrated maps, but it currently has no image-generation backend. Schematic maps remain available. A separate local image worker is future work. Independent referee availability and rules/narrative quality still depend on the harness and model; the existing explicit fallback remains required when delegation is unavailable.
+
+### Local integration test
+
+```bash
+DM_LOCAL_ENDPOINT=http://127.0.0.1:11434 npm run test:local
+```
+
+`DM_LOCAL_MODEL` selects another multimodal tool-capable model. The test defaults to the application's 64k budget and always checks explicit compaction and process resume. To stress automatic compaction, set `DM_LOCAL_CONTEXT=32768 DM_REQUIRE_AUTO_COMPACT=1`; this additionally requires an automatic compaction event. It seeds only synthetic temporary campaign data, isolates its journal daemon, and checks recall, exact damage and duplicate protection, image interpretation, compaction and process resume. It performs no direct model API calls. Set `DM_KEEP_LOCAL_TEST=1` to retain the temporary artifacts for inspection. Passing this scenario does not certify long-campaign quality or rules adjudication.

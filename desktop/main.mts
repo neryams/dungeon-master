@@ -106,6 +106,12 @@ else {
       }
       const actions: DesktopApi = {
         preferences: async () => prefs,
+        localModels: (settings) => call('localModels', settings),
+        configureLocal: async (settings) => {
+          await call('stop');
+          prefs.local = settings;
+          await savePrefs();
+        },
         selectProvider: async (provider) => {
           await call('stop');
           prefs.provider = provider;
@@ -115,10 +121,10 @@ else {
           const provider = prefs.provider ?? 'antigravity';
           const found = await call(
             'detect',
-            path ?? (provider === 'codex' ? prefs.codexExecutable : prefs.executable),
+            path ?? (provider !== 'antigravity' ? prefs.codexExecutable : prefs.executable),
             provider,
           );
-          if (provider === 'codex') prefs.codexExecutable = found.path;
+          if (provider !== 'antigravity') prefs.codexExecutable = found.path;
           else prefs.executable = found.path;
           await savePrefs();
           return found;
@@ -126,7 +132,7 @@ else {
         chooseExecutable: async () => {
           const r = await dialog.showOpenDialog(window, {
             title:
-              prefs.provider === 'codex'
+              prefs.provider !== undefined && prefs.provider !== 'antigravity'
                 ? 'Choose Codex CLI (codex)'
                 : 'Choose Antigravity CLI (agy)',
             properties: ['openFile'],
@@ -162,9 +168,12 @@ else {
         connect: (fresh = false) =>
           call(
             'connect',
-            prefs.provider === 'codex' ? prefs.codexExecutable : prefs.executable,
+            (prefs.provider ?? 'antigravity') !== 'antigravity'
+              ? prefs.codexExecutable
+              : prefs.executable,
             fresh,
             prefs.provider ?? 'antigravity',
+            prefs.local,
           ),
         submit: (input) => call('submit', input),
         snapshot: () => call('snapshot'),

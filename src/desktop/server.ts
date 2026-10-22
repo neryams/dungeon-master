@@ -3,6 +3,7 @@ import { readFile, mkdir } from 'node:fs/promises';
 import { z } from 'zod';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CampaignStore, safePath, atomicWrite } from '../store.js';
+import { LocalMemoryGuard } from './memory.js';
 import { importGeneratedArt } from './art.js';
 import { CampaignService, ToolName } from '../service.js';
 import { JournalAdapter, McpJournal } from '../journal.js';
@@ -22,9 +23,13 @@ async function checkOwner() {
 }
 await checkOwner();
 class OwnedService extends CampaignService {
+  private memory =
+    process.env.DM_DESKTOP_PROVIDER === 'ollama' ? new LocalMemoryGuard(store) : undefined;
   override async execute(name: ToolName, raw: unknown) {
     await checkOwner();
+    await this.memory?.before(name, raw);
     const result = await super.execute(name, raw);
+    this.memory?.after(name, raw, result);
     if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
       const rendered = result as { image?: { data: string }; path?: string };
       if (rendered.image && rendered.path) {
@@ -43,38 +48,41 @@ class OwnedService extends CampaignService {
   }
 }
 const service = new OwnedService(store, new JournalAdapter(store, new McpJournal(store.root)));
-const server = createMcpServer(service);
-server.registerTool(
-  'import_generated_map_art',
-  {
-    description:
-      'Copy a native host-generated PNG/JPEG/WebP from this connected conversation into campaign assets. File handling only; then register_map_art with the returned path, source revision and reference extent. No shell or API calls.',
-    inputSchema: { sourcePath: z.string().min(1).max(4096) },
-    annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  },
-  async ({ sourcePath }) => {
-    try {
-      await checkOwner();
-      const result = await importGeneratedArt(
-        store,
-        sourcePath,
-        undefined,
-        process.env.DM_DESKTOP_PROVIDER === 'codex' ? { ownerToken: token! } : undefined,
-      );
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-    } catch {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'Could not import image. Use a valid generated raster image from this connected provider conversation; do not use shell or invent paths.',
-          },
-        ],
-      };
-    }
-  },
-);
+const server = createMcpServer(service, {
+  imageContentOnly: process.env.DM_DESKTOP_PROVIDER === 'ollama',
+});
+if (process.env.DM_DESKTOP_PROVIDER !== 'ollama')
+  server.registerTool(
+    'import_generated_map_art',
+    {
+      description:
+        'Copy a native host-generated PNG/JPEG/WebP from this connected conversation into campaign assets. File handling only; then register_map_art with the returned path, source revision and reference extent. No shell or API calls.',
+      inputSchema: { sourcePath: z.string().min(1).max(4096) },
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ sourcePath }) => {
+      try {
+        await checkOwner();
+        const result = await importGeneratedArt(
+          store,
+          sourcePath,
+          undefined,
+          process.env.DM_DESKTOP_PROVIDER === 'codex' ? { ownerToken: token! } : undefined,
+        );
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Could not import image. Use a valid generated raster image from this connected provider conversation; do not use shell or invent paths.',
+            },
+          ],
+        };
+      }
+    },
+  );
 let closing = false;
 async function close() {
   if (closing) return;

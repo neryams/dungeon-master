@@ -40,9 +40,10 @@ export async function prepareWorkspace(
   source: string,
   env: Record<string, string> = {},
   ownerToken?: string,
-  provider: 'antigravity' | 'codex' = 'antigravity',
+  provider: 'antigravity' | 'codex' | 'ollama' = 'antigravity',
 ) {
-  const workspace = provider === 'codex' ? '.dm/hotseat/codex-workspace' : '.dm/hotseat/workspace';
+  const workspace =
+    provider === 'antigravity' ? '.dm/hotseat/workspace' : `.dm/hotseat/${provider}-workspace`;
   const dir = await safePath(store.root, workspace, false);
   const agents = join(dir, '.agents');
   // Do not follow campaign-provided symlinks when regenerating app-owned files.
@@ -85,7 +86,7 @@ export async function prepareWorkspace(
   await cp(join(source, 'skills'), join(agents, 'skills'), { recursive: true, force: true });
   await atomicWrite(
     join(dir, 'AGENTS.md'),
-    `# Dungeon Master hotseat\n\nUse only the ${serverName} MCP server for this campaign. Use the Dungeon Master skills in .agents/skills. Never edit campaign files or invoke raw journal tools. All game changes go through campaign tools. Native image generation is allowed for create-map-art; use referencePath from render_location_map and import_generated_map_art to copy its generated output to campaign assets before register_map_art. Do not use shell for artwork file handling. The desktop shows only publish_table_message calls. Keep all DM secrets, referee deliberations and operational logs out of those messages.\n`,
+    `# Dungeon Master hotseat\n\nUse only the ${serverName} MCP server for this campaign. Use the Dungeon Master skills in .agents/skills. Never edit campaign files or invoke raw journal tools. All game changes go through campaign tools. ${provider === 'ollama' ? 'Native artwork generation is unavailable; use schematic maps. When supported by a future provider,' : 'Native image generation is allowed for create-map-art;'} use referencePath from render_location_map and import_generated_map_art to copy its generated output to campaign assets before register_map_art. Do not use shell for artwork file handling. The desktop shows only publish_table_message calls. Keep all DM secrets, referee deliberations and operational logs out of those messages.\n`,
   );
   const binding = JSON.parse(await readFile(join(agents, 'mcp_config.json'), 'utf8'));
   return {

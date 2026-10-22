@@ -5,6 +5,7 @@ import type {
   MapInput,
   PlayerView,
   LanStatus,
+  LocalSettings,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
 const tags = {
@@ -36,6 +37,17 @@ const tags = {
   'provider-status': 'span',
   provider: 'select',
   'provider-command': 'code',
+  'provider-help': 'p',
+  'local-settings': 'div',
+  'local-endpoint': 'input',
+  'local-model': 'input',
+  'local-models': 'datalist',
+  'local-context': 'input',
+  'local-check': 'button',
+  'local-save': 'button',
+  'local-hardware': 'p',
+  'local-suggestions': 'ul',
+  'local-status': 'p',
   'check-provider': 'button',
   'choose-cli': 'button',
   'open-campaign': 'button',
@@ -403,6 +415,7 @@ async function refresh() {
   }
 }
 async function connect(fresh = false) {
+  if ($('provider').value === 'ollama') await api.configureLocal(localSettings());
   const promise = api.connect(fresh);
   void refresh();
   try {
@@ -451,12 +464,54 @@ on('dismiss', () => {
 });
 $('provider').onchange = () => {
   void (async () => {
-    const provider = $('provider').value === 'codex' ? 'codex' : 'antigravity';
+    const provider =
+      $('provider').value === 'ollama'
+        ? 'ollama'
+        : $('provider').value === 'codex'
+          ? 'codex'
+          : 'antigravity';
     await api.selectProvider(provider);
-    $('provider-command').textContent = provider === 'codex' ? 'codex login' : 'agy';
+    showProvider();
     await checkProvider();
   })().catch(notice);
 };
+function localSettings(): LocalSettings {
+  return {
+    endpoint: $('local-endpoint').value.trim(),
+    model: $('local-model').value.trim(),
+    contextTokens: Number($('local-context').value),
+  };
+}
+function showProvider() {
+  const local = $('provider').value === 'ollama';
+  $('local-settings').hidden = !local;
+  $('provider-help').hidden = local;
+  $('provider-command').textContent = $('provider').value === 'codex' ? 'codex login' : 'agy';
+}
+on('local-check', async () => {
+  $('local-status').textContent = 'Inspecting local models…';
+  const report = await api.localModels(localSettings());
+  const h = report.hardware;
+  $('local-hardware').textContent =
+    `${h.ramGiB} GiB RAM · ${h.gpu ? `${h.gpu} (${h.vramGiB} GiB)` : h.unifiedMemory ? 'Apple unified memory' : 'GPU memory not detected'}`;
+  $('local-models').replaceChildren(
+    ...report.models.map((m) => {
+      const o = node('option', `${m.sizeGiB} GiB download`);
+      o.value = m.name;
+      return o;
+    }),
+  );
+  $('local-suggestions').replaceChildren(
+    ...report.suggestions.map((s) => node('li', `${s.model}: ${s.reason}`)),
+  );
+  $('local-status').textContent =
+    `${report.selected ? `Vision + tools confirmed. Model limit: ${report.selected.maxContext} tokens. ` : ''}${report.warning ?? ''}`;
+});
+on('local-save', async () => {
+  await api.configureLocal(localSettings());
+  $('local-status').textContent =
+    'Local settings saved. Connect DM to validate and use this model.';
+});
 on('check-provider', () => checkProvider());
 on('choose-cli', async () => {
   const path = await api.chooseExecutable();
@@ -615,7 +670,12 @@ async function start() {
   recent = preferences.recent;
   $('recent').hidden = !recent;
   $('provider').value = preferences.provider ?? 'antigravity';
-  $('provider-command').textContent = preferences.provider === 'codex' ? 'codex login' : 'agy';
+  if (preferences.local) {
+    $('local-model').value = preferences.local.model;
+    $('local-endpoint').value = preferences.local.endpoint;
+    $('local-context').value = String(preferences.local.contextTokens);
+  }
+  showProvider();
   await checkProvider();
 }
 void start().catch(notice);
