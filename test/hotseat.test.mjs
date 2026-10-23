@@ -8,6 +8,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { randomUUID } from 'node:crypto';
 import { fixture, apply, hero } from './helpers.mjs';
 import { DesktopHost } from '../dist/desktop/host.js';
+import { notifyActivity } from '../dist/desktop/activity-bus.js';
 import {
   AntigravitySession,
   grantCampaignPermission,
@@ -306,8 +307,11 @@ test('desktop MCP transport stops after ownership is revoked; regenerated worksp
   const { store, service, parent } = await fixture(t);
   const host = new DesktopHost({ source: resolve('.') });
   t.after(() => host.close());
+  const desktopEvents = [];
+  host.subscribe((event) => desktopEvents.push(event));
   await host.open(store.root);
   const owner = JSON.parse(await readFile(join(store.root, '.dm/hotseat/owner.json'), 'utf8'));
+  assert.match(owner.endpoint, /(?:events\.sock|dm-activity-)/);
   const client = new Client({ name: 'owner-test', version: '1' });
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -346,6 +350,112 @@ test('desktop MCP transport stops after ownership is revoked; regenerated worksp
   assert.equal(activityFeed.rolls[0].label, 'Perception Check');
   assert.equal(activityFeed.rolls[0].total, publicRoll.structuredContent.roll.total);
   assert.doesNotMatch(JSON.stringify(activityFeed), /reason|Visible hotseat roll/);
+  for (
+    let i = 0;
+    i < 100 &&
+    !desktopEvents.some(
+      (event) =>
+        event.kind === 'activity' &&
+        event.activity?.rolls.some(
+          (roll) => roll.id === 'desktop-wrapper-public-roll' && roll.status === 'complete',
+        ),
+    );
+    i++
+  )
+    await delay(5);
+  assert.ok(
+    desktopEvents.some(
+      (event) =>
+        event.kind === 'activity' &&
+        event.activity?.rolls.some(
+          (roll) => roll.id === 'desktop-wrapper-public-roll' && roll.status === 'rolling',
+        ),
+    ),
+  );
+  assert.ok(
+    desktopEvents.some(
+      (event) =>
+        event.kind === 'activity' &&
+        event.activity?.rolls.some(
+          (roll) => roll.id === 'desktop-wrapper-public-roll' && roll.status === 'complete',
+        ),
+    ),
+  );
+  assert.ok(desktopEvents.some((event) => event.kind === 'changed'));
+  assert.equal(
+    (await host.snapshot()).activity.rolls[0].total,
+    publicRoll.structuredContent.roll.total,
+  );
+  const ownerPath = join(store.root, '.dm/hotseat/owner.json');
+  await writeFile(
+    ownerPath,
+    JSON.stringify({ ...owner, endpoint: join(store.root, 'missing.sock') }),
+  );
+  const recoveredRoll = await client.callTool({
+    name: 'roll_dice',
+    arguments: {
+      operationId: 'desktop-recovered-roll',
+      expectedRevision: 1,
+      reason: 'Recovery test',
+      expression: '1d20',
+      purpose: 'Perception check',
+      visibility: 'party',
+    },
+  });
+  assert.equal(recoveredRoll.isError, undefined);
+  assert.equal(
+    desktopEvents.some((event) =>
+      event.activity?.rolls.some((roll) => roll.id === 'desktop-recovered-roll'),
+    ),
+    false,
+  );
+  await writeFile(ownerPath, JSON.stringify(owner));
+  const recovered = await host.snapshot();
+  assert.equal(
+    recovered.activity.rolls.find((roll) => roll.id === 'desktop-recovered-roll').total,
+    recoveredRoll.structuredContent.roll.total,
+  );
+  const pending = (id) => ({ id, label: 'Dice roll', notation: '1d20', status: 'rolling' });
+  await Promise.all([
+    notifyActivity(owner.endpoint, {
+      token: owner.token,
+      kind: 'activity',
+      activity: { rolls: [pending('parallel-a')] },
+    }),
+    notifyActivity(owner.endpoint, {
+      token: owner.token,
+      kind: 'activity',
+      activity: { rolls: [pending('parallel-b')] },
+    }),
+  ]);
+  await notifyActivity(owner.endpoint, {
+    token: owner.token,
+    kind: 'activity',
+    activity: {
+      rolls: [pending('desktop-wrapper-public-roll')],
+    },
+  });
+  await notifyActivity(owner.endpoint, {
+    token: owner.token,
+    kind: 'activity',
+    activity: {
+      rolls: [{ ...pending('uncommitted-total'), status: 'complete', total: 999 }],
+    },
+  });
+  for (
+    let i = 0;
+    i < 100 && !(await host.snapshot()).activity.rolls.some((roll) => roll.id === 'parallel-b');
+    i++
+  )
+    await delay(5);
+  const merged = (await host.snapshot()).activity.rolls;
+  assert.ok(merged.some((roll) => roll.id === 'parallel-a'));
+  assert.ok(merged.some((roll) => roll.id === 'parallel-b'));
+  assert.equal(merged.find((roll) => roll.id === 'desktop-wrapper-public-roll').status, 'complete');
+  assert.equal(
+    merged.some((roll) => roll.id === 'uncommitted-total'),
+    false,
+  );
   await apply(service, [
     {
       type: 'put_entity',
@@ -383,6 +493,103 @@ test('desktop MCP transport stops after ownership is revoked; regenerated worksp
   await mkdir(workspace, { recursive: true });
   await symlink(parent, join(workspace, '.agents'));
   await assert.rejects(prepareWorkspace(store, resolve('.')), /Symlinks/);
+});
+
+test('snapshot recovery cannot overwrite a newer tool phase', async (t) => {
+  const { store, service } = await fixture(t);
+  const host = new DesktopHost({ source: resolve('.') });
+  t.after(() => host.close());
+  await host.open(store.root);
+  await apply(service, [{ type: 'put_entity', entity: hero }]);
+  await table(store, {
+    type: 'submit',
+    id: 'phase-race',
+    characterId: 'hero',
+    text: 'Look around',
+  });
+  const owner = JSON.parse(await readFile(join(store.root, '.dm/hotseat/owner.json'), 'utf8'));
+  let entered;
+  let release;
+  const started = new Promise((resolve) => {
+    entered = resolve;
+  });
+  const blocked = new Promise((resolve) => {
+    release = resolve;
+  });
+  const original = host.activity.snapshot.bind(host.activity);
+  host.activity.snapshot = async () => {
+    entered();
+    await blocked;
+    return { phase: 'Stale phase', rolls: [] };
+  };
+  try {
+    const reading = host.snapshot();
+    await started;
+    await notifyActivity(owner.endpoint, {
+      token: owner.token,
+      kind: 'activity',
+      requestId: 'phase-race',
+      activity: { phase: 'Checking rules', rolls: [] },
+    });
+    release();
+    const snapshot = await reading;
+    assert.equal(snapshot.activity.phase, 'Checking rules');
+  } finally {
+    release();
+    host.activity.snapshot = original;
+  }
+});
+
+test('snapshot settles abandoned rolls from committed events after a turn ends', async (t) => {
+  const { store, service } = await fixture(t);
+  const host = new DesktopHost({ source: resolve('.') });
+  t.after(() => host.close());
+  await host.open(store.root);
+  const owner = JSON.parse(await readFile(join(store.root, '.dm/hotseat/owner.json'), 'utf8'));
+  const pending = (id) => ({ id, label: 'Dice roll', notation: '1d20', status: 'rolling' });
+  host.stage = 'resolving';
+  await notifyActivity(owner.endpoint, {
+    token: owner.token,
+    kind: 'activity',
+    activity: { rolls: [pending('saved-without-finish')] },
+  });
+  await notifyActivity(owner.endpoint, {
+    token: owner.token,
+    kind: 'activity',
+    activity: { rolls: [pending('abandoned-roll')] },
+  });
+  const active = await host.snapshot();
+  assert.deepEqual(
+    active.activity.rolls.map((roll) => roll.status),
+    ['rolling', 'rolling'],
+  );
+  const committed = await service.execute('roll_dice', {
+    operationId: 'saved-without-finish',
+    expectedRevision: 0,
+    reason: 'Saved before process loss',
+    expression: '1d20',
+    purpose: 'Perception check',
+    visibility: 'party',
+  });
+  host.stage = 'attention';
+  const settled = await host.snapshot();
+  assert.equal(
+    settled.activity.rolls.find((roll) => roll.id === 'saved-without-finish').total,
+    committed.roll.total,
+  );
+  assert.equal(
+    settled.activity.rolls.find((roll) => roll.id === 'saved-without-finish').status,
+    'complete',
+  );
+  assert.equal(
+    settled.activity.rolls.find((roll) => roll.id === 'abandoned-roll').status,
+    'failed',
+  );
+  host.stage = 'resolving';
+  assert.equal(
+    (await host.snapshot()).activity.rolls.find((roll) => roll.id === 'abandoned-roll').status,
+    'failed',
+  );
 });
 
 test('desktop imports only its conversation raster assets and renders backgrounds with cached fallback warnings', async (t) => {

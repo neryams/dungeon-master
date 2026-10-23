@@ -37,6 +37,7 @@ export class DesktopActivity {
   constructor(
     private store: CampaignStore,
     private ownerToken: string,
+    private notify?: (activity: ActivitySnapshot, requestId?: string) => Promise<void>,
   ) {}
 
   async reset() {
@@ -208,6 +209,7 @@ export class DesktopActivity {
           ...(this.value.phase && this.requestId ? { requestId: this.requestId } : {}),
         }),
       );
+      await this.notify?.(this.value, this.requestId).catch(() => {});
     })();
   }
   private enqueue<T>(action: () => Promise<T>): Promise<T> {

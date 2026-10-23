@@ -5,6 +5,14 @@ import { randomUUID } from 'node:crypto';
 import { initialize } from '../dist/store.js';
 import { CampaignService } from '../dist/service.js';
 import { JournalAdapter } from '../dist/journal.js';
+import { notifyActivity } from '../dist/desktop/activity-bus.js';
+
+// Synthetic service writes bypass the desktop MCP wrapper; send its normal invalidation.
+export async function notifyDesktop(store) {
+  const owner = JSON.parse(await readFile(join(store.root, '.dm/hotseat/owner.json'), 'utf8'));
+  await notifyActivity(owner.endpoint, { token: owner.token, kind: 'changed' });
+}
+
 export class FileJournal {
   calls = [];
   fail = false;

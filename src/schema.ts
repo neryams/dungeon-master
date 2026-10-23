@@ -359,7 +359,7 @@ export const RollStep = z
     expression: z.string().min(1).max(40),
     mode: z.enum(['normal', 'advantage', 'disadvantage']).default('normal'),
     purpose: RequiredText,
-    visibility: Visibility.default('dm'),
+    visibility: Visibility.default('party'),
     when: RequiredText,
     optional: z.boolean().default(false),
   })

@@ -3,8 +3,55 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { connect } from 'node:net';
 import { fixture, apply, hero } from './helpers.mjs';
 import { DesktopActivity } from '../dist/desktop/activity.js';
+import { ActivityBus, notifyActivity } from '../dist/desktop/activity-bus.js';
+
+test('local activity bus rejects foreign tokens and closes its private endpoint', async () => {
+  const token = randomUUID();
+  const notices = [];
+  const bus = await ActivityBus.listen(token, async (notice) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    notices.push(notice);
+  });
+  try {
+    await notifyActivity(bus.endpoint, {
+      token: randomUUID(),
+      kind: 'activity',
+      activity: { phase: 'Checking rules', rolls: [] },
+    });
+    assert.equal(notices.length, 0);
+    await notifyActivity(bus.endpoint, {
+      token,
+      kind: 'activity',
+      activity: { phase: 'Checking rules', rolls: [] },
+    });
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].activity.phase, 'Checking rules');
+    const bytes = Buffer.from(
+      JSON.stringify({ token, kind: 'activity', activity: { phase: 'Rules 🐉', rolls: [] } }) +
+        '\n',
+    );
+    const split = bytes.indexOf(Buffer.from('🐉')) + 2;
+    await new Promise((resolve, reject) => {
+      const socket = connect(bus.endpoint);
+      socket.once('error', reject);
+      socket.once('connect', () => {
+        socket.write(bytes.subarray(0, split), () => socket.write(bytes.subarray(split)));
+      });
+      socket.once('data', () => {
+        socket.destroy();
+        resolve();
+      });
+    });
+    assert.equal(notices.at(-1).activity.phase, 'Rules 🐉');
+  } finally {
+    await bus.close();
+  }
+  await notifyActivity(bus.endpoint, { token, kind: 'changed' });
+  assert.equal(notices.length, 2);
+});
 
 async function activityFor(store, token) {
   const directory = join(store.root, '.dm/hotseat');

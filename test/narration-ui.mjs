@@ -5,7 +5,7 @@ import electron from 'electron';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fixture, apply, hero } from './helpers.mjs';
+import { fixture, apply, hero, notifyDesktop } from './helpers.mjs';
 
 function wavBase64(durationSeconds = 2) {
   const sampleRate = 16_000;
@@ -127,6 +127,7 @@ async function publishFinishedTurn(store, service, id, text) {
     requestId: id,
     status: 'completed',
   });
+  await notifyDesktop(store);
 }
 
 async function speechRequests(path) {

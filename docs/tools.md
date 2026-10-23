@@ -29,7 +29,7 @@ Partial item transfers are one batch that consumes from the source stack and cre
 
 `put_entity` supports character, NPC, item, location, faction, quest and map kinds. Characters contain ability scores, AC, HP/max/temp HP, proficiency, saves/skills, conditions, death saves and resources. Entity knowledge is `established`, `rumor` or `plan`, with `party` or `dm` visibility. Quest progress uses `status` and description. NPCs may also have character data.
 
-`roll_dice` accepts `expression`, `purpose`, `mode` and `visibility`. Normal expressions are `NdM`, `NdM+K` or `NdM-K`, bounded to 100 dice and 10000 sides. Advantage/disadvantage requires one d20. Reported mode requires `reportedTotal` and stores the expression as the operator's label without generating dice.
+`roll_dice` accepts `expression`, `purpose`, `mode` and `visibility`. All roll inputs and referee roll plans default to `party`; hidden rolls require an explicit `visibility: "dm"`. Actual rolls choose visibility independently of the referee plan and previous rolls, while expression, mode and purpose still follow the recorded procedure. This also applies to administrative rolls. Existing saved visibility is unchanged. Normal expressions are `NdM`, `NdM+K` or `NdM-K`, bounded to 100 dice and 10000 sides. Advantage/disadvantage requires one d20. Reported mode requires `reportedTotal` and stores the expression as the operator's label without generating dice.
 
 `record_scene` takes title/content/visibility. `checkpoint_session` takes a public summary/unresolved array and optional private dmNotes. `correct_campaign_event` takes the original eventId and explicit compensating changes. Historical corrections should also get a new narrative record explaining which older account is superseded.
 

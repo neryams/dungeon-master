@@ -1,6 +1,7 @@
 import type {
   CampaignSnapshot,
   DesktopSnapshot,
+  DesktopEvent,
   SubmitInput,
   MapInput,
   PlayerView,
@@ -197,6 +198,38 @@ let dialogModel: string | undefined;
 let modelSwitching = false;
 let dialogRequest = 0;
 let viewGeneration = 0;
+let updateSequence = 0;
+let refreshQueued = false;
+let updateRefreshTimer: number | undefined;
+let mapRetryTimer: number | undefined;
+function scheduleRefresh() {
+  if (updateRefreshTimer !== undefined) return;
+  updateRefreshTimer = window.setTimeout(() => {
+    updateRefreshTimer = undefined;
+    if (!$('play').hidden) void refresh();
+  }, 30);
+}
+function receiveUpdate(update: DesktopEvent) {
+  if (
+    !state ||
+    $('play').hidden ||
+    update.root !== state.root ||
+    update.campaignId !== state.campaign.id ||
+    update.sequence <= updateSequence
+  )
+    return;
+  updateSequence = update.sequence;
+  state = {
+    ...state,
+    stage: update.stage,
+    detail: update.detail,
+    activitySequence: update.sequence,
+    ...(update.kind === 'activity' && update.activity ? { activity: update.activity } : {}),
+  };
+  renderState();
+  scheduleRefresh();
+}
+const unsubscribeUpdates = api.onUpdate(receiveUpdate);
 const narrationStorageKey = 'dungeon-master.narration.v1';
 function savedNarration(): { enabled: boolean; voice: NarrationVoice } {
   try {
@@ -704,6 +737,7 @@ function renderMapLegend(map?: PlayerView['maps'][number]) {
   if (!items.children.length) items.append(node('li', 'No other revealed markers.', 'help'));
 }
 async function renderMap() {
+  const generation = viewGeneration;
   const m = state?.maps?.find((m) => m.id === selectedMap);
   renderMapLegend(m);
   $('map-empty').hidden = !!m;
@@ -744,9 +778,18 @@ async function renderMap() {
   $('map-image').hidden = true;
   try {
     const result = await api.map(input);
-    if (key !== mapKey || state.revision !== input.revision) return;
+    if (generation !== viewGeneration || key !== mapKey || state.revision !== input.revision)
+      return;
     if (result.stale || result.busy) {
       mapKey = '';
+      // A temporarily busy map should not wait for the 15-second recovery snapshot.
+      if (mapRetryTimer !== undefined) window.clearTimeout(mapRetryTimer);
+      mapRetryTimer = window.setTimeout(() => {
+        mapRetryTimer = undefined;
+        if (generation !== viewGeneration || $('play').hidden) return;
+        if (result.stale) scheduleRefresh();
+        else void renderMap();
+      }, 250);
       return;
     }
     $('map-image').src = result.image;
@@ -754,9 +797,16 @@ async function renderMap() {
     $('map-status').textContent =
       `r${result.revision}${m.kind === 'grid' ? ` · ${offset.x}, ${offset.y}` : ''}${result.warnings?.length ? ` · ${result.warnings.join(' ')}` : ''}`;
   } catch (e) {
+    if (generation !== viewGeneration) return;
     mapKey = '';
     $('map-status').textContent = 'Map unavailable; retrying';
   }
+}
+function renderElapsed() {
+  if (resolvingSince === undefined) return;
+  const elapsed = Math.floor((Date.now() - resolvingSince) / 1000);
+  $('active-turn-elapsed').textContent =
+    `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 }
 function renderState() {
   if (!state.campaign) return;
@@ -766,9 +816,7 @@ function renderState() {
   $('active-turn').hidden = !resolving;
   if (resolving) {
     $('active-turn-phase').textContent = state.activity?.phase || 'The DM is thinking';
-    const elapsed = Math.floor((Date.now() - (resolvingSince ?? Date.now())) / 1000);
-    $('active-turn-elapsed').textContent =
-      `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+    renderElapsed();
   }
   diceFeedback.observe(state.activity?.rolls ?? [], resolving);
   const settingUp = state.reviewMode === 'setup';
@@ -887,7 +935,10 @@ function renderState() {
   void renderMap();
 }
 async function refresh() {
-  if (polling) return;
+  if (polling) {
+    refreshQueued = true;
+    return;
+  }
   polling = true;
   const view = viewGeneration;
   try {
@@ -895,13 +946,29 @@ async function refresh() {
     if (view !== viewGeneration || $('play').hidden) return;
     if (snapshot.campaign) {
       if (snapshot.root !== state.root || snapshot.revision < state.revision) return;
-      state = snapshot;
+      // A snapshot started before a push must not erase newer roll or lifecycle feedback.
+      const sequence = snapshot.activitySequence ?? 0;
+      state =
+        sequence < updateSequence
+          ? {
+              ...snapshot,
+              stage: state.stage,
+              detail: state.detail,
+              activity: state.activity,
+              activitySequence: updateSequence,
+            }
+          : snapshot;
+      updateSequence = Math.max(updateSequence, sequence);
       renderState();
     }
   } catch (e) {
     notice(e);
   } finally {
     polling = false;
+    if (refreshQueued) {
+      refreshQueued = false;
+      scheduleRefresh();
+    }
   }
 }
 async function connect(fresh = false) {
@@ -919,6 +986,8 @@ async function connect(fresh = false) {
 export function showCampaign(snapshot: DesktopSnapshot) {
   if (!snapshot.campaign) throw new Error('No campaign is open');
   ++viewGeneration;
+  updateSequence = snapshot.activitySequence ?? 0;
+  refreshQueued = false;
   resolvingSince = snapshot.stage === 'resolving' ? Date.now() : undefined;
   diceFeedback.reset(snapshot.activity?.rolls ?? []);
   state = snapshot;
@@ -1348,12 +1417,25 @@ $('narration-voice').addEventListener('change', () => {
   saveNarration();
 });
 window.addEventListener('beforeunload', () => {
+  unsubscribeUpdates();
+  if (mapRetryTimer !== undefined) window.clearTimeout(mapRetryTimer);
+  if (updateRefreshTimer !== undefined) window.clearTimeout(updateRefreshTimer);
+  diceFeedback.cancel();
   narration.leave();
   narrationAudio.close();
 });
+// The clock is local; tool progress arrives through IPC. Occasional snapshots recover
+// missed notifications and changes made outside the desktop-owned tool process.
+setInterval(renderElapsed, 1000);
 setInterval(() => {
-  if (!$('play').hidden) void refresh();
-}, 1000);
+  if (!$('play').hidden && !document.hidden) void refresh();
+}, 15000);
+window.addEventListener('focus', () => {
+  if (!$('play').hidden) scheduleRefresh();
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !$('play').hidden) scheduleRefresh();
+});
 
 let lanInfo: LanStatus | null;
 async function showLan() {

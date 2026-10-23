@@ -61,7 +61,7 @@ The desktop-only `import_generated_map_art` tool copies bounded PNG/JPEG/WebP ou
 
 ## Feedback while the DM works
 
-The Electron host shows a compact activity card during a turn, with elapsed time and public cues such as checking rules, consulting campaign notes, and saving outcomes. These are tool activity cues, not a percentage complete or a view into private reasoning.
+The Electron host shows a compact activity card during a turn, with elapsed time and public cues such as checking rules, consulting campaign notes, and saving outcomes. Progress and roll updates arrive through local IPC as tools run. These are tool activity cues, not a percentage complete or a view into private reasoning. The app loads an initial snapshot and refreshes on focus or every 15 seconds while visible to recover missed updates; it no longer polls progress every second.
 
 Public dice rolls open a nonblocking popup. A plain number briefly randomizes, then settles on the saved total with its dice notation and breakdown. Consecutive rolls queue automatically; Dismiss hides the current presentation. Reduced-motion settings skip the randomizing animation, and physically reported rolls display their recorded total directly. The animation is presentation only: it never rolls dice again or delays the campaign transaction.
 

@@ -170,6 +170,40 @@ export interface CampaignActivity {
     modifier?: number;
   }[];
 }
+export const DesktopEvent = z
+  .object({
+    type: z.literal('desktop-event'),
+    root: z.string(),
+    campaignId: z.string(),
+    sequence: z.number().int().nonnegative(),
+    kind: z.enum(['activity', 'changed']),
+    stage: z.enum(['disconnected', 'connecting', 'ready', 'resolving', 'attention']),
+    detail: z.string(),
+    activity: z
+      .object({
+        phase: z.string().max(80).optional(),
+        rolls: z
+          .array(
+            z
+              .object({
+                id: z.string().min(1).max(100),
+                label: z.string().min(1).max(80),
+                notation: z.string().min(1).max(80),
+                mode: z.enum(['normal', 'advantage', 'disadvantage', 'reported']).optional(),
+                status: z.enum(['rolling', 'complete', 'failed']),
+                total: z.number().int().safe().optional(),
+                dice: z.array(z.number().int().safe()).max(100).optional(),
+                modifier: z.number().int().safe().optional(),
+              })
+              .strict(),
+          )
+          .max(12),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type DesktopEvent = z.infer<typeof DesktopEvent>;
 export type CampaignSnapshot = PlayerView & {
   root: string;
   table: TableTurn[];
@@ -182,6 +216,7 @@ export type CampaignSnapshot = PlayerView & {
   model?: string;
   speechEligibleRevisions?: number[];
   activity?: CampaignActivity;
+  activitySequence?: number;
 };
 export type DesktopSnapshot =
   CampaignSnapshot | { campaign: null; stage: Stage; detail: string; table: TableTurn[] };
@@ -239,6 +274,7 @@ export interface WorkerApi {
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
 export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect' | 'models'> {
+  onUpdate(callback: (event: DesktopEvent) => void): () => void;
   openSpeechLink(link: SpeechLink): Promise<void>;
   detect(path?: string): Promise<{ path: string; version: string }>;
   models(): Promise<ModelCatalog>;
@@ -413,7 +449,7 @@ export async function dispatchWorker(
   }
 }
 export async function dispatchDesktop(
-  api: DesktopApi,
+  api: Omit<DesktopApi, 'onUpdate'>,
   method: unknown,
   raw: unknown,
 ): Promise<unknown> {
