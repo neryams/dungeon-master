@@ -255,12 +255,21 @@ test('coordinator serializes actions, deduplicates dispatch, requires public out
   assert.equal(runs, 2);
   assert.equal((await host.submit(input)).duplicate, true);
   const revision = (await store.read()).state.revision;
-  await service.execute('publish_table_message', {
+  const published = await service.execute('publish_table_message', {
     operationId: 'published',
     expectedRevision: revision,
     reason: 'Reply',
     requestId: 'single',
     text: 'The courtyard is quiet.',
+  });
+  assert.equal((await host.snapshot()).table[0].messages[0].text, 'The courtyard is quiet.');
+  await service.execute('record_scene', {
+    operationId: 'post-publish-note',
+    expectedRevision: published.revision,
+    reason: 'Post-publish journal bookkeeping',
+    title: 'Courtyard observation',
+    content: 'Hidden watcher noted from the battlements.',
+    visibility: 'dm',
   });
   finish.resolve({ tools: [], campaignIds: [] });
   for (let i = 0; i < 100 && (await host.snapshot()).stage === 'resolving'; i++) await delay(5);

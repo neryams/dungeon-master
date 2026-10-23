@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { Change, Entity, Event, Payload, State, Roll, KnowledgeFact } from './schema.js';
+import { Change, Entity, Event, Payload, State, Roll } from './schema.js';
 import { z } from 'zod';
 import { validateReview, reduceReview } from './review.js';
 import { reduceTable } from './table.js';
@@ -25,22 +25,6 @@ export function validateState(state: State): void {
     if (state.entities[id].kind !== 'character') fail('Party members must be characters');
   }
   if (new Set(state.party).size !== (state.party?.length ?? 0)) fail('Duplicate party members');
-  for (const [id, fact] of Object.entries(state.knowledge ?? {})) {
-    if (id !== fact.id) fail('Knowledge key must match fact ID');
-    KnowledgeFact.parse(fact);
-    fact.entityIds.forEach(has);
-    for (const knownId of fact.knownBy) {
-      has(knownId);
-      if (!['character', 'npc'].includes(state.entities[knownId].kind))
-        fail('Knowledge holders must be characters or NPCs');
-    }
-    for (const disclosure of fact.disclosures)
-      if (disclosure.recipient.type === 'character') {
-        has(disclosure.recipient.id);
-        if (state.entities[disclosure.recipient.id].kind !== 'character')
-          fail('Knowledge disclosure recipient must be a character');
-      }
-  }
   for (const id of state.focus?.activeQuestIds ?? []) {
     has(id);
     if (state.entities[id].kind !== 'quest') fail('Focus must reference quests');
@@ -163,10 +147,6 @@ export function applyPayload(before: State, payload: Payload): State {
       case 'set_interaction':
         if (entity(c.id).kind !== 'npc') fail('Not an NPC');
         entity(c.id).interaction = structuredClone(c.interaction);
-        break;
-      case 'set_knowledge':
-        state.knowledge ??= {};
-        state.knowledge[c.fact.id] = structuredClone(c.fact);
         break;
       case 'define_pressure': {
         state.pressures ??= {};
@@ -420,8 +400,6 @@ export function cellRevealed(map: NonNullable<Entity['map']>, x: number, y: numb
 }
 export function partyState(state: State): State {
   const out = structuredClone(state);
-  // Knowledge is a DM working ledger. Public facts belong in ordinary entity descriptions.
-  delete out.knowledge;
   delete out.actions;
   delete out.reviewMode;
   // Conversation is exposed explicitly by the hotseat projection, not generic party tools.

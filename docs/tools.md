@@ -38,7 +38,6 @@ Partial item transfers are one batch that consumes from the source stack and cre
 - `campaign_status`: configuration, revision, session and delivery counts.
 - `resume_campaign`: compact relevant current state plus recent record references and rolls; also retries journal delivery.
 - `get_campaign_entity`: exact full entity by ID.
-- `get_campaign_knowledge`: exact private knowledge fact by `id`; returns `{revision, fact}` for the DM and `NOT_FOUND` for party requests, whether or not the ID exists.
 - `search_campaign_history`: query, optional limit, ranked record references and excerpts; status distinguishes unavailable retrieval.
 - `read_campaign_record`: reference of the form `record:<uuid>`.
 
@@ -61,28 +60,7 @@ MCP errors contain a code and useful message, with field paths for input validat
 
 `set_scene` additionally accepts centralQuestion, progress[], pendingDecision and exitConditions[]. Fields describe public progress; put secrets in separate DM entities/records. NPC wants/knows/offers are private in party views; public disclosed and topic fields must not contain secrets. Pressures never advance implicitly. Quest and interaction updates replace their structured records: preserve prior progress and resolved topics when updating.
 
-Resume prioritizes focus, active quests, scene decision/progress, relevant NPC interactions, explicit party and maps containing its members. Legacy campaigns infer party from character entities. Resolved/dormant/abandoned quests stay readable by ID. Scene location is the viewpoint, not an automatic relocation of the roster.
-
-### Private knowledge ledger
-
-`set_knowledge` accepts `fact` with these fields:
-
-| Field                   | Meaning                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| `id`                    | Stable fact ID, separate from entity IDs                                                   |
-| `truthKind`             | `established`, `claim` or `plan`; never promoted automatically by a disclosure             |
-| `truth`                 | Required DM-only account, including attribution for claims                                 |
-| `entityIds`             | Related existing entities; empty means campaign-wide context                               |
-| `knownBy`               | Existing character/NPC IDs who know this account; not a substitute for disclosure evidence |
-| `observableDescription` | Optional sensory details that could be perceived; does not mean they have been observed    |
-| `discoveryHints`        | Optional nonbinding ways the fact might be discovered                                      |
-| `disclosures`           | What an audience actually learned: `{recipient, text, kind, evidence}`                     |
-
-A disclosure recipient is `{type:"party"}` or `{type:"character", id:"character-id"}`. Its kind is `observed`, `reported`, `inferred` or `confirmed`; text describes only the part learned, and evidence records how it was learned. Attribution matters: hearing a witness's allegation does not establish the allegation as world truth. The DM must supply accurate evidence; tools validate structure and entity references, not the semantics of a discovery.
-
-`set_knowledge` replaces a complete fact. Read it first and preserve existing disclosures, holders and other fields when adding information. Old versions remain in event history, and uncertain retries use the same operation ID and exact input. Knowledge changes are allowed as story updates in reviewed mode but invalidate pending action fingerprints, so record resulting discoveries after committing the action. Use this ledger for consequential secrets and discoveries, not every incidental detail. Keep historical dialogue in scene records.
-
-DM resume includes up to 100 relevant `knowledgeFacts`, all relevant `knowledgeFactIds`, `knowledgeFactCount` and `knowledgeFactsTruncated`. Relevance follows linked scene/party entities, knowledge holders and disclosure recipients, plus campaign-wide facts. Use `get_campaign_knowledge` to read facts by ID, or follow `nextKnowledgeOffset` by supplying `knowledgeOffset` to `resume_campaign` until it returns null. All pages carry the current revision; restart paging if it changes. Party resume and player projections omit the entire ledger, even its disclosed portions; author safe public descriptions and recaps separately. A private fact becoming known never automatically publishes its canonical truth, discovery hints or other recipients' information.
+Resume prioritizes focus, active quests, scene decision/progress, relevant NPC interactions, explicit party and maps containing its members. Legacy campaigns infer party from character entities. Resolved/dormant/abandoned quests stay readable by ID. Scene location is the viewpoint, not an automatic relocation of the roster. Overarching campaign secrets and future plans belong in `visibility: dm` scene records retrieved through `search_campaign_history` and `read_campaign_record`, keeping `resume_campaign` focused on immediate scene state.
 
 ## Map authoring and rendering
 

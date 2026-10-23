@@ -136,19 +136,53 @@ test('fresh resume retains world state but party view omits DM entities, rolls a
       type: 'put_entity',
       entity: { id: 'traitor', kind: 'npc', name: 'SECRET', visibility: 'dm', knowledge: 'plan' },
     },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'innkeeper',
+        kind: 'npc',
+        name: 'Bram',
+        interaction: {
+          wants: ['Keep the peace'],
+          knows: ['The cellar door is barred'],
+          disclosed: [],
+          offers: [],
+          unresolvedTopics: ['Cellar noise'],
+          resolvedTopics: [],
+          status: 'open',
+        },
+      },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'distant-envoy',
+        kind: 'npc',
+        name: 'Envoy',
+        interaction: {
+          wants: ['Distant treaty'],
+          knows: ['Off-screen motive'],
+          disclosed: [],
+          offers: [],
+          unresolvedTopics: [],
+          resolvedTopics: [],
+          status: 'open',
+        },
+      },
+    },
     { type: 'set_session', session: 's1' },
     {
       type: 'set_scene',
       scene: {
         id: 'hall',
         title: 'Hall',
-        present: ['hero', 'traitor'],
+        present: ['hero', 'traitor', 'innkeeper'],
         unresolved: ['Who opens the door?'],
       },
     },
   ]);
   await record(service, 'The duke promised a boat.');
-  await record(service, 'SECRET betrayal', 'dm');
+  await record(service, 'SECRET betrayal plot details stay in the journal', 'dm');
   await service.execute('checkpoint_session', {
     operationId: randomUUID(),
     expectedRevision: 3,
@@ -157,6 +191,15 @@ test('fresh resume retains world state but party view omits DM entities, rolls a
     dmNotes: 'SECRET betrayal awaits.',
     unresolved: ['Who opens the door?'],
   });
+  const dmPacket = await service.execute('resume_campaign', { audience: 'dm' });
+  assert.equal(
+    JSON.stringify(dmPacket).includes('SECRET betrayal plot details stay in the journal'),
+    false,
+  );
+  assert.deepEqual(
+    dmPacket.interactions.map((i) => i.id),
+    ['innkeeper'],
+  );
   const publicPacket = await service.execute('resume_campaign', { audience: 'party' });
   assert.equal(JSON.stringify(publicPacket).includes('SECRET'), false);
   assert.equal(publicPacket.scene.unresolved[0], 'Who opens the door?');

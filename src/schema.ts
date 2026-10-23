@@ -226,36 +226,11 @@ export const Scene = z
     exitConditions: z.array(Text).optional(),
   })
   .strict();
-export const KnowledgeDisclosure = z
-  .object({
-    recipient: z.discriminatedUnion('type', [
-      z.object({ type: z.literal('party') }).strict(),
-      z.object({ type: z.literal('character'), id: Id }).strict(),
-    ]),
-    text: z.string().trim().min(1).max(20000),
-    kind: z.enum(['observed', 'reported', 'inferred', 'confirmed']),
-    evidence: z.string().trim().min(1).max(20000),
-  })
-  .strict();
-export const KnowledgeFact = z
-  .object({
-    id: Id,
-    truthKind: z.enum(['established', 'claim', 'plan']),
-    truth: z.string().trim().min(1).max(20000),
-    entityIds: z.array(Id).max(100).default([]),
-    knownBy: z.array(Id).max(100).default([]),
-    observableDescription: z.string().trim().min(1).max(20000).optional(),
-    discoveryHints: z.array(z.string().trim().min(1).max(20000)).max(20).default([]),
-    disclosures: z.array(KnowledgeDisclosure).max(100).default([]),
-  })
-  .strict();
-export type KnowledgeFact = z.infer<typeof KnowledgeFact>;
 export const Change = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set_focus'), focus: Focus }).strict(),
   z.object({ type: z.literal('set_party'), members: z.array(Id).max(100) }).strict(),
   z.object({ type: z.literal('set_quest'), id: Id, quest: QuestProgress }).strict(),
   z.object({ type: z.literal('set_interaction'), id: Id, interaction: Interaction }).strict(),
-  z.object({ type: z.literal('set_knowledge'), fact: KnowledgeFact }).strict(),
   z
     .object({
       type: z.literal('define_pressure'),
@@ -603,7 +578,6 @@ export interface State {
   focus?: z.infer<typeof Focus>;
   party?: string[];
   pressures?: Record<string, z.infer<typeof Pressure>>;
-  knowledge?: Record<string, KnowledgeFact>;
   entities: Record<string, Entity>;
   encounter?: z.infer<typeof Encounter>;
   scene?: z.infer<typeof Scene>;

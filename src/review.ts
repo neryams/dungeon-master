@@ -33,7 +33,6 @@ export function mechanical(state: State, c: Change): boolean {
     case 'set_focus':
     case 'set_quest':
     case 'set_interaction':
-    case 'set_knowledge':
     case 'define_pressure':
     case 'trigger_pressure':
     case 'set_scene':
