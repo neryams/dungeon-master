@@ -707,12 +707,18 @@ export class DesktopHost {
     const store = this.store;
     // Capture before I/O: a later event must outrank a snapshot that read older state.
     const sequence = this.activitySequence;
+    const stage = this.stage;
+    const detail = this.detail;
     const { state, events } = await store.read();
     if (store !== this.store) throw new Error('The campaign changed. Refresh the table.');
+    // A turn may start or finish during a read. Retry instead of combining its new
+    // lifecycle status with saved state captured before that transition.
+    if (stage !== this.stage || detail !== this.detail) return this.snapshot();
     const pendingId = state.table?.find((turn) => turn.status === 'pending')?.id;
     if (this.activity && this.ownerToken) {
       const recovered = await this.activity.snapshot(this.ownerToken, pendingId ?? null);
       if (store !== this.store) throw new Error('The campaign changed. Refresh the table.');
+      if (stage !== this.stage || detail !== this.detail) return this.snapshot();
       // A socket event processed during either read is newer than this recovery view.
       if (sequence === this.activitySequence) {
         const rolls = this.mergeRolls(recovered.rolls, true).flatMap((candidate) => {
@@ -731,10 +737,7 @@ export class DesktopHost {
               },
             ];
           if (candidate.status === 'complete') return [];
-          if (
-            candidate.status === 'rolling' &&
-            (this.stage === 'ready' || this.stage === 'attention')
-          )
+          if (candidate.status === 'rolling' && (stage === 'ready' || stage === 'attention'))
             return [{ ...candidate, status: 'failed' as const }];
           return [candidate];
         });
@@ -759,8 +762,8 @@ export class DesktopHost {
       root: this.store.root,
       table: state.table ?? [],
       speechEligibleRevisions: speechEligibleRevisions(events),
-      stage: this.stage,
-      detail: this.detail,
+      stage,
+      detail,
       activitySequence: sequence,
       gathering: state.gathering,
       lanHosted: !!this.lan,

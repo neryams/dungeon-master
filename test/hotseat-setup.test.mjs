@@ -85,86 +85,154 @@ test('beginSetup submits one durable onboarding turn and carries setup-only guid
   assert.match(setupPrompt, /do not start actual gameplay/);
 });
 
-test('an interrupted setup is never replayed after reopen; an explicit follow-up can finish setup', async (t) => {
-  const { store, service, parent } = await fixture(t);
-  await setReviewMode(store, service, 'setup');
-  const example = JSON.parse(await readFile('examples/lantern-ford.json', 'utf8'));
-  const prompts = [];
-  let failFirstSetup = true;
-  let host;
-  const driver = () => ({
-    run: async (prompt) => {
-      prompts.push(prompt);
-      if (prompt.startsWith('Connection check'))
-        return { tools: ['campaign_status'], campaignIds: ['test'] };
-      const current = JSON.parse(prompt.match(/Current player submission: (\{.*\})$/s)[1]);
-      if (current.requestId === 'desktop-campaign-setup' && failFirstSetup) {
-        failFirstSetup = false;
-        throw new Error('synthetic interruption');
+test(
+  'an interrupted setup is never replayed after reopen; an explicit follow-up can finish setup',
+  { timeout: 10_000 },
+  async (t) => {
+    const { store, service, parent } = await fixture(t);
+    await setReviewMode(store, service, 'setup');
+    const example = JSON.parse(await readFile('examples/lantern-ford.json', 'utf8'));
+    const prompts = [];
+    let failFirstSetup = true;
+    let followUpStarted;
+    const followUpEntered = new Promise((resolve) => {
+      followUpStarted = resolve;
+    });
+    let host;
+    const driver = () => ({
+      run: async (prompt) => {
+        prompts.push(prompt);
+        if (prompt.startsWith('Connection check'))
+          return { tools: ['campaign_status'], campaignIds: ['test'] };
+        const current = JSON.parse(prompt.match(/Current player submission: (\{.*\})$/s)[1]);
+        if (current.requestId === 'desktop-campaign-setup' && failFirstSetup) {
+          failFirstSetup = false;
+          throw new Error('synthetic interruption');
+        }
+        if (current.requestId === 'setup-follow-up') followUpStarted();
+        await apply(service, example.changes);
+        let { state } = await store.read();
+        await service.execute('create_location_map', {
+          operationId: `test-map-${current.requestId}`,
+          expectedRevision: state.revision,
+          reason: 'Create and verify the starting map',
+          entity: example.bridgeMap,
+        });
+        ({ state } = await store.read());
+        const rendered = await host.map({ mapId: example.bridgeMap.id, revision: state.revision });
+        assert.match(rendered.image, /^data:image\/png;base64,/);
+        await service.execute('configure_review', {
+          operationId: `test-review-${current.requestId}`,
+          expectedRevision: state.revision,
+          reason: 'Verify the saved party, quest, focus, scene, and rendered map',
+          mode: 'reviewed',
+        });
+        ({ state } = await store.read());
+        await service.execute('publish_table_message', {
+          operationId: `test-publish-${current.requestId}`,
+          expectedRevision: state.revision,
+          reason: 'Publish completed opening',
+          requestId: current.requestId,
+          text: 'The party and starting place are ready. The first decision is yours.',
+        });
+        return {
+          tools: ['apply_campaign_changes', 'configure_review', 'publish_table_message'],
+          campaignIds: ['test'],
+        };
+      },
+      close: async () => {},
+    });
+
+    host = testHost(store, parent, driver);
+    t.after(() => host.close());
+    await host.open(store.root);
+    await host.connect();
+    await host.beginSetup();
+    await waitFor(host, (snapshot) => snapshot.stage === 'attention');
+    assert.equal((await store.read()).state.table[0].status, 'interrupted');
+    await host.close();
+
+    host = testHost(store, parent, driver);
+    await host.open(store.root);
+    await host.connect();
+    await host.beginSetup();
+    assert.equal(
+      prompts.filter((prompt) => prompt.includes('Current player submission:')).length,
+      1,
+    );
+    assert.equal((await store.read()).state.table[0].status, 'interrupted');
+
+    await host.submit({
+      id: 'setup-follow-up',
+      text: 'Generate a small party and decide the premise for me.',
+    });
+
+    // Hold a snapshot after it has read the pending turn but before it returns. The
+    // driver can finish during this gap, exposing a mixed ready/pending snapshot.
+    await followUpEntered;
+    const originalRead = CampaignStore.prototype.read;
+    let releaseSnapshotRead;
+    const snapshotReadGate = new Promise((resolve) => {
+      releaseSnapshotRead = resolve;
+    });
+    let pendingReadCaptured;
+    const pendingRead = new Promise((resolve) => {
+      pendingReadCaptured = resolve;
+    });
+    let holdPendingRead = true;
+    CampaignStore.prototype.read = async function (...args) {
+      const hold = this !== store && this.root === store.root && holdPendingRead;
+      if (hold) holdPendingRead = false;
+      const result = await originalRead.apply(this, args);
+      if (hold) {
+        assert.equal(
+          result.state.table.find((turn) => turn.id === 'setup-follow-up').status,
+          'pending',
+        );
+        pendingReadCaptured();
+        await snapshotReadGate;
       }
-      await apply(service, example.changes);
-      let { state } = await store.read();
-      await service.execute('create_location_map', {
-        operationId: `test-map-${current.requestId}`,
-        expectedRevision: state.revision,
-        reason: 'Create and verify the starting map',
-        entity: example.bridgeMap,
-      });
-      ({ state } = await store.read());
-      const rendered = await host.map({ mapId: example.bridgeMap.id, revision: state.revision });
-      assert.match(rendered.image, /^data:image\/png;base64,/);
-      await service.execute('configure_review', {
-        operationId: `test-review-${current.requestId}`,
-        expectedRevision: state.revision,
-        reason: 'Verify the saved party, quest, focus, scene, and rendered map',
-        mode: 'reviewed',
-      });
-      ({ state } = await store.read());
-      await service.execute('publish_table_message', {
-        operationId: `test-publish-${current.requestId}`,
-        expectedRevision: state.revision,
-        reason: 'Publish completed opening',
-        requestId: current.requestId,
-        text: 'The party and starting place are ready. The first decision is yours.',
-      });
-      return {
-        tools: ['apply_campaign_changes', 'configure_review', 'publish_table_message'],
-        campaignIds: ['test'],
-      };
-    },
-    close: async () => {},
-  });
+      return result;
+    };
+    let readyReached;
+    const readyEvent = new Promise((resolve) => {
+      readyReached = resolve;
+    });
+    const unsubscribe = host.subscribe((event) => {
+      if (event.kind === 'changed' && event.stage === 'ready') readyReached();
+    });
+    t.after(() => {
+      releaseSnapshotRead();
+      unsubscribe();
+      CampaignStore.prototype.read = originalRead;
+    });
 
-  host = testHost(store, parent, driver);
-  t.after(() => host.close());
-  await host.open(store.root);
-  await host.connect();
-  await host.beginSetup();
-  await waitFor(host, (snapshot) => snapshot.stage === 'attention');
-  assert.equal((await store.read()).state.table[0].status, 'interrupted');
-  await host.close();
+    const inFlightSnapshot = host.snapshot();
+    await pendingRead;
+    await readyEvent;
+    releaseSnapshotRead();
+    const snapshot = await inFlightSnapshot;
+    assert.notEqual(
+      snapshot.stage === 'ready' && snapshot.table[1].status === 'pending',
+      true,
+      'a ready snapshot must include the completed turn',
+    );
 
-  host = testHost(store, parent, driver);
-  await host.open(store.root);
-  await host.connect();
-  await host.beginSetup();
-  assert.equal(prompts.filter((prompt) => prompt.includes('Current player submission:')).length, 1);
-  assert.equal((await store.read()).state.table[0].status, 'interrupted');
-
-  await host.submit({
-    id: 'setup-follow-up',
-    text: 'Generate a small party and decide the premise for me.',
-  });
-  const finished = await waitFor(host, (snapshot) => snapshot.stage === 'ready');
-  assert.equal(finished.reviewMode, 'reviewed');
-  assert.deepEqual(
-    finished.party.members.map((member) => member.id),
-    ['mara', 'tess'],
-  );
-  assert.equal(finished.table[1].id, 'setup-follow-up');
-  assert.equal(finished.table[1].status, 'completed');
-  assert.equal(prompts.filter((prompt) => prompt.includes('Current player submission:')).length, 2);
-});
+    const finished = await host.snapshot();
+    assert.equal(finished.stage, 'ready');
+    assert.equal(finished.reviewMode, 'reviewed');
+    assert.deepEqual(
+      finished.party.members.map((member) => member.id),
+      ['mara', 'tess'],
+    );
+    assert.equal(finished.table[1].id, 'setup-follow-up');
+    assert.equal(finished.table[1].status, 'completed');
+    assert.equal(
+      prompts.filter((prompt) => prompt.includes('Current player submission:')).length,
+      2,
+    );
+  },
+);
 
 test('beginSetup is a no-op for legacy and already reviewed campaigns', async (t) => {
   for (const mode of ['legacy', 'reviewed']) {
