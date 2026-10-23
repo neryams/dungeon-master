@@ -2,18 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fixture, apply, hero } from './helpers.mjs';
 import { CampaignStore } from '../dist/store.js';
 import { DesktopHost } from '../dist/desktop/host.js';
 
 async function waitFor(host, predicate) {
-  for (let i = 0; i < 200; i++) {
-    const snapshot = await host.snapshot();
+  // Setup includes filesystem transactions and PNG rendering, competing with the full suite in CI.
+  const deadline = performance.now() + 10_000;
+  let snapshot;
+  do {
+    snapshot = await host.snapshot();
     if (predicate(snapshot)) return snapshot;
-    await delay(5);
-  }
-  assert.fail('Timed out waiting for the desktop host state');
+    assert.notEqual(snapshot.stage, 'attention', snapshot.detail);
+    await delay(25);
+  } while (performance.now() < deadline);
+  assert.fail(
+    `Timed out waiting for the desktop host state: ${snapshot.stage}: ${snapshot.detail}`,
+  );
 }
 
 function testHost(store, parent, driver) {
