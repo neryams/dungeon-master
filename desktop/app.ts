@@ -11,6 +11,7 @@ import type {
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
+import { markerBadge } from './markers.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -83,6 +84,9 @@ const tags = {
   sheet: 'div',
   quests: 'div',
   'map-select': 'select',
+  'map-legend': 'section',
+  'map-legend-types': 'div',
+  'map-legend-items': 'ul',
   'scene-details': 'details',
   'scene-title': 'summary',
   'scene-summary': 'p',
@@ -128,6 +132,7 @@ let state: CampaignSnapshot,
   shownRevision = -1,
   transcriptKey = '',
   mapKey = '',
+  legendKey = '',
   selectedMap = '',
   mapDetails = false,
   offset = { x: 0, y: 0 },
@@ -181,8 +186,7 @@ function renderParty() {
   for (const p of members()) {
     const card = node('button', undefined, `party-card${p.id === selected ? ' selected' : ''}`);
     card.setAttribute('aria-pressed', String(p.id === selected));
-    const avatar = node('span', p.name.slice(0, 1).toUpperCase(), 'party-avatar');
-    avatar.setAttribute('aria-hidden', 'true');
+    const avatar = markerBadge(p.marker, 'party-avatar');
     card.append(avatar);
     card.append(node('strong', p.name));
     const stats = node('div', undefined, 'party-stats');
@@ -307,8 +311,78 @@ function mapDimensions(map?: PlayerView['maps'][number]) {
       }
     : { width: Number(size), height: Number(size) };
 }
+function renderMapLegend(map?: PlayerView['maps'][number]) {
+  const key = JSON.stringify([map?.id, map?.legend, members().map((member) => member.id)]);
+  if (key === legendKey) return;
+  legendKey = key;
+  $('map-legend').hidden = !map;
+  const items = $('map-legend-items');
+  items.replaceChildren();
+  if (!map) return;
+  const types = $('map-legend-types');
+  types.replaceChildren();
+  const npc = markerBadge({
+    kind: 'npc',
+    label: '',
+    color: '#64748b',
+    shape: 'circle',
+    dotted: true,
+  });
+  const object = markerBadge({
+    kind: 'object',
+    label: '',
+    color: '#64748b',
+    shape: 'triangle',
+    dotted: false,
+  });
+  for (const [icon, label] of [
+    [npc, 'NPC'],
+    [object, 'Objects / landmarks'],
+  ] as const) {
+    const key = node('span');
+    key.append(icon);
+    if (icon === object) {
+      key.append(
+        markerBadge({
+          kind: 'object',
+          label: '',
+          color: '#64748b',
+          shape: 'diamond',
+          dotted: false,
+        }),
+      );
+    }
+    key.append(node('span', label));
+    types.append(key);
+  }
+  if (map.legend.some((entry) => entry.appearance.shape === 'square')) {
+    const key = node('span');
+    key.append(
+      markerBadge({ kind: 'terrain', shape: 'square', dotted: false }),
+      node('span', 'Terrain / obstacle'),
+    );
+    types.append(key);
+  }
+  const partyIds = new Set(members().map((member) => member.id));
+  for (const entry of map.legend) {
+    if (entry.kind === 'entity' && partyIds.has(entry.id)) continue;
+    const item = node('li');
+    item.dataset.markerId = entry.id;
+    item.setAttribute(
+      'aria-label',
+      `${entry.appearance.kind}, ${entry.label}, ${entry.position}${'label' in entry.appearance && entry.appearance.label ? `, marker ${entry.appearance.label}` : ''}`,
+    );
+    const icon = markerBadge(entry.appearance);
+    const label = node('span', undefined, 'legend-label');
+    label.append(node('span', entry.label), node('small', entry.position));
+    item.append(icon, label);
+    items.append(item);
+  }
+  if (!items.children.length) items.append(node('li', 'No other revealed markers.', 'help'));
+}
 async function renderMap() {
   const m = state?.maps?.find((m) => m.id === selectedMap);
+  renderMapLegend(m);
   $('map-empty').hidden = !!m;
   $('map-image').hidden = !m;
   for (const id of [

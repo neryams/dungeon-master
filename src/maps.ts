@@ -6,6 +6,7 @@ import { Entity, State, Viewport } from './schema.js';
 import { CampaignError, cellRevealed, partyState } from './domain.js';
 import { atomicWrite, safePath } from './store.js';
 import { geometryFingerprint } from './map-art.js';
+import { mapLegend } from './map-markers.js';
 
 export type RenderMode = 'map' | 'reference';
 type BackgroundImage = { data: string; extent: z.infer<typeof Viewport> };
@@ -20,6 +21,23 @@ const esc = (s: unknown) =>
   );
 const text = (x: number, y: number, s: unknown, size = 14) =>
   `<text x="${x}" y="${y}" font-size="${size}" fill="#111827">${esc(String(s).length > 100 ? String(s).slice(0, 97) + '…' : s)}</text>`;
+const featureToken = (
+  appearance: { shape: 'triangle' | 'diamond'; color: string },
+  x: number,
+  y: number,
+  size: number,
+) =>
+  appearance.shape === 'triangle'
+    ? `<polygon points="${x},${y - size} ${x + size},${y + size} ${x - size},${y + size}" fill="${appearance.color}" stroke="white" stroke-width="2"/>`
+    : `<polygon points="${x},${y - size} ${x + size},${y} ${x},${y + size} ${x - size},${y}" fill="${appearance.color}" stroke="white" stroke-width="2"/>`;
+const tokenLabel = (
+  appearance: { label: string; textColor?: string },
+  x: number,
+  y: number,
+  size: number,
+  fontSize = 10,
+) =>
+  `<text x="${x}" y="${y + Math.min(4, size * 0.35)}" text-anchor="middle" font-size="${fontSize}" font-weight="bold" fill="${appearance.textColor ?? '#fff'}">${esc(appearance.label)}</text>`;
 export function prepareMap(entity: Entity): Entity {
   const e = structuredClone(entity),
     m = e.map!;
@@ -50,6 +68,21 @@ export function schematic(
   const entity = state.entities[mapId];
   if (!entity?.map) throw new CampaignError('NOT_FOUND', 'Map not found');
   const m = entity.map;
+  const projectedLegend = mapLegend(state, mapId);
+  const featureAppearances = new Map(
+    projectedLegend.flatMap((entry) =>
+      entry.kind === 'feature' && entry.appearance.kind === 'landmark'
+        ? [[entry.id, entry.appearance] as const]
+        : [],
+    ),
+  );
+  const entityAppearances = new Map(
+    projectedLegend.flatMap((entry) =>
+      entry.kind === 'entity' && 'color' in entry.appearance
+        ? [[entry.id, entry.appearance] as const]
+        : [],
+    ),
+  );
   // Legacy graphs use original node indices, so filtering does not rearrange the drawing.
   const layout =
     m.layout ??
@@ -129,23 +162,38 @@ export function schematic(
     }
     for (const f of m.features ?? [])
       if (inside(f.x, f.y)) {
-        if (background) {
-          draw.push(
-            f.kind === 'landmark'
-              ? `<circle cx="${px(f.x)}" cy="${py(f.y)}" r="7" fill="#fef3c7" fill-opacity="0.85" stroke="#78350f" stroke-width="2"/>`
-              : `<rect x="${px(f.x) - 16}" y="${py(f.y) - 16}" width="32" height="32" rx="4" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4 3"/>`,
-          );
-        } else {
+        const appearance = featureAppearances.get(f.id);
+        if (reference) {
+          // Reference images intentionally retain their historical feature boxes.
           draw.push(
             `<rect x="${px(f.x) - 16}" y="${py(f.y) - 16}" width="32" height="32" fill="${f.kind === 'obstacle' ? '#a1a1aa' : '#bbf7d0'}" stroke="#111827"/>`,
-            ...(!reference
+          );
+        } else if (background) {
+          draw.push(
+            appearance
+              ? featureToken(appearance, px(f.x), py(f.y), 12)
+              : `<rect x="${px(f.x) - 16}" y="${py(f.y) - 16}" width="32" height="32" rx="4" fill="none" stroke="white" stroke-width="2" stroke-dasharray="4 3"/>`,
+          );
+          if (appearance) draw.push(tokenLabel(appearance, px(f.x), py(f.y), 12, 9));
+        } else {
+          draw.push(
+            appearance
+              ? featureToken(appearance, px(f.x), py(f.y), 12)
+              : `<rect x="${px(f.x) - 16}" y="${py(f.y) - 16}" width="32" height="32" fill="${f.kind === 'obstacle' ? '#a1a1aa' : '#bbf7d0'}" stroke="#111827"/>`,
+            ...(f.kind !== 'landmark'
               ? [text(px(f.x) - 14, py(f.y) + 4, f.kind === 'obstacle' ? 'X' : '~')]
               : []),
           );
+          if (appearance) draw.push(tokenLabel(appearance, px(f.x), py(f.y), 12));
         }
         if (!reference)
           draw.push(
-            text(20, top + gridH + 30 + drawFeatureCount() * 19, `${f.label} (${f.x},${f.y})`, 13),
+            text(
+              20,
+              top + gridH + 30 + drawFeatureCount() * 19,
+              `${appearance ? `#${appearance.label} ` : ''}${f.label} (${f.x},${f.y})`,
+              13,
+            ),
           );
       }
   } else {
@@ -191,7 +239,7 @@ export function schematic(
     const point = m.kind === 'grid' ? { x: p.x!, y: p.y! } : layout[p.node!];
     if (!point || !inside(point.x, point.y)) continue;
     positions[id] = p;
-    const hash = createHash('sha256').update(id).digest();
+    const appearance = entityAppearances.get(id)!;
     const key = `${point.x},${point.y}`,
       count = occupied.get(key) ?? 0;
     occupied.set(key, count + 1);
@@ -204,26 +252,19 @@ export function schematic(
     const x = px(point.x) + ((count % columns) - (columns - 1) / 2) * spacing;
     const y = py(point.y) + (Math.floor(count / columns) - (rows - 1) / 2) * spacing;
     const size = total > 1 ? spacing * 0.34 : 12;
-    const color = ['#1d4ed8', '#9d174d', '#166534', '#6d28d9'][hash[0] % 4],
-      shape = hash[1] % 3;
     if (id === active)
       draw.push(
         `<circle cx="${x}" cy="${y}" r="${size + (total > 1 ? 2 : 6)}" fill="#fde047" stroke="#111827" stroke-width="2"/>`,
       );
-    const attrs = `fill="${color}" stroke="#fff" stroke-width="2"`;
+    const attrs = `fill="${appearance.color}" stroke="white" stroke-width="2"`;
     draw.push(
-      shape === 0
-        ? `<circle cx="${x}" cy="${y}" r="${size}" ${attrs}/>`
-        : shape === 1
-          ? `<rect x="${x - size}" y="${y - size}" width="${size * 2}" height="${size * 2}" ${attrs}/>`
-          : `<polygon points="${x},${y - size} ${x + size},${y + size} ${x - size},${y + size}" ${attrs}/>`,
+      appearance.shape === 'circle'
+        ? `<circle cx="${x}" cy="${y}" r="${size}" ${attrs}${appearance.dotted ? ' stroke-dasharray="2 2"' : ''}/>`
+        : featureToken({ shape: appearance.shape, color: appearance.color }, x, y, size),
     );
-    const label = id.slice(0, 2).toUpperCase();
-    draw.push(
-      `<text x="${x}" y="${y + (total > 1 ? 3 : 4)}" text-anchor="middle" font-size="${total > 1 ? Math.max(5, Math.min(8, size)) : 10}" font-weight="bold" fill="white">${esc(label)}</text>`,
-    );
+    draw.push(tokenLabel(appearance, x, y, size, total > 1 ? Math.max(5, Math.min(8, size)) : 10));
     legend.push(
-      `${label} ${['circle', 'square', 'triangle'][shape]} — ${state.entities[id].name}: ${p.node ?? `(${p.x},${p.y})`}${id === active ? ' — active turn' : ''}`,
+      `${appearance.label} ${appearance.kind}${appearance.dotted ? ' (dotted circle)' : appearance.shape === 'triangle' ? ' (triangle)' : appearance.shape === 'diamond' ? ' (diamond)' : ' (circle)'} — ${state.entities[id]!.name}: ${p.node ?? `(${p.x},${p.y})`}${id === active ? ' — active turn' : ''}`,
     );
   }
   const legendY = top + gridH + 40 + (m.features?.length ?? 0) * 20;

@@ -83,11 +83,41 @@ test(
     const { store, service } = await fixture(t);
     const example = JSON.parse(await readFile('examples/lantern-ford.json', 'utf8'));
     await apply(service, example.changes);
+    const mapEntity = structuredClone(example.bridgeMap);
+    const landmarkCells = [
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [4, 0],
+      [5, 0],
+      [6, 0],
+      [7, 0],
+      [8, 0],
+      [9, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+    ];
+    mapEntity.map.features.push(
+      ...landmarkCells.map(([x, y], index) => ({
+        id: `test-landmark-${String(index + 1).padStart(2, '0')}`,
+        x,
+        y,
+        label: `Test landmark ${index + 1}`,
+        kind: 'landmark',
+        visibility: 'party',
+        revealed: true,
+      })),
+    );
     await service.execute('create_location_map', {
       operationId: 'ui-map',
       expectedRevision: 1,
       reason: 'UI fixture',
-      entity: example.bridgeMap,
+      entity: mapEntity,
     });
     await apply(service, [
       {
@@ -196,6 +226,9 @@ The boards creak.
     await page.waitForSelector('#create-form');
     await page.locator('#provider').selectOption('codex');
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
+    await page.waitForFunction(
+      () => document.querySelector('#provider-command').textContent === 'codex login',
+    );
     assert.equal(await page.locator('#provider-command').innerText(), 'codex login');
     const fakeCodex = await fakeCodexCli(artifacts);
     await page.evaluate((path) => window.table.detect(path), fakeCodex.path);
@@ -256,6 +289,7 @@ The boards creak.
     await page.screenshot({ path: join(artifacts, 'local-setup.png') });
     await page.locator('#provider').selectOption('codex');
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
+    await page.locator('#local-settings').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('#local-settings').isHidden(), true);
     assert.equal(
       (await page.evaluate(() => window.table.preferences())).models.codex,
@@ -465,6 +499,109 @@ The boards creak.
         !document.getElementById('map-image').hidden &&
         document.getElementById('map-status').textContent.startsWith('r'),
     );
+    // The sidebar legend describes the selected map and gives party cards the
+    // same marker appearance used by the map renderer.
+    await page.locator('#map-legend').waitFor({ state: 'visible' });
+    const legendLabels = await page.locator('#map-legend-items').innerText();
+    assert.equal(await page.locator('#map-legend-items svg.map-marker').count(), 18);
+    assert.match(legendLabels, /Old Toll Bridge/);
+    assert.match(legendLabels, /River rocks/);
+    assert.match(legendLabels, /\(4,6\)/);
+    assert.match(legendLabels, /\(7,8\)/);
+    assert.doesNotMatch(legendLabels, /Mara|Tess/);
+    const featureMarkers = await page
+      .locator(
+        '#map-legend-items li[data-marker-id="bridge"], #map-legend-items li[data-marker-id^="test-landmark-"]',
+      )
+      .evaluateAll((items) =>
+        items.map((item) => {
+          const svg = item.querySelector('svg.map-marker');
+          const shape = svg.querySelector('polygon');
+          const text = svg.querySelector('text');
+          return {
+            id: item.dataset.markerId,
+            aria: item.getAttribute('aria-label'),
+            points: shape?.getAttribute('points'),
+            fill: shape?.getAttribute('fill'),
+            text: text?.textContent,
+            textColor: text?.getAttribute('fill'),
+          };
+        }),
+      );
+    assert.equal(featureMarkers.length, 17);
+    const projectedFeatures = await page.evaluate(async (mapId) => {
+      const snapshot = await window.table.snapshot();
+      const map = snapshot.maps.find((candidate) => candidate.id === mapId);
+      return map.legend
+        .filter((entry) => entry.kind === 'feature' && entry.featureKind === 'landmark')
+        .map((entry) => [entry.id, entry.appearance]);
+    }, example.bridgeMap.id);
+    assert.equal(projectedFeatures.length, 17);
+    const appearanceById = new Map(projectedFeatures);
+    assert.deepEqual(
+      featureMarkers.map((marker) => marker.text).sort((a, b) => Number(a) - Number(b)),
+      Array.from({ length: 17 }, (_, index) => String(index + 1)),
+    );
+    for (const marker of featureMarkers) {
+      const appearance = appearanceById.get(marker.id);
+      const number = Number(marker.text);
+      const fill = marker.fill.toLowerCase();
+      const palette = [
+        '#e69f00',
+        '#56b4e9',
+        '#009e73',
+        '#f0e442',
+        '#0072b2',
+        '#d55e00',
+        '#cc79a7',
+        '#000000',
+      ];
+      assert.ok(appearance, `Missing projected appearance for ${marker.id}`);
+      assert.equal(fill, appearance.color.toLowerCase());
+      assert.equal(marker.text, appearance.label);
+      assert.equal(marker.textColor.toLowerCase(), appearance.textColor.toLowerCase());
+      assert.equal(
+        marker.points,
+        appearance.shape === 'triangle' ? '0,-12 12,12 -12,12' : '0,-12 12,0 0,12 -12,0',
+      );
+      assert.equal(fill, palette[(number - 1) % palette.length]);
+      assert.equal(
+        marker.points,
+        number <= 8 || number === 17 ? '0,-12 12,12 -12,12' : '0,-12 12,0 0,12 -12,0',
+      );
+      assert.equal(
+        marker.textColor.toLowerCase(),
+        ['#0072b2', '#000000'].includes(fill) ? '#ffffff' : '#000000',
+      );
+      assert.match(marker.aria, new RegExp(`marker ${number}$`));
+    }
+    const seventeenth = await page
+      .locator('#map-legend-items li[data-marker-id="test-landmark-16"] svg text')
+      .textContent();
+    assert.equal(seventeenth, '17');
+    const markerData = await page.evaluate(async () => {
+      const snapshot = await window.table.snapshot();
+      return {
+        party: snapshot.party.members,
+        badges: [...document.querySelectorAll('#party .party-avatar.map-marker')].map((svg) => ({
+          text: svg.textContent.trim(),
+          fill: svg.querySelector('circle')?.getAttribute('fill'),
+        })),
+      };
+    });
+    assert.equal(markerData.badges.length, markerData.party.length);
+    markerData.party.forEach((member, index) => {
+      assert.equal(markerData.badges[index].fill, member.marker.color);
+      assert.equal(
+        markerData.badges[index].text,
+        (() => {
+          const parts = member.name.trim().split(/\s+/);
+          return (
+            parts.length > 1 ? parts[0][0] + parts.at(-1)[0] : parts[0].slice(0, 2)
+          ).toUpperCase();
+        })(),
+      );
+    });
     assert.equal(await page.locator('#map-size').inputValue(), 'auto');
     const viewport = {
       x: 0,
@@ -512,6 +649,21 @@ The boards creak.
     await page.locator('#pan-right').click();
     await page.waitForFunction(() =>
       document.getElementById('map-status').textContent.includes('5, 0'),
+    );
+    const markersAfterPan = await page
+      .locator(
+        '#map-legend-items li[data-marker-id="bridge"], #map-legend-items li[data-marker-id^="test-landmark-"]',
+      )
+      .evaluateAll((items) =>
+        items.map((item) => [
+          item.dataset.markerId,
+          item.querySelector('polygon')?.getAttribute('fill'),
+          item.querySelector('text')?.textContent,
+        ]),
+      );
+    assert.deepEqual(
+      markersAfterPan,
+      featureMarkers.map((marker) => [marker.id, marker.fill, marker.text]),
     );
     await page.locator('#map-size').selectOption('auto');
     await page.waitForFunction(() =>

@@ -13,6 +13,7 @@
     "desktop/lan.ts",
     "desktop/dom.ts",
     "desktop/markdown.ts",
+    "desktop/markers.ts",
     "desktop/globals.d.ts",
     "desktop/vendor/*.d.ts"
   ],

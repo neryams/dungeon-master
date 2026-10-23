@@ -14,7 +14,142 @@ import { JournalAdapter } from '../dist/journal.js';
 import { renderMap, schematic } from '../dist/maps.js';
 import { exportCampaign, importCampaign } from '../dist/backup.js';
 import { partyState } from '../dist/domain.js';
+import { playerView } from '../dist/player-view.js';
+import { markerAppearance, mapLegend } from '../dist/map-markers.js';
 const example = JSON.parse(await readFile('examples/lantern-ford.json', 'utf8'));
+
+test('marker appearance follows entity meaning and names, with stable ID colors', () => {
+  const character = markerAppearance({
+    id: 'char-a',
+    kind: 'character',
+    name: 'Éowyn Brightshield',
+  });
+  assert.deepEqual(
+    {
+      kind: character.kind,
+      label: character.label,
+      shape: character.shape,
+      dotted: character.dotted,
+    },
+    { kind: 'character', label: 'ÉB', shape: 'circle', dotted: false },
+  );
+  const npc = markerAppearance({ id: 'npc-a', kind: 'npc', name: 'Oren' });
+  assert.deepEqual(
+    { kind: npc.kind, label: npc.label, shape: npc.shape, dotted: npc.dotted },
+    { kind: 'npc', label: 'OR', shape: 'circle', dotted: true },
+  );
+  const object = markerAppearance({ id: 'item-a', kind: 'item', name: 'Silver Key' });
+  assert.deepEqual(
+    { kind: object.kind, label: object.label, shape: object.shape },
+    { kind: 'object', label: 'SK', shape: 'triangle' },
+  );
+  assert.equal(
+    character.color,
+    markerAppearance({ id: 'char-a', kind: 'character', name: 'Different Name' }).color,
+  );
+  assert.equal(
+    markerAppearance({ id: 'one', kind: 'character', name: 'First' }).label,
+    markerAppearance({ id: 'two', kind: 'character', name: 'First' }).label,
+  );
+});
+
+test('map legend includes visible semantic markers and map features only', async (t) => {
+  const { store } = await opening(t);
+  const state = (await store.read()).state;
+  state.entities.spy = { id: 'spy', kind: 'npc', name: 'Hidden Spy', visibility: 'dm' };
+  state.entities['river-crossing'].map.tokens.spy = { x: 1, y: 1 };
+  const entries = mapLegend(partyState(state), 'river-crossing');
+  assert.ok(
+    entries.some(
+      (entry) =>
+        entry.kind === 'entity' && entry.label === 'Mara' && entry.appearance.kind === 'character',
+    ),
+  );
+  assert.ok(entries.every((entry) => !entry.label.includes('Hidden')));
+  assert.ok(
+    entries
+      .filter((entry) => entry.kind === 'feature')
+      .every((entry) => entry.featureKind && entry.appearance),
+  );
+});
+
+test('landmarks and objects share numbered palette slots, keep viewport-stable identities, and render clearly', async (t) => {
+  const { store } = await opening(t);
+  const state = structuredClone((await store.read()).state);
+  const map = state.entities['river-crossing'].map;
+  map.features = map.features.filter((feature) => feature.kind !== 'landmark');
+  map.features.push(
+    ...Array.from({ length: 9 }, (_, i) => ({
+      id: i === 0 ? 'shared' : `landmark-${i}`,
+      x: 1 + i,
+      y: 2,
+      label: `Landmark ${i + 1}`,
+      kind: 'landmark',
+      visibility: 'party',
+      revealed: true,
+    })),
+  );
+  for (let i = 0; i < 9; i++) {
+    const id = i === 0 ? 'shared' : `object-${i}`;
+    state.entities[id] = { id, kind: 'item', name: `Object ${i + 1}` };
+    map.tokens[id] = { x: 1 + i, y: 4 };
+  }
+  const entries = mapLegend(state, 'river-crossing');
+  const allocated = entries.filter((entry) =>
+    entry.kind === 'feature'
+      ? entry.featureKind === 'landmark'
+      : entry.appearance.kind === 'object',
+  );
+  const byNumber = allocated.sort(
+    (a, b) => Number(a.appearance.label) - Number(b.appearance.label),
+  );
+  assert.deepEqual(
+    byNumber.map((entry) => entry.appearance.label),
+    Array.from({ length: 18 }, (_, i) => String(i + 1)),
+  );
+  assert.deepEqual(
+    byNumber.slice(0, 8).map((entry) => entry.appearance.color),
+    ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'],
+  );
+  assert.ok(byNumber.slice(0, 8).every((entry) => entry.appearance.shape === 'triangle'));
+  assert.ok(byNumber.slice(8, 16).every((entry) => entry.appearance.shape === 'diamond'));
+  assert.ok(byNumber.slice(16).every((entry) => entry.appearance.shape === 'triangle'));
+  assert.equal(new Set(byNumber.slice(0, 8).map((entry) => entry.appearance.color)).size, 8);
+  assert.equal(byNumber.filter((entry) => entry.id === 'shared').length, 2);
+
+  const full = schematic(state, 'river-crossing', 'dm');
+  const panned = schematic(state, 'river-crossing', 'dm', { x: 5, y: 0, width: 10, height: 12 });
+  const legendLabels = (svg) =>
+    [...svg.matchAll(/text-anchor="middle"[^>]*font-weight="bold"[^>]*>(\d+)</g)].map(
+      (match) => match[1],
+    );
+  assert.ok(legendLabels(panned.svg).every((label) => legendLabels(full.svg).includes(label)));
+  assert.match(full.svg, /fill="#E69F00" stroke="white"/);
+  const firstLandmark = byNumber.find((entry) => entry.kind === 'feature');
+  assert.match(full.svg, /Landmark 1 \(1,2\)/);
+  assert.ok(full.svg.includes(`>${firstLandmark.appearance.label}<`));
+  await sharp(Buffer.from(full.svg)).png().toBuffer();
+  const reference = schematic(state, 'river-crossing', 'dm', undefined, { mode: 'reference' });
+  assert.match(reference.svg, /width="32" height="32" fill="#bbf7d0" stroke="#111827"/);
+});
+
+test('NPC markers rasterize and reference mode keeps its original feature boxes', async (t) => {
+  const { store } = await opening(t);
+  const state = (await store.read()).state;
+  state.entities['oren-test'] = { id: 'oren-test', kind: 'npc', name: 'Oren Vale' };
+  state.entities['river-crossing'].map.tokens['oren-test'] = { x: 4, y: 6 };
+  const rendered = schematic(state, 'river-crossing', 'dm');
+  assert.match(rendered.svg, /stroke-dasharray="2 2"/);
+  assert.doesNotMatch(rendered.svg, /<circle[^>]*fill="[^"]*"[^>]*fill="none"/);
+  await sharp(Buffer.from(rendered.svg)).png().toBuffer();
+
+  const reference = schematic(state, 'river-crossing', 'dm', undefined, { mode: 'reference' });
+  assert.match(
+    reference.svg,
+    /<rect[^>]*width="32" height="32" fill="#[a-f0-9]+" stroke="#111827"\/>/,
+  );
+  assert.doesNotMatch(reference.svg, /<polygon/);
+});
 async function call(service, name, args) {
   const { revision } = await service.execute('campaign_status', {});
   return service.execute(name, {
@@ -214,6 +349,12 @@ test('player pixels and legend omit hidden markers, masked cells, features and g
   const before = (await store.read()).state;
   const rendered = schematic(before, 'river-crossing', 'party');
   assert.doesNotMatch(rendered.svg, /SECRET|Keeper cache|spy/);
+  const view = playerView(before, store.config);
+  assert.doesNotMatch(JSON.stringify(view.maps), /SECRET|Keeper cache|spy/);
+  for (const member of view.party.members) {
+    const entry = view.maps.flatMap((map) => map.legend).find((entry) => entry.id === member.id);
+    assert.deepEqual(entry.appearance, member.marker);
+  }
   const without = structuredClone(before);
   delete without.entities.spy;
   delete without.entities['river-crossing'].map.tokens.spy;
@@ -236,6 +377,12 @@ test('player pixels and legend omit hidden markers, masked cells, features and g
     audience: 'party',
   });
   assert.equal(hidden.positions.mara, undefined);
+  const maskedState = await store.read();
+  assert.ok(
+    !playerView(maskedState.state, store.config)
+      .maps.find((m) => m.id === 'river-crossing')
+      .legend.some((entry) => entry.id === 'mara'),
+  );
   await call(service, 'set_map_reveal', {
     mapId: 'river-crossing',
     revealed: true,

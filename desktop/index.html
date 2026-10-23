@@ -200,6 +200,14 @@
           <button id="table-seat" class="quiet">Table</button
           ><button id="pass" class="secondary">Pass seat →</button>
         </div>
+        <section id="map-legend" aria-label="Map key" hidden>
+          <h2>Map key</h2>
+          <p class="legend-help">
+            Party circles match the cards above. Numbered objects match the key below.
+          </p>
+          <div id="map-legend-types"></div>
+          <ul id="map-legend-items" aria-label="Revealed map markers"></ul>
+        </section>
         <div class="sheet-tabs">
           <button id="sheet-tab" class="tab active">Character</button
           ><button id="quest-tab" class="tab">Journal</button>
@@ -248,9 +256,9 @@
             id="map-details"
             class="quiet"
             aria-pressed="false"
-            title="Show map legend and coordinates"
+            title="Show coordinates and the printable map key"
           >
-            Legend
+            Details
           </button>
         </div>
         <div class="map-footer">
