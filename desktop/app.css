@@ -17,6 +17,23 @@ dialog::backdrop {
 #lan-links {
   width: 100%;
 }
+#switch-model {
+  width: 100%;
+}
+.model-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 12px 0 6px;
+}
+.model-label-row label {
+  margin: 0;
+}
+#refresh-models {
+  font-size: 11px;
+  padding: 2px 4px;
+}
 #lan-players,
 #lan-required {
   margin: 16px 0;

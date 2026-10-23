@@ -13,6 +13,69 @@ import sharp from 'sharp';
 import { createServer } from 'node:http';
 import { renderMapImage } from '../dist/maps.js';
 
+async function fakeCodexCli(directory) {
+  const path = join(directory, 'codex-fixture.mjs');
+  const requests = join(directory, 'codex-requests.jsonl');
+  await writeFile(
+    path,
+    `#!/usr/bin/env node
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
+const args = process.argv.slice(2);
+if (args[0] === '--version') { process.stdout.write('codex fixture 1.0\\n'); process.exit(0); }
+if (args[0] === 'app-server' && args[1] === '--help') { process.stdout.write('app-server --listen\\n'); process.exit(0); }
+if (args[0] !== 'app-server') process.exit(2);
+const send = (message) => process.stdout.write(JSON.stringify(message) + '\\n');
+const log = (message) => appendFileSync(process.env.DM_FAKE_CODEX_LOG, JSON.stringify(message) + '\\n');
+let turn = 0;
+let serverName;
+createInterface({ input: process.stdin }).on('line', (line) => {
+  const message = JSON.parse(line);
+  log(message);
+  if (message.method === 'initialize') send({ id: message.id, result: {} });
+  if (message.method === 'account/read') send({ id: message.id, result: { account: { type: 'chatgpt' } } });
+  if (message.method === 'config/read') send({ id: message.id, result: { config: { mcp_servers: { unrelated: { command: 'ignored', args: [] } } } } });
+  if (message.method === 'model/list') {
+    const data = [
+      { model: 'gpt-6-sol', displayName: 'GPT-6 Sol', defaultReasoningEffort: 'medium', isDefault: true },
+    ];
+    if (!existsSync(process.env.DM_FAKE_CODEX_HIDE_ASTRA)) data.push({
+      model: 'gpt-6-astra',
+      displayName: 'GPT-6 Astra · extended reasoning and context',
+      defaultReasoningEffort: 'high',
+    });
+    send({ id: message.id, result: { data, nextCursor: null } });
+  }
+  if (message.method === 'thread/start' || message.method === 'thread/resume') {
+    serverName = Object.entries(message.params.config.mcp_servers).find(([, server]) => server.enabled && server.required)?.[0];
+    const id = message.params.model === 'gpt-6-astra' ? 'fixture-astra' : message.params.model === 'gpt-6-sol' ? 'fixture-sol' : 'fixture-default';
+    send({ id: message.id, result: { thread: { id } } });
+  }
+  if (message.method === 'turn/start') {
+    const prompt = message.params.input?.[0]?.text ?? '';
+    if (!prompt.startsWith('Connection check only.')) process.exit(3);
+    const id = 'fixture-turn-' + (++turn);
+    const threadId = message.params.threadId;
+    send({ method: 'turn/started', params: { threadId, turn: { id } } });
+    send({ id: message.id, result: { turn: { id } } });
+    const finishConnectionCheck = () => {
+      const campaign = JSON.parse(readFileSync(resolve(process.cwd(), '../../..', 'campaign.json'), 'utf8'));
+      const output = { campaign: { schemaVersion: campaign.schemaVersion, id: campaign.id }, revision: 0, journal: {} };
+      const item = { type: 'mcpToolCall', server: serverName, tool: 'campaign_status', status: 'completed', result: { content: [{ type: 'text', text: JSON.stringify(output) }] } };
+      send({ method: 'item/completed', params: { threadId, turnId: id, item } });
+      send({ method: 'turn/completed', params: { threadId, turn: { id, status: 'completed' } } });
+    };
+    if (threadId === 'fixture-astra') setTimeout(finishConnectionCheck, 500);
+    else finishConnectionCheck();
+  }
+});
+`,
+    { mode: 0o755 },
+  );
+  return { path, requests, hideAstra: join(directory, 'hide-astra') };
+}
+
 test(
   'Electron renders setup, exact sheets and maps, hotseat switching, safe narration and restart recovery',
   { timeout: 60000 },
@@ -107,6 +170,8 @@ The boards creak.
       ...process.env,
       DM_DESKTOP_NODE: process.execPath,
       DM_DESKTOP_USER_DATA: join(artifacts, 'profile'),
+      DM_FAKE_CODEX_LOG: join(artifacts, 'codex-requests.jsonl'),
+      DM_FAKE_CODEX_HIDE_ASTRA: join(artifacts, 'hide-astra'),
     };
     delete env.ELECTRON_RUN_AS_NODE;
     let app;
@@ -132,6 +197,31 @@ The boards creak.
     await page.locator('#provider').selectOption('codex');
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
     assert.equal(await page.locator('#provider-command').innerText(), 'codex login');
+    const fakeCodex = await fakeCodexCli(artifacts);
+    await page.evaluate((path) => window.table.detect(path), fakeCodex.path);
+    await page.locator('#refresh-models').click();
+    await page.waitForFunction(() =>
+      document.querySelector('#models-status').textContent.includes('2 models available'),
+    );
+    assert.deepEqual(
+      await page
+        .locator('#provider-model option')
+        .evaluateAll((options) => options.map((option) => [option.value, option.textContent])),
+      [
+        ['', 'CLI default'],
+        ['gpt-6-sol', 'GPT-6 Sol'],
+        ['gpt-6-astra', 'GPT-6 Astra · extended reasoning and context'],
+      ],
+    );
+    await page.locator('#provider-model').selectOption('gpt-6-sol');
+    await page.waitForFunction(
+      async () => (await window.table.preferences()).models?.codex === 'gpt-6-sol',
+    );
+    await page.waitForFunction(
+      () =>
+        document.querySelector('#models-status').textContent ===
+        'Model selected for this provider.',
+    );
     await page.screenshot({ path: join(artifacts, 'setup.png') });
     const metadata = createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
@@ -167,6 +257,11 @@ The boards creak.
     await page.locator('#provider').selectOption('codex');
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
     assert.equal(await page.locator('#local-settings').isHidden(), true);
+    assert.equal(
+      (await page.evaluate(() => window.table.preferences())).models.codex,
+      'gpt-6-sol',
+      'Switching through local mode preserves the Codex model choice',
+    );
 
     const security = await app.evaluate(({ BrowserWindow }) => {
       const prefs = BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences();
@@ -185,6 +280,155 @@ The boards creak.
         showCampaign(await window.table.open(root));
       }, store.root);
     await load(page);
+    const savedBeforeModelSwitch = await store.read();
+    const hitPointsBeforeModelSwitch = Object.entries(savedBeforeModelSwitch.state.entities)
+      .filter(([, entity]) => entity.kind === 'character')
+      .map(([id, entity]) => [id, entity.character.hp]);
+    await page.evaluate(async () => {
+      await window.table.connect();
+      const { showCampaign } = await import('./app.js');
+      showCampaign(await window.table.snapshot());
+    });
+    await page.waitForFunction(
+      () => document.querySelector('#connection').textContent === 'DM model…',
+    );
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 720));
+    await page.waitForTimeout(150);
+    const sessionPath = join(store.root, '.dm/hotseat/codex-session.json');
+    const sessionBeforeSwitch = JSON.parse(await readFile(sessionPath, 'utf8'));
+    assert.equal(sessionBeforeSwitch.model, 'gpt-6-sol');
+    await page.locator('#connection').click();
+    await page.locator('#model-dialog[open]').waitFor();
+    await page.waitForFunction(() =>
+      document.querySelector('#model-dialog-status').textContent.includes('Choose a model'),
+    );
+    await page.locator('#switch-model').selectOption('gpt-6-astra');
+    assert.equal(
+      await page.locator('#switch-model option:checked').innerText(),
+      'GPT-6 Astra · extended reasoning and context',
+    );
+    assert.equal(await page.locator('#model-apply').isDisabled(), false);
+    const modelDialogLayout = await page.evaluate(() => {
+      const dialog = document.querySelector('#model-dialog');
+      const select = document.querySelector('#switch-model');
+      const bounds = dialog.getBoundingClientRect();
+      const selectBounds = select.getBoundingClientRect();
+      return {
+        viewportWidth: innerWidth,
+        pageScrollWidth: document.documentElement.scrollWidth,
+        dialogLeft: bounds.left,
+        dialogRight: bounds.right,
+        selectLeft: selectBounds.left,
+        selectRight: selectBounds.right,
+        dialogClientWidth: dialog.clientWidth,
+        dialogScrollWidth: dialog.scrollWidth,
+      };
+    });
+    assert.ok(
+      modelDialogLayout.pageScrollWidth <= modelDialogLayout.viewportWidth,
+      `Page has horizontal overflow at minimum size: ${JSON.stringify(modelDialogLayout)}`,
+    );
+    assert.ok(
+      modelDialogLayout.dialogLeft >= 0 &&
+        modelDialogLayout.dialogRight <= modelDialogLayout.viewportWidth,
+      `Model dialog exceeds viewport at minimum size: ${JSON.stringify(modelDialogLayout)}`,
+    );
+    assert.ok(
+      modelDialogLayout.selectLeft >= modelDialogLayout.dialogLeft &&
+        modelDialogLayout.selectRight <= modelDialogLayout.dialogRight,
+      `Model option selector exceeds the dialog: ${JSON.stringify(modelDialogLayout)}`,
+    );
+    assert.ok(
+      modelDialogLayout.dialogScrollWidth <= modelDialogLayout.dialogClientWidth,
+      `Model dialog has horizontal overflow at minimum size: ${JSON.stringify(modelDialogLayout)}`,
+    );
+    await page.screenshot({ path: join(artifacts, 'model-switch-ready.png') });
+    const modelWarning = await page.locator('#model-dialog').innerText();
+    assert.match(modelWarning, /fresh DM conversation/i);
+    assert.match(modelWarning, /cached tokens may need to be rebuilt/i);
+    assert.match(modelWarning, /saved campaign, characters, maps and history are preserved/i);
+    await page.locator('#model-cancel').click();
+    await page.waitForFunction(() => !document.querySelector('#model-dialog').open);
+    assert.equal((await page.evaluate(() => window.table.preferences())).models.codex, 'gpt-6-sol');
+    assert.deepEqual(JSON.parse(await readFile(sessionPath, 'utf8')), sessionBeforeSwitch);
+
+    await page.locator('#connection').click();
+    await page.locator('#model-dialog[open]').waitFor();
+    await page.waitForFunction(() => !document.querySelector('#switch-model').disabled);
+    await page.locator('#switch-model').selectOption('gpt-6-astra');
+    assert.equal(await page.locator('#model-apply').isDisabled(), false);
+    await page.locator('#model-apply').click();
+    await page.waitForFunction(() => document.querySelector('#model-cancel').disabled);
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#model-dialog').evaluate((dialog) => dialog.open), true);
+    assert.equal(await page.locator('#model-cancel').isDisabled(), true);
+    await page.waitForFunction(() => !document.querySelector('#model-dialog').open);
+    await page.waitForFunction(
+      async () => (await window.table.preferences()).models?.codex === 'gpt-6-astra',
+    );
+    const sessionAfterSwitch = JSON.parse(await readFile(sessionPath, 'utf8'));
+    assert.equal(sessionAfterSwitch.model, 'gpt-6-astra');
+    assert.notEqual(sessionAfterSwitch.conversationId, sessionBeforeSwitch.conversationId);
+    const savedAfterModelSwitch = await store.read();
+    assert.equal(savedAfterModelSwitch.state.revision, savedBeforeModelSwitch.state.revision);
+    assert.deepEqual(savedAfterModelSwitch.state.table, savedBeforeModelSwitch.state.table);
+    assert.deepEqual(
+      Object.entries(savedAfterModelSwitch.state.entities)
+        .filter(([, entity]) => entity.kind === 'character')
+        .map(([id, entity]) => [id, entity.character.hp]),
+      hitPointsBeforeModelSwitch,
+    );
+    const fakeRequests = (await readFile(fakeCodex.requests, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(JSON.parse);
+    const starts = fakeRequests.filter((request) => request.method === 'thread/start');
+    assert.deepEqual(
+      starts.map((request) => request.params.model),
+      ['gpt-6-sol', 'gpt-6-astra'],
+    );
+    for (const request of starts) {
+      const servers = request.params.config.mcp_servers;
+      assert.equal(servers.unrelated.enabled, false);
+      const active = Object.entries(servers).filter(
+        ([, server]) => server.enabled && server.required,
+      );
+      assert.equal(active.length, 1);
+      assert.match(active[0][0], /^dm-hotseat-[a-f0-9]{12}$/);
+    }
+    assert.ok(
+      fakeRequests
+        .filter((request) => request.method === 'turn/start')
+        .every((request) => request.params.input[0].text.startsWith('Connection check only.')),
+      'The fake provider should only receive read-only connection checks',
+    );
+    await writeFile(fakeCodex.hideAstra, 'hide Astra from the catalog\n');
+    const unavailableModelError = await page.evaluate(async () => {
+      try {
+        await window.table.connect();
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    });
+    assert.match(unavailableModelError, /That model is unavailable/);
+    const afterUnavailableModel = (await readFile(fakeCodex.requests, 'utf8'))
+      .trim()
+      .split('\n')
+      .map(JSON.parse);
+    assert.equal(
+      afterUnavailableModel.filter((request) => request.method === 'thread/start').length,
+      starts.length,
+      'An unavailable saved model must be rejected before a new thread starts',
+    );
+    assert.deepEqual(JSON.parse(await readFile(sessionPath, 'utf8')), sessionAfterSwitch);
+    assert.equal(
+      (await page.evaluate(() => window.table.preferences())).models.codex,
+      'gpt-6-astra',
+    );
+    const afterUnavailableState = await store.read();
+    assert.equal(afterUnavailableState.state.revision, savedAfterModelSwitch.state.revision);
+    assert.deepEqual(afterUnavailableState.state.table, savedAfterModelSwitch.state.table);
     await page.waitForFunction(() => document.getElementById('map-image').naturalWidth > 0);
     assert.match(await page.locator('#transcript').innerText(), /boards creak/);
     assert.match(await page.locator('#transcript').innerText(), /Turn interrupted/);

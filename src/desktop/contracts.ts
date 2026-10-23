@@ -49,6 +49,16 @@ export const LanAdminInput = z.discriminatedUnion('action', [
 ]);
 export const Provider = z.enum(['antigravity', 'codex', 'ollama']);
 export type Provider = z.infer<typeof Provider>;
+export const ModelId = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/);
+export interface ModelCatalog {
+  models: { id: string; name: string; description?: string; isDefault?: boolean }[];
+  defaultModel?: string;
+}
 // Only local metadata endpoints are contacted here; model inference stays in the CLI.
 export const LocalSettings = z
   .object({
@@ -91,6 +101,10 @@ export const Preferences = z
     codexExecutable: z.string().optional(),
     local: LocalSettings.optional(),
     provider: Provider.optional(),
+    models: z
+      .object({ antigravity: ModelId.optional(), codex: ModelId.optional() })
+      .strict()
+      .optional(),
     recent: z.string().optional(),
   })
   .strict();
@@ -110,6 +124,8 @@ export type CampaignSnapshot = PlayerView & {
   detail: string;
   reviewMode: 'legacy' | 'setup' | 'reviewed';
   lanHosted: boolean;
+  provider?: Provider;
+  model?: string;
 };
 export type DesktopSnapshot =
   CampaignSnapshot | { campaign: null; stage: Stage; detail: string; table: TableTurn[] };
@@ -139,6 +155,7 @@ export type LanSnapshot = PlayerView & {
 export interface WorkerApi {
   localModels(settings: LocalSettings): Promise<LocalModels>;
   detect(path?: string, provider?: Provider): Promise<{ path: string; version: string }>;
+  models(path?: string, provider?: Provider, local?: LocalSettings): Promise<ModelCatalog>;
   create(input: CreateInput): Promise<DesktopSnapshot>;
   open(root: string): Promise<DesktopSnapshot>;
   connect(
@@ -146,6 +163,7 @@ export interface WorkerApi {
     fresh?: boolean,
     provider?: Provider,
     local?: LocalSettings,
+    model?: string,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
   beginSetup(): Promise<void>;
@@ -157,8 +175,11 @@ export interface WorkerApi {
   lanStatus(): Promise<LanStatus | null>;
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
-export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect'> {
+export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect' | 'models'> {
   detect(path?: string): Promise<{ path: string; version: string }>;
+  models(): Promise<ModelCatalog>;
+  selectModel(model?: string): Promise<void>;
+  switchModel(model?: string): Promise<void>;
   preferences(): Promise<Preferences>;
   configureLocal(settings: LocalSettings): Promise<void>;
   selectProvider(provider: Provider): Promise<void>;
@@ -205,6 +226,7 @@ const OptionalWireBoolean = z
   .boolean()
   .nullish()
   .transform((value) => value ?? undefined);
+const OptionalWireModel = ModelId.nullish().transform((value) => value ?? undefined);
 
 // Dispatch parses unknown transport input before calling a typed handler. No method lookup casts.
 export async function dispatchWorker(
@@ -225,6 +247,25 @@ export async function dispatchWorker(
       );
     case 'localModels':
       return api.localModels(...z.tuple([LocalSettings]).parse(raw));
+    case 'models': {
+      const args = z
+        .union([
+          z.tuple([]),
+          z.tuple([OptionalWireString]),
+          z.tuple([OptionalWireString, Provider]),
+          z.tuple([
+            OptionalWireString,
+            Provider,
+            LocalSettings.nullish().transform((value) => value ?? undefined),
+          ]),
+        ])
+        .parse(raw);
+      return args.length === 3
+        ? api.models(args[0], args[1], args[2])
+        : args.length === 2
+          ? api.models(args[0], args[1])
+          : api.models(args[0]);
+    }
     case 'create':
       return api.create(...z.tuple([CreateInput]).parse(raw));
     case 'open':
@@ -242,11 +283,20 @@ export async function dispatchWorker(
             Provider,
             LocalSettings.nullish().transform((value) => value ?? undefined),
           ]),
+          z.tuple([
+            OptionalWireString,
+            OptionalWireBoolean,
+            Provider,
+            LocalSettings.nullish().transform((value) => value ?? undefined),
+            OptionalWireModel,
+          ]),
         ])
         .parse(raw);
-      return args.length === 4
-        ? api.connect(args[0], args[1], args[2], args[3])
-        : api.connect(args[0], args[1], args[2]);
+      return args.length === 5
+        ? api.connect(args[0], args[1], args[2], args[3], args[4])
+        : args.length === 4
+          ? api.connect(args[0], args[1], args[2], args[3])
+          : api.connect(args[0], args[1], args[2]);
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
@@ -283,6 +333,13 @@ export async function dispatchDesktop(
 ): Promise<unknown> {
   if (typeof method !== 'string') throw new Error('Invalid desktop method');
   switch (method) {
+    case 'models':
+      z.tuple([]).parse(raw);
+      return api.models();
+    case 'selectModel':
+      return api.selectModel(...z.union([z.tuple([]), z.tuple([OptionalWireModel])]).parse(raw));
+    case 'switchModel':
+      return api.switchModel(...z.union([z.tuple([]), z.tuple([OptionalWireModel])]).parse(raw));
     case 'detect':
       return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
     case 'configureLocal':

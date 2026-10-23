@@ -6,6 +6,8 @@ import type {
   PlayerView,
   LanStatus,
   LocalSettings,
+  ModelCatalog,
+  Provider,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
@@ -17,6 +19,13 @@ const tags = {
   campaigns: 'button',
   connection: 'button',
   stop: 'button',
+  'model-dialog': 'dialog',
+  'model-current': 'p',
+  'switch-model': 'select',
+  'model-dialog-status': 'p',
+  'model-apply': 'button',
+  'model-cancel': 'button',
+  'change-model': 'button',
   'lan-dialog': 'dialog',
   'lan-help': 'p',
   'lan-qr': 'img',
@@ -39,6 +48,10 @@ const tags = {
   provider: 'select',
   'provider-command': 'code',
   'provider-help': 'p',
+  'hosted-model-settings': 'div',
+  'provider-model': 'select',
+  'refresh-models': 'button',
+  'models-status': 'span',
   'local-settings': 'div',
   'local-endpoint': 'input',
   'local-model': 'input',
@@ -121,6 +134,11 @@ let state: CampaignSnapshot,
   polling = false,
   submitting = false,
   pendingSubmission: SubmitInput | undefined;
+let modelRequest = 0;
+let modelSaving: Promise<void> = Promise.resolve();
+let dialogModel: string | undefined;
+let modelSwitching = false;
+let dialogRequest = 0;
 function notice(error: unknown) {
   $('notice-text').textContent = errorMessage(error).replace(
     /^Error invoking remote method '[^']+': Error: /,
@@ -386,10 +404,13 @@ function renderState() {
   const busy = state.stage === 'connecting' || state.stage === 'resolving';
   $('stop').hidden = state.stage !== 'resolving' && state.stage !== 'ready';
   $('campaigns').disabled = busy;
-  $('connection').disabled = busy || state.stage === 'ready';
+  $('connection').disabled = busy;
+  $('connection').title = state.model
+    ? `Current model: ${state.model}`
+    : 'Current model: CLI default';
   $('connection').textContent =
     state.stage === 'ready'
-      ? 'DM connected'
+      ? 'DM model…'
       : state.stage === 'connecting'
         ? 'Connecting…'
         : 'Connect DM';
@@ -471,6 +492,7 @@ async function refresh() {
   }
 }
 async function connect(fresh = false) {
+  await modelSaving;
   if ($('provider').value === 'ollama') await api.configureLocal(localSettings());
   const promise = api.connect(fresh);
   void refresh();
@@ -512,6 +534,7 @@ async function checkProvider(path?: string) {
   try {
     const found = await api.detect(path);
     $('provider-status').textContent = `Detected · ${found.version}`;
+    await loadModels();
   } catch (e) {
     $('provider-status').textContent = 'Not ready · Install or choose the selected CLI below';
     throw e;
@@ -522,15 +545,21 @@ on('dismiss', () => {
 });
 $('provider').onchange = () => {
   void (async () => {
+    $('provider').disabled = true;
     const provider =
       $('provider').value === 'ollama'
         ? 'ollama'
         : $('provider').value === 'codex'
           ? 'codex'
           : 'antigravity';
-    await api.selectProvider(provider);
-    showProvider();
-    await checkProvider();
+    try {
+      await modelSaving;
+      await api.selectProvider(provider);
+      showProvider();
+      await checkProvider();
+    } finally {
+      $('provider').disabled = false;
+    }
   })().catch(notice);
 };
 function localSettings(): LocalSettings {
@@ -544,8 +573,134 @@ function showProvider() {
   const local = $('provider').value === 'ollama';
   $('local-settings').hidden = !local;
   $('provider-help').hidden = local;
+  $('hosted-model-settings').hidden = local;
   $('provider-command').textContent = $('provider').value === 'codex' ? 'codex login' : 'agy';
 }
+function fillModels(
+  select: HTMLSelectElement,
+  catalog: ModelCatalog,
+  selected?: string,
+  local = false,
+) {
+  select.replaceChildren();
+  if (!local) {
+    const option = node('option', 'CLI default');
+    option.value = '';
+    select.append(option);
+  }
+  for (const model of catalog.models) {
+    const option = node('option', model.name);
+    option.value = model.id;
+    select.append(option);
+  }
+  if (selected && !catalog.models.some((model) => model.id === selected)) {
+    const option = node('option', `${selected} (saved selection)`);
+    option.value = selected;
+    option.disabled = true;
+    select.append(option);
+  }
+  select.value = selected ?? '';
+}
+async function loadModels() {
+  const request = ++modelRequest;
+  const provider = $('provider').value as Provider;
+  if (provider === 'ollama') return;
+  $('provider-model').disabled = true;
+  $('models-status').textContent = 'Loading available models…';
+  const prefs = await api.preferences();
+  const selected = prefs.models?.[provider];
+  fillModels($('provider-model'), { models: [] }, selected);
+  try {
+    const catalog = await api.models();
+    if (request !== modelRequest || $('provider').value !== provider) return;
+    fillModels($('provider-model'), catalog, selected);
+    $('models-status').textContent =
+      selected && !catalog.models.some((model) => model.id === selected)
+        ? 'Saved model is unavailable. Choose another model or CLI default.'
+        : `${catalog.models.length} models available`;
+  } catch {
+    if (request !== modelRequest || $('provider').value !== provider) return;
+    $('models-status').textContent = 'Could not load models. Check CLI sign-in, then Refresh.';
+  } finally {
+    if (request === modelRequest) $('provider-model').disabled = false;
+  }
+}
+on('refresh-models', loadModels);
+$('provider-model').onchange = () => {
+  $('provider-model').disabled = true;
+  $('models-status').textContent = 'Saving model choice…';
+  modelSaving = (async () => {
+    await api.selectModel($('provider-model').value || undefined);
+    $('models-status').textContent = 'Model selected for this provider.';
+  })()
+    .catch(async (error) => {
+      notice(error);
+      await loadModels();
+    })
+    .finally(() => {
+      $('provider-model').disabled = false;
+    });
+};
+async function showModelDialog() {
+  if (modelSwitching || state.stage === 'connecting' || state.stage === 'resolving') return;
+  const request = ++dialogRequest;
+  $('model-dialog').showModal();
+  $('model-dialog-status').textContent = 'Loading available models…';
+  $('model-apply').disabled = true;
+  $('switch-model').disabled = true;
+  $('switch-model').replaceChildren();
+  const prefs = await api.preferences();
+  const provider = prefs.provider ?? 'antigravity';
+  const savedModel = provider === 'ollama' ? prefs.local?.model : prefs.models?.[provider];
+  dialogModel = state.provider === provider ? (state.model ?? savedModel) : savedModel;
+  $('model-current').textContent = `Current: ${dialogModel ?? 'CLI default'}`;
+  try {
+    const catalog = await api.models();
+    if (request !== dialogRequest || !$('model-dialog').open) return;
+    fillModels($('switch-model'), catalog, dialogModel, provider === 'ollama');
+    $('switch-model').disabled = false;
+    $('model-dialog-status').textContent = 'Choose a model to start fresh DM context.';
+  } catch (error) {
+    if (request === dialogRequest) $('model-dialog-status').textContent = errorMessage(error);
+  }
+}
+$('switch-model').onchange = () => {
+  $('model-apply').disabled =
+    modelSwitching || ($('switch-model').value || undefined) === dialogModel;
+};
+on('model-cancel', () => {
+  if (modelSwitching) return;
+  ++dialogRequest;
+  $('model-dialog').close();
+});
+$('model-dialog').addEventListener('cancel', (event) => {
+  if (modelSwitching) event.preventDefault();
+  else ++dialogRequest;
+});
+on('model-apply', async () => {
+  if (modelSwitching) return;
+  modelSwitching = true;
+  $('model-apply').disabled = true;
+  $('model-cancel').disabled = true;
+  $('switch-model').disabled = true;
+  $('model-dialog-status').textContent = 'Starting fresh DM context with the selected model…';
+  try {
+    const pending = api.switchModel($('switch-model').value || undefined);
+    void refresh();
+    await pending;
+    await api.beginSetup();
+    $('model-dialog').close();
+  } catch (error) {
+    $('model-dialog-status').textContent = errorMessage(error);
+  } finally {
+    modelSwitching = false;
+    $('model-cancel').disabled = false;
+    $('switch-model').disabled = false;
+    await refresh();
+    $('model-apply').disabled = ($('switch-model').value || undefined) === dialogModel;
+  }
+});
+on('change-model', showModelDialog);
 on('local-check', async () => {
   $('local-status').textContent = 'Inspecting local models…';
   const report = await api.localModels(localSettings());
@@ -600,8 +755,15 @@ on('campaigns', async () => {
   $('revision').textContent = '';
   recent = state.root;
   $('recent').hidden = false;
+  const prefs = await api.preferences();
+  if (prefs.local) {
+    $('local-model').value = prefs.local.model;
+    $('local-endpoint').value = prefs.local.endpoint;
+    $('local-context').value = String(prefs.local.contextTokens);
+  }
+  await loadModels();
 });
-on('connection', () => connect());
+on('connection', () => (state?.stage === 'ready' ? showModelDialog() : connect()));
 on('reconnect', () => connect());
 on('fresh', () => connect(true));
 on('stop', async () => {

@@ -25,6 +25,22 @@
         <button id="stop" class="quiet" hidden>Stop DM</button>
       </div>
     </header>
+    <dialog id="model-dialog" aria-labelledby="model-title">
+      <h2 id="model-title">Change DM model</h2>
+      <p id="model-current" class="help"></p>
+      <label for="switch-model">Model</label>
+      <select id="switch-model"></select>
+      <p class="help">
+        Switching starts a fresh DM conversation. Previous conversation context will not carry over,
+        and cached tokens may need to be rebuilt. Your saved campaign, characters, maps and history
+        are preserved.
+      </p>
+      <p id="model-dialog-status" role="status" class="help"></p>
+      <div class="button-row">
+        <button id="model-apply" class="primary" disabled>Switch model &amp; reconnect</button>
+        <button id="model-cancel" class="quiet">Cancel</button>
+      </div>
+    </dialog>
     <dialog id="lan-dialog">
       <h2>LAN game</h2>
       <p id="lan-help">
@@ -69,6 +85,16 @@
               <option value="codex">Codex CLI</option>
               <option value="ollama">Local · Ollama + Codex CLI (Experimental)</option></select
             ><span id="provider-status">Checking installation…</span>
+            <div id="hosted-model-settings">
+              <div class="model-label-row">
+                <label for="provider-model">Model</label>
+                <button id="refresh-models" class="quiet" type="button">Refresh</button>
+              </div>
+              <select id="provider-model">
+                <option value="">CLI default</option>
+              </select>
+              <span id="models-status" role="status"></span>
+            </div>
           </div>
         </div>
         <p class="help" id="provider-help">
@@ -266,6 +292,7 @@
           <p>Turn interrupted. Check saved outcomes before continuing.</p>
           <button id="reconnect" class="secondary">Reconnect DM</button
           ><button id="fresh" class="quiet">Reset DM context</button>
+          <button id="change-model" class="quiet">Change model…</button>
         </div>
         <form id="action-form">
           <label for="action" id="acting-as">Table</label

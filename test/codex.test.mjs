@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { writeFile, readFile, mkdir, symlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { CodexSession } from '../dist/desktop/codex.js';
+import { AntigravitySession } from '../dist/desktop/antigravity.js';
 import { DesktopHost } from '../dist/desktop/host.js';
 import { prepareWorkspace } from '../dist/desktop/antigravity.js';
 import { fixture } from './helpers.mjs';
@@ -25,6 +26,10 @@ createInterface({input:process.stdin}).on('line', line => {
  if(m.method==='initialize') send({id:m.id,result:{}});
  if(m.method==='account/read') send({id:m.id,result:{account:process.env.DM_FIXTURE_AUTH==='none'?null:{type:process.env.DM_FIXTURE_AUTH??'chatgpt'}}});
  if(m.method==='config/read') send({id:m.id,result:{config:{mcp_servers:{unrelated:{command:'ignored',tool_timeout_sec:null}},plugins:{'old@market':{enabled:true}}}}});
+ if(m.method==='model/list') send({id:m.id,result:{data:[
+   {model:'gpt-6-mini',defaultReasoningEffort:'high'},
+   {model:'gpt-6-astra',defaultReasoningEffort:'medium'}
+ ],nextCursor:null}});
  if(m.method==='thread/start'||m.method==='thread/resume') send({id:m.id,result:{thread:{id:'thread-1'}}});
  if(m.method==='thread/compact/start') {
    const id='compact-'+(++turn);
@@ -129,14 +134,102 @@ for (const [prompt, pattern] of [
 }
 
 test('Codex resumes its thread and does not silently replace missing context', async (t) => {
-  const { driver, parent } = await driverFixture(t, { conversationId: 'thread-1' });
+  const { driver, parent } = await driverFixture(t, {
+    conversationId: 'thread-1',
+    model: 'gpt-6-astra',
+  });
   await driver.run('hello');
   const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
     .trim()
     .split('\n')
     .map(JSON.parse);
-  assert.equal(requests.find((r) => r.method === 'thread/resume').params.threadId, 'thread-1');
+  const resume = requests.find((r) => r.method === 'thread/resume').params;
+  assert.equal(resume.threadId, 'thread-1');
+  assert.equal(resume.model, 'gpt-6-astra');
+  assert.equal(resume.config.model, 'gpt-6-astra');
+  assert.equal(resume.config.model_reasoning_effort, 'medium');
+  assert.equal(requests.find((r) => r.method === 'turn/start').params.model, 'gpt-6-astra');
   assert.ok(!requests.some((r) => r.method === 'thread/start'));
+});
+
+test('Codex passes the selected model to thread start and turn start', async (t) => {
+  const { driver, parent } = await driverFixture(t, { model: 'gpt-6-mini' });
+  await driver.run('hello');
+  const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  const start = requests.find((request) => request.method === 'thread/start').params;
+  const turn = requests.find((request) => request.method === 'turn/start').params;
+  assert.equal(start.model, 'gpt-6-mini');
+  assert.equal(start.config.model, 'gpt-6-mini');
+  assert.equal(start.config.model_reasoning_effort, 'high');
+  assert.equal(turn.model, 'gpt-6-mini');
+});
+
+test('Codex rejects a model missing from the live account catalog before starting a thread', async (t) => {
+  const { driver, parent } = await driverFixture(t, { model: 'gpt-6-unavailable' });
+  await assert.rejects(driver.run('hello'), /Reset DM context/);
+
+  const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  assert.ok(requests.some((request) => request.method === 'model/list'));
+  assert.ok(
+    !requests.some((request) =>
+      ['thread/start', 'thread/resume', 'turn/start'].includes(request.method),
+    ),
+  );
+});
+
+test('local Codex model stays authoritative when a hosted model selection is also present', async (t) => {
+  const { driver, parent } = await driverFixture(t, {
+    model: 'gpt-6-mini',
+    local: { endpoint: 'http://127.0.0.1:11435', model: 'custom-vision:9b', contextTokens: 32768 },
+    env: { ...process.env, DM_FIXTURE_AUTH: 'none' },
+  });
+  await driver.run('hello');
+  const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  assert.equal(
+    requests.find((request) => request.method === 'thread/start').params.model,
+    'custom-vision:9b',
+  );
+  assert.equal(requests.find((request) => request.method === 'turn/start').params.model, undefined);
+});
+
+test('Antigravity passes the selected model as one argument', async (t) => {
+  const { parent } = await fixture(t);
+  const cli = join(parent, 'agy-model.mjs');
+  await writeFile(
+    cli,
+    `
+import { appendFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
+appendFileSync(${JSON.stringify(join(parent, 'args.jsonl'))}, JSON.stringify(process.argv.slice(2))+'\\n');
+createInterface({input:process.stdin}).on('line', () => process.stdout.write(JSON.stringify({event:'result',result:{status:'SUCCESS'}})+'\\n'));
+`,
+  );
+  const session = new AntigravitySession({
+    executable: process.execPath,
+    prefixArgs: [cli],
+    cwd: parent,
+    model: 'claude-sonnet-5-5-high',
+    timeoutMs: 1000,
+  });
+  t.after(() => session.close());
+  await session.run('hello');
+  assert.deepEqual(JSON.parse((await readFile(join(parent, 'args.jsonl'), 'utf8')).trim()), [
+    '--model',
+    'claude-sonnet-5-5-high',
+    '--input-format',
+    'stream-json',
+    '--output-format',
+    'stream-json',
+  ]);
 });
 
 test('provider switching keeps separate context, resets durably, and preserves plugin configuration', async (t) => {

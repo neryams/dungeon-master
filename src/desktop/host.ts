@@ -24,6 +24,9 @@ import { localModels, validateLocalModel, verifyLocalContext, localModelCatalog 
 import { LocalSettings } from './contracts.js';
 import { Provider } from './contracts.js';
 import { LanGame } from './lan.js';
+import { providerModels } from './models.js';
+import type { ModelCatalog } from './contracts.js';
+import { ModelId } from './contracts.js';
 
 const execute = promisify(execFile);
 import { SubmitInput as Submit, CreateInput as Create, MapInput } from './contracts.js';
@@ -43,6 +46,7 @@ export class DesktopHost {
   private detail = 'Connect a DM provider to start playing.';
   private provider: Provider = 'antigravity';
   private local?: LocalSettings;
+  private model?: string;
   private conversationId?: string;
   private mapCache?: { key: string; image: string; warnings: string[] };
   private mapping = false;
@@ -61,6 +65,7 @@ export class DesktopHost {
       permissionPath?: string;
       driver?: (options: CodexOptions) => AgentDriver;
       probe?: typeof detectAntigravity;
+      modelProbe?: typeof providerModels;
     },
   ) {}
 
@@ -70,6 +75,30 @@ export class DesktopHost {
     return (this.options.probe ?? (provider !== 'antigravity' ? detectCodex : detectAntigravity))(
       path,
     );
+  }
+  async models(
+    path?: string,
+    provider: Provider = 'antigravity',
+    local?: LocalSettings,
+  ): Promise<ModelCatalog> {
+    Provider.parse(provider);
+    if (provider === 'ollama') {
+      const settings = LocalSettings.parse(local);
+      const catalog = await this.localModels(settings);
+      return {
+        models: catalog.models.map(({ name }) => ({
+          id: name,
+          name,
+          ...(name === settings.model ? { isDefault: true } : {}),
+        })),
+        defaultModel: settings.model,
+      };
+    }
+    const found = await this.detect(path, provider);
+    return (this.options.modelProbe ?? providerModels)(found.path, provider, {
+      env: { ...process.env, ...this.options.env },
+      cwd: this.options.source,
+    });
   }
   private async outsideSource(path: string) {
     const source = await realpath(this.options.source);
@@ -220,8 +249,9 @@ export class DesktopHost {
     }
     throw new Error('Campaign is changing in another client. Try again once it is idle.');
   }
-  private async loadSession(provider: Provider) {
+  private async loadSession(provider: Provider, model?: string) {
     this.provider = provider;
+    this.model = model;
     this.sessionFile = await safePath(
       this.requireStore().root,
       provider === 'antigravity'
@@ -232,14 +262,30 @@ export class DesktopHost {
     this.conversationId = undefined;
     try {
       const cache = JSON.parse(await readFile(this.sessionFile, 'utf8'));
+      const cachedModel = Object.hasOwn(cache, 'model')
+        ? cache.model
+        : provider === 'ollama'
+          ? cache.local?.model
+          : undefined;
       if (
         cache.campaignRoot === this.requireStore().root &&
         (cache.provider ?? 'antigravity') === provider &&
         (provider !== 'ollama' || JSON.stringify(cache.local) === JSON.stringify(this.local)) &&
+        cachedModel === model &&
         typeof cache.conversationId === 'string' &&
         /^[a-zA-Z0-9_-]{1,100}$/.test(cache.conversationId)
       )
         this.conversationId = cache.conversationId;
+      else if (
+        cache.campaignRoot === this.requireStore().root &&
+        (cache.provider ?? 'antigravity') === provider
+      ) {
+        // A locator for another model must never be resumed. Remove it before a failed connect
+        // can leave a stale conversation available to a later retry.
+        await unlink(this.sessionFile).catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+      }
     } catch {
       /* Optional provider context; events remain authoritative. */
     }
@@ -249,6 +295,7 @@ export class DesktopHost {
     fresh = false,
     provider: Provider = 'antigravity',
     local?: LocalSettings,
+    model?: string,
   ) {
     Provider.parse(provider);
     const label =
@@ -257,6 +304,8 @@ export class DesktopHost {
     if (!this.leaseHealthy)
       throw new Error('The campaign session lock was lost. Reopen the campaign.');
     if (this.working || this.connecting || this.changing) throw new Error('The DM is busy.');
+    const selectedModel = model === undefined ? undefined : ModelId.parse(model);
+    this.provider = provider;
     const generation = ++this.generation;
     const checkActive = () => {
       if (generation !== this.generation) throw new Error('Connection was stopped.');
@@ -268,6 +317,9 @@ export class DesktopHost {
       await this.agent?.close();
       this.agent = undefined;
       this.local = provider === 'ollama' ? LocalSettings.parse(local) : undefined;
+      if (this.local && selectedModel !== undefined)
+        this.local = LocalSettings.parse({ ...this.local, model: selectedModel });
+      this.model = this.local?.model ?? selectedModel;
       const localInfo = this.local ? await validateLocalModel(this.local) : undefined;
       const found = await this.detect(executable, provider);
       checkActive();
@@ -281,7 +333,7 @@ export class DesktopHost {
       checkActive();
       if (provider === 'antigravity')
         await grantCampaignPermission(workspace.serverName, this.options.permissionPath);
-      await this.loadSession(provider);
+      await this.loadSession(provider, this.model);
       checkActive();
       if (fresh) {
         this.conversationId = undefined;
@@ -314,6 +366,7 @@ export class DesktopHost {
       const config = {
         executable: found.path,
         local: this.local,
+        model: this.model,
         modelCatalog,
         localThinking: localInfo?.capabilities.includes('thinking'),
         cwd: workspace.dir,
@@ -378,6 +431,7 @@ export class DesktopHost {
         JSON.stringify({
           campaignRoot: this.requireStore().root,
           provider: this.provider,
+          ...(this.model !== undefined ? { model: this.model } : {}),
           ...(this.local ? { local: this.local } : {}),
           conversationId: this.conversationId,
         }),
@@ -505,6 +559,8 @@ export class DesktopHost {
       gathering: state.gathering,
       lanHosted: !!this.lan,
       reviewMode: state.reviewMode ?? 'legacy',
+      provider: this.provider,
+      ...(this.model !== undefined ? { model: this.model } : {}),
     };
   }
   async map(raw: MapInput): Promise<MapResult> {

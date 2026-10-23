@@ -160,6 +160,7 @@ export class AntigravitySession implements AgentDriver {
       executable: string;
       cwd: string;
       conversationId?: string;
+      model?: string;
       env?: NodeJS.ProcessEnv;
       timeoutMs?: number;
       progress?: (text: string) => void;
@@ -193,6 +194,7 @@ export class AntigravitySession implements AgentDriver {
   private start() {
     const args = [
       ...(this.options.prefixArgs ?? []),
+      ...(this.options.model ? ['--model', this.options.model] : []),
       '--input-format',
       'stream-json',
       '--output-format',
