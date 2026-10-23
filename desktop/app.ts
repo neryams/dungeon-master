@@ -31,6 +31,8 @@ const tags = {
   'speech-settings': 'button',
   'speech-dialog': 'dialog',
   'speech-intro': 'p',
+  'speech-license-info': 'p',
+  'speech-download-info': 'p',
   'speech-license-link': 'button',
   'speech-model-link': 'button',
   'speech-access-link': 'button',
@@ -279,15 +281,24 @@ async function checkNarration() {
 function updateSpeechSetupDialog() {
   const current = speechInstallState;
   if (!current) return;
+  const bundled = current.bundled === true;
   $('speech-consent').disabled = current.phase === 'installing';
-  $('speech-token').disabled = current.phase === 'installing';
+  $('speech-token').disabled = bundled || current.phase === 'installing';
+  $('speech-license-info').hidden = current.phase === 'ready';
+  $('speech-download-info').hidden = bundled || current.phase === 'ready';
+  $('speech-token-label').hidden = bundled || current.phase === 'ready';
   $('speech-install').disabled =
     speechInstallBusy ||
     current.phase === 'installing' ||
     current.phase === 'ready' ||
     !$('speech-consent').checked;
-  $('speech-install').textContent =
-    current.phase === 'error' ? 'Agree & retry installation' : 'Agree & install narration';
+  $('speech-install').textContent = bundled
+    ? current.phase === 'error'
+      ? 'Try narration again'
+      : 'Agree & enable narration'
+    : current.phase === 'error'
+      ? 'Agree & retry installation'
+      : 'Agree & install narration';
   $('speech-cancel').hidden = current.phase !== 'installing';
   $('speech-close').disabled = false;
   $('speech-close').textContent =
@@ -296,25 +307,34 @@ function updateSpeechSetupDialog() {
       : current.phase === 'installing'
         ? 'Continue playing'
         : 'Skip for now';
-  $('speech-token-label').hidden = current.phase === 'ready';
   $('speech-consent').closest('label')!.hidden = current.phase === 'ready';
   $('speech-intro').textContent =
     current.phase === 'ready'
-      ? 'Narration is installed and ready. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
-      : 'Dungeon Master can read new DM messages aloud with a local Phonon voice. The speech model downloads to this computer and runs locally. Text is sent to the local speech engine only. You can skip this and play normally, or set it up later from Narration setup.';
+      ? bundled
+        ? 'Narration is enabled. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
+        : 'Narration is installed and ready. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
+      : bundled
+        ? 'Dungeon Master includes optional Phonon narration. Accept its noncommercial license to enable it. Speech runs locally on this computer. You can skip this and play normally, or change this later from Narration setup.'
+        : 'Dungeon Master can read new DM messages aloud with a local Phonon voice. The speech model downloads to this computer and runs locally. Text is sent to the local speech engine only. You can skip this and play normally, or set it up later from Narration setup.';
   $('speech-status').textContent =
-    current.phase === 'installing'
-      ? safeSpeechDetail(current.detail) ||
-        'Installing narration… This can take a few minutes. You can keep playing while it installs.'
-      : current.phase === 'error'
-        ? safeSpeechDetail(current.detail) ||
-          'Narration could not be installed. Check model access and try again.'
-        : current.phase === 'declined'
-          ? 'Narration is off. You can still play normally and set it up later.'
-          : current.phase === 'ready'
-            ? safeSpeechDetail(current.detail) || 'Narration is ready.'
-            : safeSpeechDetail(current.detail) ||
-              'Optional: install local narration when you are ready.';
+    bundled && current.phase === 'ready'
+      ? 'Narration is ready.'
+      : bundled && current.phase === 'error'
+        ? safeSpeechDetail(current.detail)
+        : bundled && current.phase === 'declined'
+          ? 'Narration is off. You can still play normally and enable it later.'
+          : current.phase === 'installing'
+            ? safeSpeechDetail(current.detail) ||
+              'Installing narration… This can take a few minutes. You can keep playing while it installs.'
+            : current.phase === 'error'
+              ? safeSpeechDetail(current.detail) ||
+                'Narration could not be installed. Check model access and try again.'
+              : current.phase === 'declined'
+                ? 'Narration is off. You can still play normally and set it up later.'
+                : current.phase === 'ready'
+                  ? safeSpeechDetail(current.detail) || 'Narration is ready.'
+                  : safeSpeechDetail(current.detail) ||
+                    'Optional: install local narration when you are ready.';
   if (!firstSpeechPromptChecked) {
     firstSpeechPromptChecked = true;
     if (current.phase === 'unconfigured') {
@@ -368,7 +388,9 @@ async function skipSpeechSetup() {
 }
 async function installSpeech() {
   if (!speechInstallState || !$('speech-consent').checked || speechInstallBusy) return;
-  const token = $('speech-token').value.trim() || undefined;
+  const token = speechInstallState.bundled
+    ? undefined
+    : $('speech-token').value.trim() || undefined;
   $('speech-token').value = '';
   speechInstallBusy = true;
   updateSpeechSetupDialog();

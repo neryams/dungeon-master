@@ -53,6 +53,9 @@ else {
         env: {
           ...process.env,
           ELECTRON_RUN_AS_NODE: undefined,
+          DM_BUNDLED_SPEECH: app.isPackaged
+            ? join(process.resourcesPath, 'speech')
+            : process.env.DM_BUNDLED_SPEECH,
           PATH: [
             dirname(nodePath),
             process.env.PATH,
@@ -263,6 +266,13 @@ else {
         declineSpeech: () => call('declineSpeech'),
         cancelSpeechInstall: () => call('cancelSpeechInstall'),
         openSpeechLink: async (link) => {
+          if (link === 'license' && app.isPackaged) {
+            const error = await shell.openPath(
+              join(process.resourcesPath, 'speech', 'licenses', 'CC-BY-NC-4.0.txt'),
+            );
+            if (error) throw new Error('Could not open the included narration license.');
+            return;
+          }
           const urls = {
             license: 'https://creativecommons.org/licenses/by-nc/4.0/',
             model: 'https://huggingface.co/gradium/phonon-40m-en',

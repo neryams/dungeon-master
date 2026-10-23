@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
-import { access, cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,8 @@ export interface SpeechInstallState {
   detail: string;
   accepted: boolean;
   licenseRevision: string;
+  /** True when the app ships the speech runtime and assets with its installer. */
+  bundled?: boolean;
 }
 
 export interface SpeechInstallerOptions {
@@ -21,6 +23,7 @@ export interface SpeechInstallerOptions {
   arch?: string;
   fetch?: typeof globalThis.fetch;
   spawn?: typeof nodeSpawn;
+  bundledRoot?: string;
 }
 
 type ConsentReceipt = { licenseRevision: string; acceptedAt: string };
@@ -68,6 +71,7 @@ export class SpeechInstaller {
   private readonly arch: string;
   private readonly fetcher: typeof globalThis.fetch;
   private readonly spawnProcess: typeof nodeSpawn;
+  private readonly bundledRoot: string | undefined;
   private state: SpeechInstallState = {
     phase: 'unconfigured',
     detail: 'Optional local narration has not been installed.',
@@ -93,6 +97,9 @@ export class SpeechInstaller {
     this.arch = options.arch ?? process.arch;
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.spawnProcess = options.spawn ?? nodeSpawn;
+    this.bundledRoot = options.bundledRoot ?? process.env.DM_BUNDLED_SPEECH;
+    if (!this.bundledRoot) delete this.state.bundled;
+    else this.state.bundled = true;
   }
 
   async status(): Promise<SpeechInstallState> {
@@ -104,6 +111,7 @@ export class SpeechInstaller {
         licenseRevision: PHONON_LICENSE_REVISION,
       };
     if (this.state.phase === 'installing') return { ...this.state };
+    if (this.bundledRoot) return this.bundledStatus();
     const generation = this.generation;
     await this.decisionWrite.catch(() => {});
     if (!this.isCurrent(generation)) return this.currentState();
@@ -171,6 +179,44 @@ export class SpeechInstaller {
     }
     if (this.state.phase === 'installing') return { ...this.state };
 
+    if (this.bundledRoot) {
+      const generation = ++this.generation;
+      try {
+        await mkdir(this.home, { recursive: true });
+        if (!this.isCurrent(generation)) return this.currentState();
+        const ready = await this.bundledAssetsReady();
+        if (!this.isCurrent(generation)) return this.currentState();
+        if (!ready) throw new Error('bundled_assets_incomplete');
+        await this.queueDecisionWrite(async () => {
+          if (!this.isCurrent(generation)) return;
+          await this.writeReceipt({
+            licenseRevision: PHONON_LICENSE_REVISION,
+            acceptedAt: new Date().toISOString(),
+          });
+          await this.writeDecision('accepted');
+        });
+        if (!this.isCurrent(generation)) return this.currentState();
+        this.state = {
+          phase: 'ready',
+          detail: 'Optional local narration is ready.',
+          accepted: true,
+          licenseRevision: PHONON_LICENSE_REVISION,
+          bundled: true,
+        };
+      } catch {
+        if (this.isCurrent(generation))
+          this.state = {
+            phase: 'error',
+            detail:
+              'Bundled narration files could not be verified. Reinstall the app to repair them.',
+            accepted: false,
+            licenseRevision: PHONON_LICENSE_REVISION,
+            bundled: true,
+          };
+      }
+      return { ...this.state };
+    }
+
     const generation = ++this.generation;
     this.state = {
       phase: 'installing',
@@ -195,6 +241,7 @@ export class SpeechInstaller {
       detail: 'Local narration was declined. The app remains playable.',
       accepted: false,
       licenseRevision: PHONON_LICENSE_REVISION,
+      ...(this.bundledRoot ? { bundled: true } : {}),
     };
     await this.queueDecisionWrite(async () => {
       await this.writeDecision('declined');
@@ -539,6 +586,115 @@ export class SpeechInstaller {
       return (
         assetInfo.model_revision === 'cc738b7e4d182c2ba1bafb8062aa4846af000637' &&
         assetInfo.voice_revision === 'da6c9ec0d47be8df5c87c730a3aa97187f3229c3'
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async bundledStatus(): Promise<SpeechInstallState> {
+    const generation = this.generation;
+    const base = {
+      licenseRevision: PHONON_LICENSE_REVISION,
+      bundled: true,
+    } as const;
+    await this.decisionWrite.catch(() => {});
+    if (!this.isCurrent(generation)) return this.currentState();
+    const decision = await this.readDecision();
+    if (!this.isCurrent(generation)) return this.currentState();
+    if (decision?.licenseRevision === PHONON_LICENSE_REVISION && decision.decision === 'declined') {
+      this.state = {
+        phase: 'declined',
+        detail: 'Local narration was declined. The app remains playable.',
+        accepted: false,
+        ...base,
+      };
+      return { ...this.state };
+    }
+    const receipt = await this.readReceipt();
+    if (!this.isCurrent(generation)) return this.currentState();
+    const accepted =
+      decision?.licenseRevision === PHONON_LICENSE_REVISION &&
+      decision.decision === 'accepted' &&
+      receipt?.licenseRevision === PHONON_LICENSE_REVISION;
+    if (!accepted) {
+      this.state = {
+        phase: 'unconfigured',
+        detail: 'Optional local narration is ready when you accept its license.',
+        accepted: false,
+        ...base,
+      };
+      return { ...this.state };
+    }
+    const assetsReady = await this.bundledAssetsReady();
+    if (!this.isCurrent(generation)) return this.currentState();
+    if (assetsReady) {
+      this.state = {
+        phase: 'ready',
+        detail: 'Optional local narration is ready.',
+        accepted: true,
+        ...base,
+      };
+      return { ...this.state };
+    }
+    this.state = {
+      phase: 'error',
+      detail: 'Bundled narration files could not be verified. Reinstall the app to repair them.',
+      accepted: true,
+      ...base,
+    };
+    return { ...this.state };
+  }
+
+  private async bundledAssetsReady(): Promise<boolean> {
+    if (!this.bundledRoot) return false;
+    const files = [
+      'bin/ptts',
+      'model/config.json',
+      'model/tokenizer.json',
+      'model/model.q8.gguf',
+      'model/default-voice.safetensors',
+      'model/README.md',
+      'voices/Easton.safetensors',
+      'voices/Zoey.safetensors',
+      'licenses/CC-BY-NC-4.0.txt',
+      'licenses/NOTICE.md',
+      'licenses/Apache-2.0.txt',
+      'licenses/PTTS-MIT.txt',
+      'licenses/PTTS-APACHE-2.0.txt',
+      'speech-assets.json',
+    ];
+    try {
+      const entries = await Promise.all(
+        files.map(async (file) => {
+          const info = await stat(join(this.bundledRoot!, file));
+          return info.isFile() && info.size > 0;
+        }),
+      );
+      if (entries.some((present) => !present)) return false;
+      await access(join(this.bundledRoot, 'bin/ptts'), 1); // X_OK without importing platform-specific constants.
+      const manifest = JSON.parse(
+        await readFile(join(this.bundledRoot, 'speech-assets.json'), 'utf8'),
+      ) as {
+        phonon_cli_version?: string;
+        model_repo?: string;
+        model_revision?: string;
+        voice_repo?: string;
+        voice_revision?: string;
+        platform?: string;
+        runtime_archive?: string;
+        runtime_archive_sha256?: string;
+      };
+      return (
+        manifest.phonon_cli_version === '0.4.0' &&
+        manifest.model_repo === 'gradium/phonon-40m-en' &&
+        manifest.model_revision === 'cc738b7e4d182c2ba1bafb8062aa4846af000637' &&
+        manifest.voice_repo === 'gradium/phonon-voices' &&
+        manifest.voice_revision === 'da6c9ec0d47be8df5c87c730a3aa97187f3229c3' &&
+        manifest.platform === `${this.platform}-${this.arch}` &&
+        manifest.runtime_archive === 'ptts-0.4.0-aarch64-apple-darwin.tar.gz' &&
+        manifest.runtime_archive_sha256 ===
+          '7b26c8b9d98f5b5894de09af2aad35e64827e8475c07b003557cafc1ebba6a40'
       );
     } catch {
       return false;

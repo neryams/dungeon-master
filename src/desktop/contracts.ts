@@ -51,6 +51,7 @@ export interface SpeechInstallState {
   detail: string;
   accepted: boolean;
   licenseRevision: string;
+  bundled?: boolean;
 }
 export const SpeechInstallInput = z
   .object({

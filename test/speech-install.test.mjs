@@ -170,6 +170,101 @@ test('declining narration performs no downloads and keeps gameplay available', a
   }
 });
 
+test('bundled narration enables from verified local files after consent without installing or downloading', async () => {
+  const home = await makeHome();
+  const bundle = path.join(home, 'bundle');
+  const files = [
+    'bin/ptts',
+    'model/config.json',
+    'model/tokenizer.json',
+    'model/model.q8.gguf',
+    'model/default-voice.safetensors',
+    'model/README.md',
+    'voices/Easton.safetensors',
+    'voices/Zoey.safetensors',
+    'licenses/CC-BY-NC-4.0.txt',
+    'licenses/NOTICE.md',
+    'licenses/Apache-2.0.txt',
+    'licenses/PTTS-MIT.txt',
+    'licenses/PTTS-APACHE-2.0.txt',
+  ];
+  for (const file of files) {
+    const target = path.join(bundle, file);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, 'fixture');
+  }
+  await writeFile(
+    path.join(bundle, 'speech-assets.json'),
+    JSON.stringify({
+      phonon_cli_version: '0.4.0',
+      model_repo: 'gradium/phonon-40m-en',
+      model_revision: 'cc738b7e4d182c2ba1bafb8062aa4846af000637',
+      voice_repo: 'gradium/phonon-voices',
+      voice_revision: 'da6c9ec0d47be8df5c87c730a3aa97187f3229c3',
+      platform: `${process.platform}-${process.arch}`,
+      runtime_archive: 'ptts-0.4.0-aarch64-apple-darwin.tar.gz',
+      runtime_archive_sha256: '7b26c8b9d98f5b5894de09af2aad35e64827e8475c07b003557cafc1ebba6a40',
+    }),
+  );
+  const { chmod } = await import('node:fs/promises');
+  await chmod(path.join(bundle, 'bin/ptts'), 0o755);
+  let downloads = 0;
+  const installer = new SpeechInstaller({
+    home: path.join(home, 'profile-speech'),
+    bundledRoot: bundle,
+    fetch: async () => {
+      downloads += 1;
+      throw new Error('bundled setup must never download');
+    },
+    spawn: () => {
+      throw new Error('bundled setup must never install a runtime');
+    },
+  });
+  try {
+    const initial = await installer.status();
+    assert.equal(initial.phase, 'unconfigured');
+    assert.equal(initial.bundled, true);
+    const enabled = await installer.install({
+      accepted: true,
+      licenseRevision: PHONON_LICENSE_REVISION,
+      token: 'irrelevant-token',
+    });
+    assert.equal(enabled.phase, 'ready');
+    assert.equal(enabled.bundled, true);
+    assert.equal(enabled.accepted, true);
+    assert.equal(downloads, 0);
+    const receipt = JSON.parse(
+      await readFile(path.join(home, 'profile-speech', 'consent.json'), 'utf8'),
+    );
+    assert.equal(receipt.licenseRevision, PHONON_LICENSE_REVISION);
+    assert.equal('token' in receipt, false);
+
+    const restarted = new SpeechInstaller({
+      home: path.join(home, 'profile-speech'),
+      bundledRoot: bundle,
+    });
+    try {
+      assert.equal((await restarted.status()).phase, 'ready');
+      await restarted.decline();
+    } finally {
+      restarted.close();
+    }
+    const reopened = new SpeechInstaller({
+      home: path.join(home, 'profile-speech'),
+      bundledRoot: bundle,
+    });
+    try {
+      assert.equal((await reopened.status()).phase, 'declined');
+      assert.equal((await reopened.status()).accepted, false);
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    installer.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test('decline cancels an in-flight bootstrap and persists across a new installer instance', async () => {
   const home = await makeHome();
   let downloads = 0;

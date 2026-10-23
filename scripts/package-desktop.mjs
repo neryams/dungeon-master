@@ -16,6 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
+import { prepareSpeechBundle } from './package-speech.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(root, 'build/desktop-app');
@@ -152,6 +153,8 @@ async function stageApp() {
 async function prepare() {
   assertTarget();
   await stageApp();
+  const speech = await prepareSpeechBundle({ sourceRoot: root });
+  if (!speech.included) throw new Error('The desktop release requires a complete Phonon bundle.');
   await rm(runtimeDir, { recursive: true, force: true });
   await mkdir(runtimeDir, { recursive: true });
   await downloadNode(runtimeDir);

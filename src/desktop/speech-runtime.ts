@@ -1,6 +1,10 @@
-import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access as nodeAccess } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import {
+  spawn as nodeSpawn,
+  type ChildProcess,
+  type ChildProcessWithoutNullStreams,
+} from 'node:child_process';
+import { access as nodeAccess, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,6 +38,16 @@ type Opening = {
   cancel: (error: Error) => void;
 };
 
+type NativeSpeechManifest = {
+  model_repo?: string;
+  model_revision?: string;
+  voice_repo?: string;
+  voice_revision?: string;
+  phonon_cli_version?: string;
+  platform?: string;
+  runtime_archive_sha256?: string;
+};
+
 export type SpeechRuntimeOptions = {
   home?: string;
   sourceRoot?: string;
@@ -51,6 +65,7 @@ export class SpeechRuntime {
   private readonly sourceRoot: string;
   private readonly pythonPath: string;
   private readonly scriptPath: string;
+  private readonly bundledSpeechRoot: string | undefined;
   private readonly spawnProcess: typeof nodeSpawn;
   private readonly startupTimeoutMs: number;
   private readonly synthesisTimeoutMs: number;
@@ -63,6 +78,8 @@ export class SpeechRuntime {
   private generation = 0;
   private requestEpoch = 0;
   private closed = false;
+  private nativeChild: ChildProcess | undefined;
+  private nativeGeneration = 0;
 
   constructor(options: SpeechRuntimeOptions = {}) {
     this.home =
@@ -79,6 +96,7 @@ export class SpeechRuntime {
         process.platform === 'win32' ? 'python.exe' : 'python',
       );
     this.scriptPath = options.scriptPath ?? join(this.sourceRoot, 'scripts', 'phonon-speech.py');
+    this.bundledSpeechRoot = process.env.DM_BUNDLED_SPEECH;
     this.spawnProcess = options.spawn ?? nodeSpawn;
     this.startupTimeoutMs = options.startupTimeoutMs ?? STARTUP_TIMEOUT_MS;
     this.synthesisTimeoutMs = options.synthesisTimeoutMs ?? SYNTHESIS_TIMEOUT_MS;
@@ -87,18 +105,51 @@ export class SpeechRuntime {
 
   async status(): Promise<Status> {
     if (this.closed) return { available: false, detail: 'Speech runtime is closed.' };
-    const required = [
-      this.pythonPath,
-      this.scriptPath,
-      join(this.home, 'model', 'config.json'),
-      join(this.home, 'model', 'model.q8.gguf'),
-      join(this.home, 'model', 'tokenizer.json'),
-      join(this.home, 'voices', 'selected-voices.jsonl'),
-      join(this.home, 'voices', 'Easton.safetensors'),
-      join(this.home, 'voices', 'Zoey.safetensors'),
-    ];
+    const required = this.bundledSpeechRoot
+      ? [
+          join(this.bundledSpeechRoot, 'bin', 'ptts'),
+          join(this.bundledSpeechRoot, 'speech-assets.json'),
+          join(this.bundledSpeechRoot, 'model', 'config.json'),
+          join(this.bundledSpeechRoot, 'model', 'model.q8.gguf'),
+          join(this.bundledSpeechRoot, 'model', 'tokenizer.json'),
+          join(this.bundledSpeechRoot, 'model', 'default-voice.safetensors'),
+          join(this.bundledSpeechRoot, 'model', 'README.md'),
+          join(this.bundledSpeechRoot, 'voices', 'Easton.safetensors'),
+          join(this.bundledSpeechRoot, 'voices', 'Zoey.safetensors'),
+          join(this.bundledSpeechRoot, 'licenses', 'CC-BY-NC-4.0.txt'),
+          join(this.bundledSpeechRoot, 'licenses', 'NOTICE.md'),
+          join(this.bundledSpeechRoot, 'licenses', 'Apache-2.0.txt'),
+          join(this.bundledSpeechRoot, 'licenses', 'PTTS-MIT.txt'),
+          join(this.bundledSpeechRoot, 'licenses', 'PTTS-APACHE-2.0.txt'),
+        ]
+      : [
+          this.pythonPath,
+          this.scriptPath,
+          join(this.home, 'model', 'config.json'),
+          join(this.home, 'model', 'model.q8.gguf'),
+          join(this.home, 'model', 'tokenizer.json'),
+          join(this.home, 'voices', 'selected-voices.jsonl'),
+          join(this.home, 'voices', 'Easton.safetensors'),
+          join(this.home, 'voices', 'Zoey.safetensors'),
+        ];
     try {
       await Promise.all(required.map((path) => this.assetAccess(path)));
+      if (this.bundledSpeechRoot) {
+        const manifest = JSON.parse(
+          await readFile(join(this.bundledSpeechRoot, 'speech-assets.json'), 'utf8'),
+        ) as NativeSpeechManifest;
+        if (
+          manifest.phonon_cli_version !== '0.4.0' ||
+          manifest.platform !== 'darwin-arm64' ||
+          manifest.model_repo !== 'gradium/phonon-40m-en' ||
+          manifest.model_revision !== 'cc738b7e4d182c2ba1bafb8062aa4846af000637' ||
+          manifest.voice_repo !== 'gradium/phonon-voices' ||
+          manifest.voice_revision !== 'da6c9ec0d47be8df5c87c730a3aa97187f3229c3' ||
+          manifest.runtime_archive_sha256 !==
+            '7b26c8b9d98f5b5894de09af2aad35e64827e8475c07b003557cafc1ebba6a40'
+        )
+          throw new Error('Invalid bundled Phonon manifest');
+      }
       return { available: true, detail: 'Phonon speech is ready.' };
     } catch {
       return {
@@ -115,6 +166,8 @@ export class SpeechRuntime {
     }
     if (voice !== 'Easton' && voice !== 'Zoey') throw new Error('Unsupported speech voice.');
     if (this.activeRequest) throw new Error('Speech synthesis is already in progress.');
+
+    if (this.bundledSpeechRoot) return this.synthesizeNative(text, voice);
 
     const epoch = this.requestEpoch;
     const request = { epoch };
@@ -156,6 +209,7 @@ export class SpeechRuntime {
     opening?.cancel(new Error('Speech request was cancelled.'));
     const child = this.child;
     if (child) this.failChild(child, new Error('Speech request was cancelled.'));
+    this.killNativeChild();
   }
 
   close(): void {
@@ -173,6 +227,133 @@ export class SpeechRuntime {
       clearTimeout(child.startupTimer);
       child.process.kill();
     }
+    this.killNativeChild();
+  }
+
+  private async synthesizeNative(text: string, voice: Voice): Promise<string> {
+    const epoch = this.requestEpoch;
+    const request = { epoch };
+    this.activeRequest = request;
+    let directory: string | undefined;
+    let timeout: NodeJS.Timeout | undefined;
+    let spawnedChild: ChildProcess | undefined;
+    const generation = ++this.nativeGeneration;
+    try {
+      const ready = await this.status();
+      if (!ready.available) throw new Error(ready.detail);
+      if (this.closed || this.requestEpoch !== epoch || this.activeRequest !== request)
+        throw new Error('Speech request was cancelled.');
+      directory = await mkdtemp(join(tmpdir(), 'dm-phonon-'));
+      if (
+        this.closed ||
+        this.requestEpoch !== epoch ||
+        this.activeRequest !== request ||
+        generation !== this.nativeGeneration
+      )
+        throw new Error('Speech request was cancelled.');
+      const output = join(directory, 'speech.wav');
+      const binary = join(this.bundledSpeechRoot!, 'bin', 'ptts');
+      const model = join(this.bundledSpeechRoot!, 'model');
+      const voicePath = join(this.bundledSpeechRoot!, 'voices', `${voice}.safetensors`);
+      const child = this.spawnProcess(
+        binary,
+        [
+          '--model',
+          model,
+          '--voice',
+          voicePath,
+          '--lang',
+          'en',
+          '--quant',
+          'q8_0',
+          '--device',
+          'cpu',
+          '--threads',
+          '4',
+          '--seed',
+          '42',
+          '--output',
+          output,
+          '--',
+          text,
+        ],
+        {
+          cwd: directory,
+          stdio: ['ignore', 'ignore', 'ignore'],
+          env: this.nativeEnvironment(directory),
+          windowsHide: true,
+        },
+      );
+      spawnedChild = child;
+      this.nativeChild = child;
+      const code = await new Promise<number | null>((resolve, reject) => {
+        timeout = setTimeout(() => {
+          this.killNativeChild(child);
+          reject(new Error('Speech synthesis timed out.'));
+        }, this.synthesisTimeoutMs);
+        child.once('error', () => reject(new Error('Speech engine could not start.')));
+        child.once('exit', (exitCode) => resolve(exitCode));
+      });
+      if (this.nativeChild === child) this.nativeChild = undefined;
+      if (
+        this.closed ||
+        this.requestEpoch !== epoch ||
+        this.activeRequest !== request ||
+        generation !== this.nativeGeneration
+      )
+        throw new Error('Speech request was cancelled.');
+      if (code !== 0) throw new Error('Speech synthesis failed.');
+      const info = await stat(output);
+      if (info.size < 44 || info.size > MAX_AUDIO_BYTES)
+        throw new Error('Speech engine returned invalid or oversized audio.');
+      const audio = await readFile(output);
+      if (audio.toString('ascii', 0, 4) !== 'RIFF' || audio.toString('ascii', 8, 12) !== 'WAVE')
+        throw new Error('Speech engine returned invalid audio.');
+      if (
+        this.closed ||
+        this.requestEpoch !== epoch ||
+        this.activeRequest !== request ||
+        generation !== this.nativeGeneration
+      )
+        throw new Error('Speech request was cancelled.');
+      return audio.toString('base64');
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      if (spawnedChild && this.nativeChild === spawnedChild) this.killNativeChild(spawnedChild);
+      if (this.activeRequest === request) this.activeRequest = undefined;
+      if (directory) await rm(directory, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  private killNativeChild(expected?: ChildProcess): void {
+    const child = expected ?? this.nativeChild;
+    if (!expected || this.nativeChild === child) {
+      this.nativeChild = undefined;
+      this.nativeGeneration += 1;
+    }
+    if (!child || child.exitCode !== null) return;
+    child.kill('SIGTERM');
+    const escalation = setTimeout(() => {
+      if (child.exitCode === null) child.kill('SIGKILL');
+    }, 500);
+    escalation.unref();
+    child.once('exit', () => clearTimeout(escalation));
+  }
+
+  private nativeEnvironment(directory: string): NodeJS.ProcessEnv {
+    return {
+      PATH: (process.env.PATH ?? '').split(delimiter).filter(Boolean).join(delimiter),
+      HOME: this.home,
+      USERPROFILE: this.home,
+      TMPDIR: directory,
+      TEMP: directory,
+      TMP: directory,
+      HF_HOME: join(this.home, 'hf-cache'),
+      HF_HUB_OFFLINE: '1',
+      HF_HUB_DISABLE_TELEMETRY: '1',
+      HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
+      RUST_LOG: 'error',
+    };
   }
 
   private async ensureChild(epoch: number): Promise<RuntimeChild> {

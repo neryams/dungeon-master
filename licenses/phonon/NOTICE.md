@@ -2,7 +2,8 @@
 
 Dungeon Master application code is licensed under MIT. The following optional
 assets and tools have separate licenses; MIT does not grant additional rights
-to those components. No Phonon weights are included in the application installer.
+to those components. The macOS installer includes Phonon weights for
+noncommercial distribution and use under their separate license.
 
 ## Phonon 40M English
 
@@ -22,8 +23,8 @@ directed toward commercial advantage or monetary compensation. It does not mean
 merely that the application is free. Commercial rights are not provided by this
 application; contact the model's rights holder for separate permission.
 
-The app downloads the original pinned q8 weights without modifying them. Model
-cards and upstream attribution are retained with the downloaded assets. Gradium's
+The app includes the original pinned q8 weights without modifying them. Model
+cards and upstream attribution are retained with the assets. Gradium's
 model card credits Kyutai's Pocket TTS and Mimi as the underlying work. No
 endorsement of Dungeon Master by these organizations is claimed.
 
@@ -42,13 +43,13 @@ voice licenses do not remove the Phonon 40M model's noncommercial restriction.
 
 ## Runtime
 
-The optional `ptts` runtime is a separate MIT OR Apache-2.0 project:
-https://github.com/gradium-ai/phonon. Installed packages retain their distribution
-license metadata. The speech environment is downloaded only after explicit
-acceptance; it runs locally after installation. Hugging Face access approval is
-separate from the application's agreement checkbox.
+The `ptts` runtime is a separate MIT OR Apache-2.0 project:
+https://github.com/gradium-ai/xn-ptts. The macOS package includes a pinned native
+runtime with its license notices. Speech runs locally using bundled assets.
+Hugging Face access is needed only by maintainers downloading upstream assets,
+or by source developers using the separate Python fallback.
 
-The installer uses Astral's uv 0.13.5 (MIT OR Apache-2.0), downloaded from
+The source-development fallback uses Astral's uv 0.13.5 (MIT OR Apache-2.0), downloaded from
 https://github.com/astral-sh/uv/releases/tag/0.13.5. Its MIT license and copyright
 notice are in `uv-LICENSE-MIT.txt`. The private CPython distribution retains its
 license under `python/.../lib/python3.12/LICENSE.txt`; installed speech packages

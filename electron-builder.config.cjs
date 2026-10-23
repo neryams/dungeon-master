@@ -22,6 +22,11 @@ module.exports = {
   artifactName: '${productName}-${version}-${arch}.${ext}',
   extraResources: [
     {
+      from: 'build/desktop-speech',
+      to: 'speech',
+      filter: ['**/*'],
+    },
+    {
       from: 'build/desktop-node',
       to: 'node',
       filter: ['bin/node', 'LICENSE'],

@@ -2,13 +2,13 @@
 
 ## macOS installer
 
-The initial distributable targets **Apple silicon Macs (arm64)**. Open the DMG, drag **Dungeon Master** to Applications, then launch it from Applications. The installer bundles Electron, Node.js, application dependencies, rules and skills. No source checkout, npm, Python or uv installation is required to launch the app or use its optional narration installer.
+The initial distributable targets **Apple silicon Macs (arm64)**. Open the DMG, drag **Dungeon Master** to Applications, then launch it from Applications. The installer bundles Electron, Node.js, application dependencies, rules, skills, the native Phonon speech engine, the 40M model and Easton/Zoey voices. No source checkout, Git, npm, Python, uv, Hugging Face account or speech download is required to play or enable narration.
 
-Git is still required to create campaign repositories. Install and sign in to the chosen Codex or Antigravity CLI separately; local mode additionally needs Ollama. The app does not install or authenticate those providers. Use **Choose executable** if a provider is not detected.
+Campaign repositories are initialized by the bundled isomorphic-git library. Install and sign in to the chosen Codex or Antigravity CLI separately; local mode additionally needs Ollama. The app does not install or authenticate those providers. Use **Choose executable** if a provider is not detected.
 
 Current local builds are unsigned development previews. Public macOS releases still require Developer ID signing and Apple notarization; generating a DMG does not complete those steps. Do not disable system security settings to install an untrusted build. Automatic updates, Intel Mac installers, Windows installers and Linux installers are not provided by this initial packaging target.
 
-First launch offers optional **Narration setup**. Skip it to use the app without spoken DM messages. No speech runtime or model is downloaded until you accept and choose to install. You can return to **Narration setup** later from the top bar.
+First launch offers optional **Narration setup**. Skip it to use the app without spoken DM messages. The speech engine and model are already included; acknowledgement enables local playback without a download. You can return to **Narration setup** later from the top bar.
 
 ## Launch from source
 
@@ -129,18 +129,15 @@ Each DM message has a **Read aloud** button during play. Manual replay works whi
 
 Open **Narration setup**, review the linked Phonon model and **CC BY-NC 4.0** license, and explicitly acknowledge noncommercial use and the attribution/license conditions. The application remains MIT-licensed; that does not grant commercial rights to the model. Choose **Skip for now** to continue without speech. Declining is remembered and does not prevent campaign play.
 
-Phonon 40M is gated on Hugging Face. Open **Model access**, accept its access conditions with your Hugging Face account, and supply a read token authorized for that model in the setup's password field, or use your existing local Hugging Face login. The app clears the field after submission and uses the credential only for the current download; it does not save it in preferences, consent receipts, logs or campaign records. The in-app acknowledgement does not replace the model host's access approval. Network/access failures leave the app usable and installation can be retried or cancelled.
+The packaged app contains the pinned model, voice files, native speech engine, provenance and license notices in its read-only resources. Accepting enables local speech immediately; declining is remembered in the user cache and leaves gameplay available. No Hugging Face login or access token is requested. Neither narration nor consent requires a network connection. Generated audio is temporary and does not enter campaign history.
 
-After acceptance, the installer downloads a checksum-verified setup tool, a private Python runtime, pinned speech packages, the pinned Phonon 40M model, and Easton/Zoey voices. These live under `~/.cache/dungeon-master/speech` (`DM_SPEECH_HOME` overrides this directory). A versioned consent receipt and model/voice provenance are stored there alongside license notices. No model weights are bundled with the app. Subsequent narration uses local assets with Hub access disabled. Generated audio remains in memory and does not enter campaign history.
-
-For source-development automation, build first and explicitly acknowledge the same terms:
+Source developers can still use the private Python setup fallback. This downloads the gated model and therefore requires approved Hugging Face access and a configured login or `HF_TOKEN`:
 
 ```bash
-npm run build
 npm run speech:setup -- --accept-phonon-noncommercial
 ```
 
-This command uses the same installer and consent policy. It uses the configured Hugging Face login or `HF_TOKEN` for the authorized download; never include credentials in source files or issue reports. Run without the acceptance flag to see the license information without downloading.
+This source-only fallback has the same consent policy. It keeps its environment and receipts under `~/.cache/dungeon-master/speech` (`DM_SPEECH_HOME` overrides it). Never include credentials in source files or issue reports. Packaged users do not run this command.
 
 The first reading loads the engine. Long messages play in prose chunks, omitting Markdown formatting, link destinations and code blocks. This is English narration; fantasy names and unusual spellings may be pronounced imperfectly. An unavailable engine reports a status beside the controls and leaves campaign play usable. Retry a message after installing the engine with **Read aloud**.
 
@@ -152,7 +149,7 @@ npm run desktop:dist
 npm run desktop:smoke -- --launch
 ```
 
-Build on an Apple silicon Mac. `desktop:dist` stages an allowlisted payload, installs production dependencies, downloads and verifies the pinned official Node distribution, and creates a DMG and ZIP under ignored `release/`. It excludes development journals, campaign data, credentials and speech weights. Third-party notices and dependency license files are retained. `desktop:smoke` tests the packaged Node/worker/native dependencies and a temporary campaign; `--launch` also checks the packaged Electron UI with an isolated profile. It does not start or reconfigure the user's journal daemon.
+Build on an Apple silicon Mac. `desktop:dist` stages an allowlisted payload, installs production dependencies, downloads and verifies the pinned official Node distribution, and creates a DMG and ZIP under ignored `release/`. It excludes development journals, campaign data, credentials and personal speech settings. It also stages an explicit, revision-pinned speech asset bundle and checksum-verified native engine. Maintainers prepare model assets using their own approved Hugging Face access before building; credentials and Hub caches are never copied. Third-party notices and dependency license files are retained. `desktop:smoke` tests the packaged Node/worker/native dependencies, temporary campaign creation and both voices with a fresh home and only bundled Node on PATH; `--launch` also checks the packaged Electron UI with an isolated profile. It does not start or reconfigure the user's journal daemon.
 
 The build does not publish artifacts or sign them. Release owners must configure signing and notarization, review the included dependency notices, and test on a clean target machine before public distribution. Provider installation and login remain explicit user steps.
 

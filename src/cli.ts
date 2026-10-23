@@ -4,8 +4,9 @@ import { readFile, mkdir, mkdtemp, writeFile, cp, access } from 'node:fs/promise
 import { resolve, join, dirname } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
+import { init as initGit } from 'isomorphic-git';
 import { CampaignStore, initialize, atomicWrite } from './store.js';
 import { CampaignConfig } from './schema.js';
 import { exportCampaign, importCampaign } from './backup.js';
@@ -44,8 +45,8 @@ const { positionals, values } = parseArgs({
   },
 });
 const [command, arg] = positionals;
-function git(root: string) {
-  execFileSync('git', ['init', '-b', 'main', root], { stdio: 'pipe' });
+async function initializeGitRepository(root: string) {
+  await initGit({ fs, dir: root, defaultBranch: 'main' });
 }
 async function setup(store: CampaignStore) {
   const source = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -149,7 +150,7 @@ async function main() {
         review: { type: 'configure', mode: 'setup', reason: 'New campaign setup' },
       }),
     );
-    git(store.root);
+    await initializeGitRepository(store.root);
     console.log(JSON.stringify(await setup(store), null, 2));
     return;
   }
@@ -167,7 +168,7 @@ async function main() {
         premise: 'A ferry lantern has gone dark on the night of the harvest crossing.',
       }),
     );
-    git(store.root);
+    await initializeGitRepository(store.root);
     const service = new CampaignService(
       store,
       new JournalAdapter(store, new McpJournal(store.root)),
@@ -249,7 +250,7 @@ async function main() {
   if (command === 'import') {
     if (!arg) throw new Error('Supply an archive file');
     const store = await importCampaign(root, JSON.parse(await readFile(arg, 'utf8')));
-    git(store.root);
+    await initializeGitRepository(store.root);
     console.log(JSON.stringify(await setup(store), null, 2));
     return;
   }

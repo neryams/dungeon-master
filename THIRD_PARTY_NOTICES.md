@@ -2,7 +2,7 @@
 
 Dungeon Master's original application code is licensed under the MIT License
 in `LICENSE`. This license does not replace the licenses of bundled dependencies,
-rulebooks, or optional downloaded models.
+rulebooks, or bundled models.
 
 ## Desktop distribution
 
@@ -15,6 +15,7 @@ and does not replace, their full license texts.
 
 `markdown-it` is MIT-licensed; the browser build includes its license alongside
 the bundled renderer module. Other dependencies retain their upstream notices.
+`isomorphic-git` (MIT) initializes campaign repositories without a system Git executable.
 
 ## Dungeons & Dragons SRD
 
@@ -24,14 +25,16 @@ Those materials are not relicensed under the application's MIT license.
 
 ## Optional narration
 
-Phonon model weights are **not bundled**. Installation is optional and requires
-explicit acknowledgement of the model's CC BY-NC 4.0 terms. Users who decline
-can use the application without narration. Installation also requires access
-to the model on Hugging Face. The access credential is used only for the current
-download and is not saved by the application.
+The macOS installer includes pinned Phonon 40M model weights and the native speech
+runtime. This distribution of the model is for noncommercial purposes under
+CC BY-NC 4.0. Its restrictions apply independently of the application's MIT
+license. Explicit acknowledgement enables narration; users who decline can play
+without it. End users do not need a Hugging Face account or token. Build-time
+download credentials and personal settings are never bundled.
 
 See `licenses/phonon/NOTICE.md`, `licenses/phonon/CC-BY-NC-4.0.txt`, and
 `licenses/phonon/Apache-2.0.txt` for sources, pinned revisions, model restrictions,
 voice licensing and runtime information. These notices are also copied into
-the installed speech asset directory. Installed Python/runtime packages retain
-their own license metadata.
+the bundled speech resource directory. Native runtime licenses are retained
+there. The separate source-development Python fallback retains installed package
+license metadata and requires authorized upstream download access.
