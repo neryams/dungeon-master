@@ -866,6 +866,7 @@ summary {
   line-height: 1.5;
 }
 .active-turn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 9px;

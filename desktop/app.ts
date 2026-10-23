@@ -814,6 +814,7 @@ function renderState() {
   if (resolving && resolvingSince === undefined) resolvingSince = Date.now();
   if (!resolving) resolvingSince = undefined;
   $('active-turn').hidden = !resolving;
+  $('session-status').hidden = resolving && !state.lanHosted;
   if (resolving) {
     $('active-turn-phase').textContent = state.activity?.phase || 'The DM is thinking';
     renderElapsed();

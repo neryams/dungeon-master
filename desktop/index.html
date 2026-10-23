@@ -355,13 +355,13 @@
             </p>
           </div>
         </div>
-        <div id="active-turn" class="active-turn" hidden>
-          <span class="active-turn-mark" aria-hidden="true">✦</span>
-          <span id="active-turn-phase">The DM is thinking</span>
-          <time id="active-turn-elapsed">0:00</time>
-        </div>
         <div id="transcript" role="log" aria-label="Public table conversation">
           <p class="conversation-empty">Describe your party or send an action.</p>
+        </div>
+        <div id="active-turn" class="active-turn" hidden>
+          <span class="active-turn-mark" aria-hidden="true">✦</span>
+          <span id="active-turn-phase" role="status" aria-live="polite">The DM is thinking</span>
+          <time id="active-turn-elapsed">0:00</time>
         </div>
         <div id="session-status" role="status">
           <span id="status-dot" class="small-dot"></span
