@@ -20,6 +20,49 @@ dialog::backdrop {
 #switch-model {
   width: 100%;
 }
+#speech-dialog {
+  width: min(620px, 92vw);
+}
+#speech-dialog .inline-link {
+  color: var(--accent, #d2b979);
+  text-decoration: underline;
+  padding: 0 2px;
+}
+.speech-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text, #e6e1cf);
+  line-height: 1.5;
+  margin: 18px 0;
+}
+.speech-consent input {
+  width: auto !important;
+  min-width: 0;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.speech-consent span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#speech-token {
+  width: 100%;
+  margin-top: 6px;
+}
+.speech-token-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+#speech-status {
+  min-height: 1.4em;
+}
 .model-label-row {
   display: flex;
   align-items: center;
@@ -37,4 +80,38 @@ dialog::backdrop {
 #lan-players,
 #lan-required {
   margin: 16px 0;
+}
+/* Narration remains available while the transcript scrolls or the DM works. */
+.narration-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border, #3c4847);
+  flex-shrink: 0;
+}
+.narration-controls label {
+  margin: 0;
+  font-size: 12px;
+}
+.narration-controls select {
+  width: 105px;
+  min-width: 0;
+  margin: 0;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.narration-controls button,
+.message-read {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+#narration-status {
+  flex-basis: 100%;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.message-read {
+  margin-top: 8px;
 }

@@ -14,6 +14,8 @@
     "desktop/dom.ts",
     "desktop/markdown.ts",
     "desktop/markers.ts",
+    "desktop/narration.ts",
+    "desktop/narration-audio.ts",
     "desktop/globals.d.ts",
     "desktop/vendor/*.d.ts"
   ],

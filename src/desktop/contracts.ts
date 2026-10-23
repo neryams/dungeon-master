@@ -28,6 +28,47 @@ export const MapInput = z
     details: z.boolean().optional(),
   })
   .strict();
+export const SpeechInput = z
+  .object({
+    campaignId: Id,
+    turnId: Id,
+    revision: z.number().int().positive().safe(),
+    voice: z.enum(['Easton', 'Zoey']),
+    part: z.number().int().min(0).max(2000),
+  })
+  .strict();
+export type SpeechInput = z.infer<typeof SpeechInput>;
+export interface SpeechResult {
+  audio: string;
+  nextPart?: number;
+}
+export interface SpeechStatus {
+  available: boolean;
+  detail: string;
+}
+export interface SpeechInstallState {
+  phase: 'unconfigured' | 'declined' | 'installing' | 'ready' | 'error';
+  detail: string;
+  accepted: boolean;
+  licenseRevision: string;
+  bundled?: boolean;
+}
+export const SpeechInstallInput = z
+  .object({
+    accepted: z.literal(true),
+    licenseRevision: z.string().min(1).max(200),
+    token: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1024)
+      .regex(/^[A-Za-z0-9_-]+$/)
+      .optional(),
+  })
+  .strict();
+export type SpeechInstallInput = z.infer<typeof SpeechInstallInput>;
+export const SpeechLink = z.enum(['license', 'model', 'token']);
+export type SpeechLink = z.infer<typeof SpeechLink>;
 export const IntentInput = z
   .object({
     id: z.string().uuid(),
@@ -126,6 +167,7 @@ export type CampaignSnapshot = PlayerView & {
   lanHosted: boolean;
   provider?: Provider;
   model?: string;
+  speechEligibleRevisions?: number[];
 };
 export type DesktopSnapshot =
   CampaignSnapshot | { campaign: null; stage: Stage; detail: string; table: TableTurn[] };
@@ -169,6 +211,13 @@ export interface WorkerApi {
   beginSetup(): Promise<void>;
   snapshot(): Promise<DesktopSnapshot>;
   map(input: MapInput): Promise<MapResult>;
+  speech(input: SpeechInput): Promise<SpeechResult>;
+  speechStatus(): Promise<SpeechStatus>;
+  cancelSpeech(): Promise<void>;
+  speechSetupStatus(): Promise<SpeechInstallState>;
+  installSpeech(input: SpeechInstallInput): Promise<SpeechInstallState>;
+  declineSpeech(): Promise<SpeechInstallState>;
+  cancelSpeechInstall(): Promise<SpeechInstallState>;
   stop(): Promise<void>;
   startLan(): Promise<LanStatus>;
   stopLan(): Promise<void>;
@@ -176,6 +225,7 @@ export interface WorkerApi {
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
 export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect' | 'models'> {
+  openSpeechLink(link: SpeechLink): Promise<void>;
   detect(path?: string): Promise<{ path: string; version: string }>;
   models(): Promise<ModelCatalog>;
   selectModel(model?: string): Promise<void>;
@@ -305,6 +355,28 @@ export async function dispatchWorker(
       return api.beginSetup();
     case 'map':
       return api.map(...z.tuple([MapInput]).parse(raw));
+    case 'speech':
+      return api.speech(...z.tuple([SpeechInput]).parse(raw));
+    case 'speechStatus':
+      z.tuple([]).parse(raw);
+      return api.speechStatus();
+    case 'cancelSpeech':
+      z.tuple([]).parse(raw);
+      return api.cancelSpeech();
+    case 'speechSetupStatus':
+      z.tuple([]).parse(raw);
+      return api.speechSetupStatus();
+    case 'installSpeech':
+      // Never return validator details containing a submitted credential.
+      if (!z.tuple([SpeechInstallInput]).safeParse(raw).success)
+        throw new Error('Confirm the narration terms and provide a valid download credential.');
+      return api.installSpeech(...z.tuple([SpeechInstallInput]).parse(raw));
+    case 'declineSpeech':
+      z.tuple([]).parse(raw);
+      return api.declineSpeech();
+    case 'cancelSpeechInstall':
+      z.tuple([]).parse(raw);
+      return api.cancelSpeechInstall();
     case 'lanAdmin':
       return api.lanAdmin(...z.tuple([LanAdminInput]).parse(raw));
     case 'snapshot':
@@ -333,6 +405,8 @@ export async function dispatchDesktop(
 ): Promise<unknown> {
   if (typeof method !== 'string') throw new Error('Invalid desktop method');
   switch (method) {
+    case 'openSpeechLink':
+      return api.openSpeechLink(...z.tuple([SpeechLink]).parse(raw));
     case 'models':
       z.tuple([]).parse(raw);
       return api.models();

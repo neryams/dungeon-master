@@ -27,12 +27,20 @@ import { LanGame } from './lan.js';
 import { providerModels } from './models.js';
 import type { ModelCatalog } from './contracts.js';
 import { ModelId } from './contracts.js';
+import { SpeechInput, type SpeechResult } from './contracts.js';
+import { SpeechRuntime } from './speech-runtime.js';
+import { SpeechInstaller } from './speech-install.js';
+import { SpeechInstallInput } from './contracts.js';
+import { speechEligibleRevisions, speechParts } from './speech-text.js';
 
 const execute = promisify(execFile);
 import { SubmitInput as Submit, CreateInput as Create, MapInput } from './contracts.js';
 import type { DesktopSnapshot, MapResult, Stage } from './contracts.js';
 
 export class DesktopHost {
+  private speechRuntime?: SpeechRuntime;
+  private speechGeneration = 0;
+  private speechInstaller?: SpeechInstaller;
   private store?: CampaignStore;
   private lan?: LanGame;
   private lanStarting?: Promise<LanGame>;
@@ -66,6 +74,8 @@ export class DesktopHost {
       driver?: (options: CodexOptions) => AgentDriver;
       probe?: typeof detectAntigravity;
       modelProbe?: typeof providerModels;
+      speechRuntime?: SpeechRuntime;
+      speechInstaller?: SpeechInstaller;
     },
   ) {}
 
@@ -549,11 +559,14 @@ export class DesktopHost {
   }
   async snapshot(): Promise<DesktopSnapshot> {
     if (!this.store) return { stage: this.stage, detail: this.detail, campaign: null, table: [] };
-    const { state } = await this.store.read();
+    const store = this.store;
+    const { state, events } = await store.read();
+    if (store !== this.store) throw new Error('The campaign changed. Refresh the table.');
     return {
       ...playerView(state, this.store.config),
       root: this.store.root,
       table: state.table ?? [],
+      speechEligibleRevisions: speechEligibleRevisions(events),
       stage: this.stage,
       detail: this.detail,
       gathering: state.gathering,
@@ -562,6 +575,71 @@ export class DesktopHost {
       provider: this.provider,
       ...(this.model !== undefined ? { model: this.model } : {}),
     };
+  }
+  private narrator() {
+    return (this.speechRuntime ??= this.options.speechRuntime ?? new SpeechRuntime());
+  }
+  private narrationSetup() {
+    return (this.speechInstaller ??=
+      this.options.speechInstaller ?? new SpeechInstaller({ sourceRoot: this.options.source }));
+  }
+  speechSetupStatus() {
+    return this.narrationSetup().status();
+  }
+  async installSpeech(raw: SpeechInstallInput) {
+    const parsed = SpeechInstallInput.safeParse(raw);
+    if (!parsed.success)
+      throw new Error('Confirm the narration terms and provide a valid download credential.');
+    await this.cancelSpeech();
+    return this.narrationSetup().install(parsed.data);
+  }
+  async declineSpeech() {
+    await this.cancelSpeech();
+    return this.narrationSetup().decline();
+  }
+  async cancelSpeechInstall() {
+    await this.cancelSpeech();
+    return this.narrationSetup().cancel();
+  }
+  closeSpeechSetup() {
+    this.speechInstaller?.close();
+  }
+  async speechStatus() {
+    const setup = await this.speechSetupStatus();
+    if (!setup.accepted || setup.phase !== 'ready')
+      return { available: false, detail: setup.detail };
+    return this.narrator().status();
+  }
+  async cancelSpeech() {
+    ++this.speechGeneration;
+    this.speechRuntime?.cancel();
+  }
+  async speech(raw: SpeechInput): Promise<SpeechResult> {
+    const input = SpeechInput.parse(raw);
+    const store = this.requireStore();
+    const generation = this.speechGeneration;
+    if (this.changing || store.config.id !== input.campaignId)
+      throw new Error('The campaign changed. Choose a message from the current campaign.');
+    const { state } = await store.read();
+    if (store !== this.store || generation !== this.speechGeneration || this.changing)
+      throw new Error('Reading cancelled.');
+    if (state.reviewMode === 'setup') throw new Error('Narration is available during play.');
+    const setup = await this.speechSetupStatus();
+    if (!setup.accepted || setup.phase !== 'ready')
+      throw new Error('Set up optional narration before reading messages aloud.');
+    if (store !== this.store || generation !== this.speechGeneration)
+      throw new Error('Reading cancelled.');
+    const message = state.table
+      ?.find((turn) => turn.id === input.turnId)
+      ?.messages.find((entry) => entry.revision === input.revision);
+    if (!message) throw new Error('That public DM message is unavailable.');
+    const parts = speechParts(message.text);
+    if (!parts.length && input.part === 0) return { audio: '' };
+    if (input.part >= parts.length) throw new Error('That message part is unavailable.');
+    const audio = await this.narrator().synthesize(parts[input.part], input.voice);
+    if (store !== this.store || generation !== this.speechGeneration)
+      throw new Error('Reading cancelled.');
+    return { audio, ...(input.part + 1 < parts.length ? { nextPart: input.part + 1 } : {}) };
   }
   async map(raw: MapInput): Promise<MapResult> {
     const input = MapInput.parse(raw);
@@ -653,6 +731,9 @@ export class DesktopHost {
     }
   }
   async close() {
+    await this.cancelSpeech();
+    this.speechRuntime?.close();
+    this.speechRuntime = undefined;
     await this.stopLan();
     await this.stop();
     if (this.store && this.ownerToken) {
