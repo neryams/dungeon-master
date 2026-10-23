@@ -6,6 +6,7 @@ import type {
   MapInput,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
+import { markdownMessage } from './markdown.js';
 const tags = {
   title: 'strong',
   status: 'span',
@@ -202,9 +203,9 @@ function render() {
     );
     if (t.actions)
       for (const x of t.actions)
-        a.append(el('strong', nameOf(x.characterId)), el('p', x.pass ? 'Pass' : x.text));
-    else a.append(el('strong', t.speaker), el('p', t.text));
-    for (const m of t.messages) a.append(el('strong', 'Dungeon Master'), el('p', m.text));
+        a.append(el('strong', nameOf(x.characterId)), markdownMessage(x.pass ? 'Pass' : x.text));
+    else a.append(el('strong', t.speaker), markdownMessage(t.text));
+    for (const m of t.messages) a.append(el('strong', 'Dungeon Master'), markdownMessage(m.text));
     transcript.append(a);
   }
   if (atBottom) transcript.scrollTop = transcript.scrollHeight;

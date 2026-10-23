@@ -35,7 +35,27 @@ test(
             expectedRevision: s.revision,
             reason: 'test',
             requestId: s.table.at(-1).id,
-            text: 'The lantern lights the bridge. <script>window.UNSAFE=true</script>',
+            text: `The lantern lights the bridge. **The sign** points ahead, and Tess *listens*.
+
+## By the river
+
+- The lantern burns low.
+- Water rushes below.
+
+1. Read the sign.
+2. Follow the path.
+
+The inscription says \`keep moving\`.
+
+\`\`\`text
+Lantern light fades.
+\`\`\`
+
+<script>window.UNSAFE=true</script>
+<img src="https://example.invalid/hostile.png" onerror="window.UNSAFE=true">
+<div onclick="window.UNSAFE=true">raw HTML stays text</div>
+![remote image](https://example.invalid/markdown.png)
+[unsafe link](javascript:window.UNSAFE=true)`,
             ...(count === 2
               ? {
                   responseRequest: {
@@ -94,6 +114,21 @@ test(
     await b.locator('#text').fill('Yes, carefully.');
     await b.locator('#confirm').click();
     await a.waitForFunction(() => document.querySelectorAll('#transcript article').length === 2);
+    const narration = a.locator('#transcript .message-markdown:has(h2)').first();
+    assert.equal(await narration.locator('h2').count(), 1);
+    assert.equal(await narration.locator('strong').innerText(), 'The sign');
+    assert.equal(await narration.locator('em').innerText(), 'listens');
+    assert.equal(await narration.locator('ul li').count(), 2);
+    assert.equal(await narration.locator('ol li').count(), 2);
+    assert.equal(await narration.locator('code').count(), 2);
+    assert.equal(await narration.locator('pre code').count(), 1);
+    assert.equal(await a.locator('#transcript script, #transcript img, #transcript a').count(), 0);
+    assert.match(
+      await a.locator('#transcript').innerText(),
+      /<script>window\.UNSAFE=true<\/script>/,
+    );
+    assert.match(await a.locator('#transcript').innerText(), /<img src=/);
+    assert.match(await a.locator('#transcript').innerText(), /unsafe link/);
     assert.equal(await a.evaluate(() => window.UNSAFE), undefined);
     await a.getByRole('button', { name: 'Map', exact: true }).click();
     await a.waitForFunction(() => document.querySelector('#map-image').naturalWidth > 0);

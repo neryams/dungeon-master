@@ -1,6 +1,7 @@
 import { partyState } from './domain.js';
 import { State, CampaignConfig, Entity } from './schema.js';
 import { characterSheet, partyOverview } from './sheets.js';
+import { markerAppearance, mapLegend } from './map-markers.js';
 
 // Shared by the read-only web panel and desktop. Never return the original snapshot.
 export function playerView(original: State, config: CampaignConfig) {
@@ -10,7 +11,13 @@ export function playerView(original: State, config: CampaignConfig) {
   return {
     campaign: { id: config.id, name: config.name },
     revision: state.revision,
-    party: overview,
+    party: {
+      ...overview,
+      members: overview.members.map((member) => ({
+        ...member,
+        marker: markerAppearance(state.entities[member.id]),
+      })),
+    },
     sheets: overview.members.map((m) => characterSheet(state, m.id)),
     focus: state.focus,
     scene: state.scene,
@@ -19,7 +26,13 @@ export function playerView(original: State, config: CampaignConfig) {
     ),
     maps: Object.values(state.entities)
       .filter((e) => e.map)
-      .map((e) => ({ id: e.id, name: e.name, kind: e.map!.kind, bounds: e.map!.bounds })),
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        kind: e.map!.kind,
+        bounds: e.map!.bounds,
+        legend: mapLegend(state, e.id),
+      })),
     encounter: state.encounter
       ? {
           round: state.encounter.round,

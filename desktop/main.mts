@@ -104,6 +104,28 @@ else {
         await writeFile(prefsPath + '.tmp', JSON.stringify(prefs), { mode: 0o600 });
         await rename(prefsPath + '.tmp', prefsPath);
       }
+      const executable = (provider = prefs.provider ?? 'antigravity') =>
+        provider === 'antigravity' ? prefs.executable : prefs.codexExecutable;
+      async function checkModel(
+        model: string | undefined,
+        provider = prefs.provider ?? 'antigravity',
+      ) {
+        if (model === undefined && provider !== 'ollama') return;
+        const catalog = await call('models', executable(provider), provider, prefs.local);
+        if (!catalog.models.some((entry) => entry.id === model))
+          throw new Error('That model is unavailable. Refresh the model list and choose another.');
+      }
+      function rememberModel(
+        model: string | undefined,
+        provider = prefs.provider ?? 'antigravity',
+      ) {
+        if (provider === 'ollama') {
+          if (!prefs.local || !model) throw new Error('Configure a local model first.');
+          prefs.local = { ...prefs.local, model };
+        } else {
+          prefs.models = { ...prefs.models, [provider]: model };
+        }
+      }
       const actions: DesktopApi = {
         preferences: async () => prefs,
         localModels: (settings) => call('localModels', settings),
@@ -115,6 +137,47 @@ else {
         selectProvider: async (provider) => {
           await call('stop');
           prefs.provider = provider;
+          await savePrefs();
+        },
+        models: () => call('models', executable(), prefs.provider ?? 'antigravity', prefs.local),
+        selectModel: async (model) => {
+          const provider = prefs.provider ?? 'antigravity';
+          const view = await call('snapshot');
+          if (view.campaign && !['disconnected', 'attention'].includes(view.stage))
+            throw new Error('Use DM model to change models in an active campaign.');
+          await checkModel(model, provider);
+          const latest = await call('snapshot');
+          if (latest.campaign && !['disconnected', 'attention'].includes(latest.stage))
+            throw new Error('Wait for the DM before changing models.');
+          if ((prefs.provider ?? 'antigravity') !== provider)
+            throw new Error('The provider changed. Choose its model again.');
+          rememberModel(model, provider);
+          await savePrefs();
+        },
+        switchModel: async (model) => {
+          const provider = prefs.provider ?? 'antigravity';
+          await checkModel(model, provider);
+          if ((prefs.provider ?? 'antigravity') !== provider)
+            throw new Error('The provider changed. Choose its model again.');
+          const local =
+            provider === 'ollama' && prefs.local && model ? { ...prefs.local, model } : prefs.local;
+          try {
+            await call('connect', executable(provider), true, provider, local, model);
+          } catch (error) {
+            const view = await call('snapshot');
+            const attemptedModel = provider === 'ollama' ? local?.model : model;
+            if (
+              view.campaign &&
+              view.stage === 'attention' &&
+              view.provider === provider &&
+              view.model === attemptedModel
+            ) {
+              rememberModel(model, provider);
+              await savePrefs();
+            }
+            throw error;
+          }
+          rememberModel(model, provider);
           await savePrefs();
         },
         detect: async (path) => {
@@ -165,17 +228,19 @@ else {
           await savePrefs();
           return state;
         },
-        connect: (fresh = false) =>
-          call(
-            'connect',
-            (prefs.provider ?? 'antigravity') !== 'antigravity'
-              ? prefs.codexExecutable
-              : prefs.executable,
-            fresh,
-            prefs.provider ?? 'antigravity',
-            prefs.local,
-          ),
+        connect: async (fresh = false) => {
+          const provider = prefs.provider ?? 'antigravity';
+          const model = provider === 'ollama' ? undefined : prefs.models?.[provider];
+          if (provider !== 'ollama') await checkModel(model, provider);
+          if (
+            (prefs.provider ?? 'antigravity') !== provider ||
+            (provider !== 'ollama' && prefs.models?.[provider] !== model)
+          )
+            throw new Error('The provider or model changed. Connect again with your selection.');
+          return call('connect', executable(provider), fresh, provider, prefs.local, model);
+        },
         submit: (input) => call('submit', input),
+        beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),
         stop: () => call('stop'),

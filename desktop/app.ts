@@ -6,8 +6,12 @@ import type {
   PlayerView,
   LanStatus,
   LocalSettings,
+  ModelCatalog,
+  Provider,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
+import { markdownMessage } from './markdown.js';
+import { markerBadge } from './markers.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -16,6 +20,13 @@ const tags = {
   campaigns: 'button',
   connection: 'button',
   stop: 'button',
+  'model-dialog': 'dialog',
+  'model-current': 'p',
+  'switch-model': 'select',
+  'model-dialog-status': 'p',
+  'model-apply': 'button',
+  'model-cancel': 'button',
+  'change-model': 'button',
   'lan-dialog': 'dialog',
   'lan-help': 'p',
   'lan-qr': 'img',
@@ -38,6 +49,10 @@ const tags = {
   provider: 'select',
   'provider-command': 'code',
   'provider-help': 'p',
+  'hosted-model-settings': 'div',
+  'provider-model': 'select',
+  'refresh-models': 'button',
+  'models-status': 'span',
   'local-settings': 'div',
   'local-endpoint': 'input',
   'local-model': 'input',
@@ -69,6 +84,9 @@ const tags = {
   sheet: 'div',
   quests: 'div',
   'map-select': 'select',
+  'map-legend': 'section',
+  'map-legend-types': 'div',
+  'map-legend-items': 'ul',
   'scene-details': 'details',
   'scene-title': 'summary',
   'scene-summary': 'p',
@@ -86,6 +104,11 @@ const tags = {
   'review-mode': 'span',
   encounter: 'div',
   transcript: 'div',
+  'conversation-label': 'span',
+  'setup-guide': 'div',
+  'setup-progress': 'p',
+  'setup-activity': 'div',
+  'setup-activity-detail': 'p',
   'session-status': 'div',
   'status-dot': 'span',
   'status-text': 'span',
@@ -109,12 +132,18 @@ let state: CampaignSnapshot,
   shownRevision = -1,
   transcriptKey = '',
   mapKey = '',
+  legendKey = '',
   selectedMap = '',
   mapDetails = false,
   offset = { x: 0, y: 0 },
   polling = false,
   submitting = false,
   pendingSubmission: SubmitInput | undefined;
+let modelRequest = 0;
+let modelSaving: Promise<void> = Promise.resolve();
+let dialogModel: string | undefined;
+let modelSwitching = false;
+let dialogRequest = 0;
 function notice(error: unknown) {
   $('notice-text').textContent = errorMessage(error).replace(
     /^Error invoking remote method '[^']+': Error: /,
@@ -140,12 +169,14 @@ function members() {
   return state?.party?.members ?? [];
 }
 function seat(id: string | undefined) {
-  selected = id;
+  selected = state.reviewMode === 'setup' ? undefined : id;
   renderParty();
   renderSheet();
   $('acting-as').textContent = selected
     ? `Playing as ${members().find((p) => p.id === selected)?.name ?? 'character'}`
-    : 'Table';
+    : state.reviewMode === 'setup'
+      ? 'Your campaign preferences'
+      : 'Table';
 }
 function renderParty() {
   const party = $('party');
@@ -155,8 +186,7 @@ function renderParty() {
   for (const p of members()) {
     const card = node('button', undefined, `party-card${p.id === selected ? ' selected' : ''}`);
     card.setAttribute('aria-pressed', String(p.id === selected));
-    const avatar = node('span', p.name.slice(0, 1).toUpperCase(), 'party-avatar');
-    avatar.setAttribute('aria-hidden', 'true');
+    const avatar = markerBadge(p.marker, 'party-avatar');
     card.append(avatar);
     card.append(node('strong', p.name));
     const stats = node('div', undefined, 'party-stats');
@@ -237,15 +267,28 @@ function renderTranscript() {
   const key = JSON.stringify(state.table);
   if (key === transcriptKey) return;
   transcriptKey = key;
-  if (!state.table?.length) return;
   const log = $('transcript');
+  if (!state.table?.length) {
+    log.replaceChildren(
+      node(
+        'p',
+        state.reviewMode === 'setup'
+          ? 'The DM will guide you through the adventure, party, and opening scene. Connect to begin.'
+          : 'Describe your party or send an action.',
+        'conversation-empty',
+      ),
+    );
+    return;
+  }
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 100;
   log.replaceChildren();
   function message(speaker: string, text: string, revision: number, player = false) {
     const article = node('article', undefined, `message${player ? ' player' : ''}`);
     const label = node('div', undefined, 'message-label');
     label.append(node('span', speaker.toUpperCase()), node('small', `r${revision}`));
-    article.append(label, node('div', text, 'message-text'));
+    const body = markdownMessage(text);
+    body.classList.add('message-text');
+    article.append(label, body);
     log.append(article);
     return article;
   }
@@ -268,8 +311,78 @@ function mapDimensions(map?: PlayerView['maps'][number]) {
       }
     : { width: Number(size), height: Number(size) };
 }
+function renderMapLegend(map?: PlayerView['maps'][number]) {
+  const key = JSON.stringify([map?.id, map?.legend, members().map((member) => member.id)]);
+  if (key === legendKey) return;
+  legendKey = key;
+  $('map-legend').hidden = !map;
+  const items = $('map-legend-items');
+  items.replaceChildren();
+  if (!map) return;
+  const types = $('map-legend-types');
+  types.replaceChildren();
+  const npc = markerBadge({
+    kind: 'npc',
+    label: '',
+    color: '#64748b',
+    shape: 'circle',
+    dotted: true,
+  });
+  const object = markerBadge({
+    kind: 'object',
+    label: '',
+    color: '#64748b',
+    shape: 'triangle',
+    dotted: false,
+  });
+  for (const [icon, label] of [
+    [npc, 'NPC'],
+    [object, 'Objects / landmarks'],
+  ] as const) {
+    const key = node('span');
+    key.append(icon);
+    if (icon === object) {
+      key.append(
+        markerBadge({
+          kind: 'object',
+          label: '',
+          color: '#64748b',
+          shape: 'diamond',
+          dotted: false,
+        }),
+      );
+    }
+    key.append(node('span', label));
+    types.append(key);
+  }
+  if (map.legend.some((entry) => entry.appearance.shape === 'square')) {
+    const key = node('span');
+    key.append(
+      markerBadge({ kind: 'terrain', shape: 'square', dotted: false }),
+      node('span', 'Terrain / obstacle'),
+    );
+    types.append(key);
+  }
+  const partyIds = new Set(members().map((member) => member.id));
+  for (const entry of map.legend) {
+    if (entry.kind === 'entity' && partyIds.has(entry.id)) continue;
+    const item = node('li');
+    item.dataset.markerId = entry.id;
+    item.setAttribute(
+      'aria-label',
+      `${entry.appearance.kind}, ${entry.label}, ${entry.position}${'label' in entry.appearance && entry.appearance.label ? `, marker ${entry.appearance.label}` : ''}`,
+    );
+    const icon = markerBadge(entry.appearance);
+    const label = node('span', undefined, 'legend-label');
+    label.append(node('span', entry.label), node('small', entry.position));
+    item.append(icon, label);
+    items.append(item);
+  }
+  if (!items.children.length) items.append(node('li', 'No other revealed markers.', 'help'));
+}
 async function renderMap() {
   const m = state?.maps?.find((m) => m.id === selectedMap);
+  renderMapLegend(m);
   $('map-empty').hidden = !!m;
   $('map-image').hidden = !m;
   for (const id of [
@@ -324,18 +437,54 @@ async function renderMap() {
 }
 function renderState() {
   if (!state.campaign) return;
+  const settingUp = state.reviewMode === 'setup';
+  const generating = settingUp && state.stage === 'resolving';
+  $('setup-activity').hidden = !generating;
+  if (generating) {
+    const partySaved = members().length > 0;
+    const mapSaved = state.maps.length > 0;
+    const openingSaved = !!(state.scene && state.focus?.primaryObjective);
+    $('setup-activity-detail').textContent =
+      partySaved && mapSaved && openingSaved
+        ? 'Your party, map, and opening are saved. The DM is checking the details and preparing your briefing.'
+        : partySaved && mapSaved
+          ? 'Your party and map are saved. The DM is preparing the opening scene and your first decision.'
+          : partySaved
+            ? 'Your party is saved. The DM is working on the starting map and opening adventure.'
+            : mapSaved
+              ? 'The starting map is saved. The DM is working on your characters and their place in the adventure.'
+              : 'Turning your ideas into characters, places, and the opening adventure.';
+  }
+  $('play').classList.toggle('setup-flow', settingUp);
+  $('setup-guide').hidden = !settingUp;
+  $('conversation-label').textContent = settingUp ? 'Campaign creation' : 'Chat';
+  $('action').placeholder = settingUp
+    ? 'Describe your idea, answer the DM, or ask for suggestions…'
+    : 'Describe an action…';
+  if (settingUp) {
+    $('setup-progress').textContent = [
+      members().length ? `Party saved · ${members().length} characters` : 'Party to create',
+      state.maps.length ? 'Map saved' : 'Map to create',
+      state.scene && state.focus?.primaryObjective ? 'Opening saved' : 'Opening to create',
+    ].join('  /  ');
+  }
   $('campaign-heading').textContent = state.campaign.name;
   $('revision').textContent = `Saved · r${state.revision}`;
   $('connection').hidden = false;
   $('campaigns').hidden = false;
   $('lan-host').hidden = false;
+  $('lan-host').disabled = settingUp;
+  $('lan-host').title = settingUp ? 'Finish campaign setup before inviting players.' : '';
   const busy = state.stage === 'connecting' || state.stage === 'resolving';
   $('stop').hidden = state.stage !== 'resolving' && state.stage !== 'ready';
   $('campaigns').disabled = busy;
-  $('connection').disabled = busy || state.stage === 'ready';
+  $('connection').disabled = busy;
+  $('connection').title = state.model
+    ? `Current model: ${state.model}`
+    : 'Current model: CLI default';
   $('connection').textContent =
     state.stage === 'ready'
-      ? 'DM connected'
+      ? 'DM model…'
       : state.stage === 'connecting'
         ? 'Connecting…'
         : 'Connect DM';
@@ -344,7 +493,9 @@ function renderState() {
   $('status-text').textContent = state.lanHosted
     ? 'Use LAN game → Open player seat to play.'
     : state.stage === 'ready'
-      ? 'DM connected'
+      ? settingUp
+        ? 'DM connected · Build your campaign together.'
+        : 'DM connected'
       : state.stage === 'disconnected'
         ? 'Connect DM to send an action.'
         : state.detail;
@@ -415,11 +566,13 @@ async function refresh() {
   }
 }
 async function connect(fresh = false) {
+  await modelSaving;
   if ($('provider').value === 'ollama') await api.configureLocal(localSettings());
   const promise = api.connect(fresh);
   void refresh();
   try {
     await promise;
+    await api.beginSetup();
   } finally {
     await refresh();
   }
@@ -439,6 +592,7 @@ export function showCampaign(snapshot: DesktopSnapshot) {
   $('welcome').hidden = true;
   $('play').hidden = false;
   $('action').value = '';
+  $('acting-as').textContent = 'Table';
   $('notice').hidden = true;
   $('transcript').replaceChildren(
     node('p', 'Describe your party or send an action.', 'conversation-empty'),
@@ -454,6 +608,7 @@ async function checkProvider(path?: string) {
   try {
     const found = await api.detect(path);
     $('provider-status').textContent = `Detected · ${found.version}`;
+    await loadModels();
   } catch (e) {
     $('provider-status').textContent = 'Not ready · Install or choose the selected CLI below';
     throw e;
@@ -464,15 +619,21 @@ on('dismiss', () => {
 });
 $('provider').onchange = () => {
   void (async () => {
+    $('provider').disabled = true;
     const provider =
       $('provider').value === 'ollama'
         ? 'ollama'
         : $('provider').value === 'codex'
           ? 'codex'
           : 'antigravity';
-    await api.selectProvider(provider);
-    showProvider();
-    await checkProvider();
+    try {
+      await modelSaving;
+      await api.selectProvider(provider);
+      showProvider();
+      await checkProvider();
+    } finally {
+      $('provider').disabled = false;
+    }
   })().catch(notice);
 };
 function localSettings(): LocalSettings {
@@ -486,8 +647,134 @@ function showProvider() {
   const local = $('provider').value === 'ollama';
   $('local-settings').hidden = !local;
   $('provider-help').hidden = local;
+  $('hosted-model-settings').hidden = local;
   $('provider-command').textContent = $('provider').value === 'codex' ? 'codex login' : 'agy';
 }
+function fillModels(
+  select: HTMLSelectElement,
+  catalog: ModelCatalog,
+  selected?: string,
+  local = false,
+) {
+  select.replaceChildren();
+  if (!local) {
+    const option = node('option', 'CLI default');
+    option.value = '';
+    select.append(option);
+  }
+  for (const model of catalog.models) {
+    const option = node('option', model.name);
+    option.value = model.id;
+    select.append(option);
+  }
+  if (selected && !catalog.models.some((model) => model.id === selected)) {
+    const option = node('option', `${selected} (saved selection)`);
+    option.value = selected;
+    option.disabled = true;
+    select.append(option);
+  }
+  select.value = selected ?? '';
+}
+async function loadModels() {
+  const request = ++modelRequest;
+  const provider = $('provider').value as Provider;
+  if (provider === 'ollama') return;
+  $('provider-model').disabled = true;
+  $('models-status').textContent = 'Loading available models…';
+  const prefs = await api.preferences();
+  const selected = prefs.models?.[provider];
+  fillModels($('provider-model'), { models: [] }, selected);
+  try {
+    const catalog = await api.models();
+    if (request !== modelRequest || $('provider').value !== provider) return;
+    fillModels($('provider-model'), catalog, selected);
+    $('models-status').textContent =
+      selected && !catalog.models.some((model) => model.id === selected)
+        ? 'Saved model is unavailable. Choose another model or CLI default.'
+        : `${catalog.models.length} models available`;
+  } catch {
+    if (request !== modelRequest || $('provider').value !== provider) return;
+    $('models-status').textContent = 'Could not load models. Check CLI sign-in, then Refresh.';
+  } finally {
+    if (request === modelRequest) $('provider-model').disabled = false;
+  }
+}
+on('refresh-models', loadModels);
+$('provider-model').onchange = () => {
+  $('provider-model').disabled = true;
+  $('models-status').textContent = 'Saving model choice…';
+  modelSaving = (async () => {
+    await api.selectModel($('provider-model').value || undefined);
+    $('models-status').textContent = 'Model selected for this provider.';
+  })()
+    .catch(async (error) => {
+      notice(error);
+      await loadModels();
+    })
+    .finally(() => {
+      $('provider-model').disabled = false;
+    });
+};
+async function showModelDialog() {
+  if (modelSwitching || state.stage === 'connecting' || state.stage === 'resolving') return;
+  const request = ++dialogRequest;
+  $('model-dialog').showModal();
+  $('model-dialog-status').textContent = 'Loading available models…';
+  $('model-apply').disabled = true;
+  $('switch-model').disabled = true;
+  $('switch-model').replaceChildren();
+  const prefs = await api.preferences();
+  const provider = prefs.provider ?? 'antigravity';
+  const savedModel = provider === 'ollama' ? prefs.local?.model : prefs.models?.[provider];
+  dialogModel = state.provider === provider ? (state.model ?? savedModel) : savedModel;
+  $('model-current').textContent = `Current: ${dialogModel ?? 'CLI default'}`;
+  try {
+    const catalog = await api.models();
+    if (request !== dialogRequest || !$('model-dialog').open) return;
+    fillModels($('switch-model'), catalog, dialogModel, provider === 'ollama');
+    $('switch-model').disabled = false;
+    $('model-dialog-status').textContent = 'Choose a model to start fresh DM context.';
+  } catch (error) {
+    if (request === dialogRequest) $('model-dialog-status').textContent = errorMessage(error);
+  }
+}
+$('switch-model').onchange = () => {
+  $('model-apply').disabled =
+    modelSwitching || ($('switch-model').value || undefined) === dialogModel;
+};
+on('model-cancel', () => {
+  if (modelSwitching) return;
+  ++dialogRequest;
+  $('model-dialog').close();
+});
+$('model-dialog').addEventListener('cancel', (event) => {
+  if (modelSwitching) event.preventDefault();
+  else ++dialogRequest;
+});
+on('model-apply', async () => {
+  if (modelSwitching) return;
+  modelSwitching = true;
+  $('model-apply').disabled = true;
+  $('model-cancel').disabled = true;
+  $('switch-model').disabled = true;
+  $('model-dialog-status').textContent = 'Starting fresh DM context with the selected model…';
+  try {
+    const pending = api.switchModel($('switch-model').value || undefined);
+    void refresh();
+    await pending;
+    await api.beginSetup();
+    $('model-dialog').close();
+  } catch (error) {
+    $('model-dialog-status').textContent = errorMessage(error);
+  } finally {
+    modelSwitching = false;
+    $('model-cancel').disabled = false;
+    $('switch-model').disabled = false;
+    await refresh();
+    $('model-apply').disabled = ($('switch-model').value || undefined) === dialogModel;
+  }
+});
+on('change-model', showModelDialog);
 on('local-check', async () => {
   $('local-status').textContent = 'Inspecting local models…';
   const report = await api.localModels(localSettings());
@@ -542,8 +829,15 @@ on('campaigns', async () => {
   $('revision').textContent = '';
   recent = state.root;
   $('recent').hidden = false;
+  const prefs = await api.preferences();
+  if (prefs.local) {
+    $('local-model').value = prefs.local.model;
+    $('local-endpoint').value = prefs.local.endpoint;
+    $('local-context').value = String(prefs.local.contextTokens);
+  }
+  await loadModels();
 });
-on('connection', () => connect());
+on('connection', () => (state?.stage === 'ready' ? showModelDialog() : connect()));
 on('reconnect', () => connect());
 on('fresh', () => connect(true));
 on('stop', async () => {

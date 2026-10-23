@@ -8,6 +8,16 @@ import type { LocalSettings } from './contracts.js';
 import type { AgentDriver, AgentResult } from './antigravity.js';
 
 const execute = promisify(execFile);
+const REASONING_EFFORTS = new Set([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+]);
 // Restore only the active request, never repeat the large skill/history preamble.
 function continuationFor(prompt: string | undefined): string {
   if (!prompt) return '';
@@ -56,6 +66,7 @@ export interface CodexOptions {
   serverName: string;
   server: { command: string; args: string[]; env: Record<string, string> };
   conversationId?: string;
+  model?: string;
   local?: LocalSettings;
   modelCatalog?: string;
   localThinking?: boolean;
@@ -194,6 +205,42 @@ export class CodexSession implements AgentDriver {
         ]),
       );
       const local = this.options.local;
+      const selectedModel = local?.model ?? this.options.model;
+      let selectedReasoningEffort: string | undefined;
+      if (!local && this.options.model) {
+        const seenCursors = new Set<string>();
+        let cursor: string | undefined;
+        let selectedModelAvailable = false;
+        for (let pageNumber = 0; pageNumber < 20; pageNumber++) {
+          const page = await this.request('model/list', {
+            limit: 100,
+            includeHidden: true,
+            ...(cursor ? { cursor } : {}),
+          });
+          if (!Array.isArray(page?.data) || page.data.length > 100)
+            throw new Error('Codex returned an invalid model catalog.');
+          const selected = page.data.find((entry: any) => entry?.model === this.options.model);
+          if (selected) {
+            selectedModelAvailable = true;
+            if (REASONING_EFFORTS.has(selected.defaultReasoningEffort))
+              selectedReasoningEffort = selected.defaultReasoningEffort;
+            break;
+          }
+          const nextCursor = page.nextCursor;
+          if (nextCursor === undefined || nextCursor === null || nextCursor === '') break;
+          if (
+            typeof nextCursor !== 'string' ||
+            nextCursor.length > 4096 ||
+            seenCursors.has(nextCursor)
+          )
+            throw new Error('Codex returned an invalid model catalog cursor.');
+          seenCursors.add(nextCursor);
+          cursor = nextCursor;
+          if (pageNumber === 19) throw new Error('Codex returned too many model catalog pages.');
+        }
+        if (!selectedModelAvailable)
+          throw new Error('The selected Codex model is not available for this account.');
+      }
       if (local)
         Object.assign(config, {
           model: local.model,
@@ -216,8 +263,16 @@ export class CodexSession implements AgentDriver {
           'memories.generate_memories': false,
           'memories.use_memories': false,
         });
+      else if (selectedModel) {
+        config.model = selectedModel;
+        if (selectedReasoningEffort) config.model_reasoning_effort = selectedReasoningEffort;
+      }
       const params = {
-        ...(local ? { model: local.model, modelProvider: 'dm_ollama' } : {}),
+        ...(local
+          ? { model: local.model, modelProvider: 'dm_ollama' }
+          : selectedModel
+            ? { model: selectedModel }
+            : {}),
         cwd: this.options.cwd,
         approvalPolicy: 'never',
         sandbox: 'read-only',
@@ -243,6 +298,7 @@ export class CodexSession implements AgentDriver {
     const response = await this.request('turn/start', {
       threadId: this.threadId,
       input: [{ type: 'text', text: prompt }],
+      ...(!this.options.local && this.options.model ? { model: this.options.model } : {}),
     });
     if (this.pending && !this.turnId) this.turnId = response.turn?.id;
   }

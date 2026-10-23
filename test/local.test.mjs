@@ -242,6 +242,10 @@ test('local model/context switches cannot resume a different model session or al
   await writeFile(join(store.root, '.codex/config.toml'), '# campaign plugin\n');
   await host.open(store.root);
   await host.connect(undefined, false, 'ollama', settings);
+  const locatorPath = join(store.root, '.dm/hotseat/ollama-session.json');
+  const oldLocator = JSON.parse(await readFile(locatorPath, 'utf8'));
+  delete oldLocator.model;
+  await writeFile(locatorPath, JSON.stringify(oldLocator));
   await host.connect(undefined, false, 'ollama', settings);
   await host.connect(undefined, false, 'ollama', { ...settings, model: 'custom:two' });
   await host.connect(undefined, false, 'ollama', {

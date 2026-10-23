@@ -25,6 +25,22 @@
         <button id="stop" class="quiet" hidden>Stop DM</button>
       </div>
     </header>
+    <dialog id="model-dialog" aria-labelledby="model-title">
+      <h2 id="model-title">Change DM model</h2>
+      <p id="model-current" class="help"></p>
+      <label for="switch-model">Model</label>
+      <select id="switch-model"></select>
+      <p class="help">
+        Switching starts a fresh DM conversation. Previous conversation context will not carry over,
+        and cached tokens may need to be rebuilt. Your saved campaign, characters, maps and history
+        are preserved.
+      </p>
+      <p id="model-dialog-status" role="status" class="help"></p>
+      <div class="button-row">
+        <button id="model-apply" class="primary" disabled>Switch model &amp; reconnect</button>
+        <button id="model-cancel" class="quiet">Cancel</button>
+      </div>
+    </dialog>
     <dialog id="lan-dialog">
       <h2>LAN game</h2>
       <p id="lan-help">
@@ -69,6 +85,16 @@
               <option value="codex">Codex CLI</option>
               <option value="ollama">Local · Ollama + Codex CLI (Experimental)</option></select
             ><span id="provider-status">Checking installation…</span>
+            <div id="hosted-model-settings">
+              <div class="model-label-row">
+                <label for="provider-model">Model</label>
+                <button id="refresh-models" class="quiet" type="button">Refresh</button>
+              </div>
+              <select id="provider-model">
+                <option value="">CLI default</option>
+              </select>
+              <span id="models-status" role="status"></span>
+            </div>
           </div>
         </div>
         <p class="help" id="provider-help">
@@ -174,6 +200,14 @@
           <button id="table-seat" class="quiet">Table</button
           ><button id="pass" class="secondary">Pass seat →</button>
         </div>
+        <section id="map-legend" aria-label="Map key" hidden>
+          <h2>Map key</h2>
+          <p class="legend-help">
+            Party circles match the cards above. Numbered objects match the key below.
+          </p>
+          <div id="map-legend-types"></div>
+          <ul id="map-legend-items" aria-label="Revealed map markers"></ul>
+        </section>
         <div class="sheet-tabs">
           <button id="sheet-tab" class="tab active">Character</button
           ><button id="quest-tab" class="tab">Journal</button>
@@ -222,9 +256,9 @@
             id="map-details"
             class="quiet"
             aria-pressed="false"
-            title="Show map legend and coordinates"
+            title="Show coordinates and the printable map key"
           >
-            Legend
+            Details
           </button>
         </div>
         <div class="map-footer">
@@ -234,7 +268,26 @@
       </section>
       <section class="conversation-pane">
         <div class="conversation-title">
-          <span class="eyebrow">Chat</span><span class="chat-mark" aria-hidden="true">✦</span>
+          <span class="eyebrow" id="conversation-label">Chat</span
+          ><span class="chat-mark" aria-hidden="true">✦</span>
+        </div>
+        <div id="setup-guide" hidden>
+          <h1>Create your campaign</h1>
+          <p>
+            Tell the DM what kind of adventure you want. A detailed idea, a mood, or “surprise me”
+            is enough. Bring your own characters, build them together, or let the DM create them.
+          </p>
+          <p id="setup-progress" role="status"></p>
+        </div>
+        <div id="setup-activity" role="status" aria-live="polite" aria-atomic="true" hidden>
+          <span class="setup-spinner" aria-hidden="true"></span>
+          <div>
+            <h2>The DM is building your campaign</h2>
+            <p id="setup-activity-detail"></p>
+            <p class="setup-activity-help">
+              This can take a few minutes. Completed steps are saved along the way.
+            </p>
+          </div>
         </div>
         <div id="transcript" role="log" aria-label="Public table conversation">
           <p class="conversation-empty">Describe your party or send an action.</p>
@@ -247,6 +300,7 @@
           <p>Turn interrupted. Check saved outcomes before continuing.</p>
           <button id="reconnect" class="secondary">Reconnect DM</button
           ><button id="fresh" class="quiet">Reset DM context</button>
+          <button id="change-model" class="quiet">Change model…</button>
         </div>
         <form id="action-form">
           <label for="action" id="acting-as">Table</label
