@@ -26,6 +26,7 @@ export function createMcpServer(
       'get_party_overview',
       'render_location_map',
       'get_campaign_entity',
+      'get_campaign_knowledge',
       'search_campaign_history',
       'read_campaign_record',
     ].includes(name);

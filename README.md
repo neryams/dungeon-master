@@ -26,6 +26,7 @@ If your client doesn't discover local plugins, use the direct MCP and skill inst
 - Graph/grid map authoring, atomic subgroup movement, explicit reveal masks, illustrated backgrounds aligned to saved map geometry and PNG tool responses.
 - Cryptographic dice, recorded physical dice, idempotent retries, revision conflicts and explicit corrections.
 - Append-only JSON event history, replayable state, Markdown scene records and journal-backed historical retrieval.
+- A private, event-backed knowledge ledger separating world truth, observations and character discoveries, loaded directly into the DM's resume context.
 - Seven campaign skills: create, run, close, maintain, player sheets, rules referee and optional host-generated map artwork.
 - Export/import, validation, pending journal delivery recovery and an original example adventure.
 - Player-facing filtering of DM-only entities and records. One trusted operator controls the whole campaign; this is not multi-user authorization.

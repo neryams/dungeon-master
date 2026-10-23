@@ -15,6 +15,10 @@ Initialization creates an isolated campaign workspace and a bound plugin/marketp
 
 Once campaign tools are available, call campaign_status. Confirm it is the intended campaign before writing. Use apply_campaign_changes to create characters, starting inventory, locations, maps, quests, session and scene. Batch related entities so references are valid at the end of the transaction. Keep DM secrets in separate visibility=dm entities or records; campaign configuration, scene summaries and unresolved questions are player-facing.
 
+Prepare the opening from the characters' perceptible evidence. Keep NPC claims distinct from established truth, leave player theories unconfirmed until play establishes them, and keep future plans out of public scene text. Protect discoveries with fair clues and multiple valid approaches; do not put a hidden solution menu in the opening. Frame risks as observable possibilities, not guaranteed outcomes.
+
+Save consequential secrets with set_knowledge changes in apply_campaign_changes: fact contains a stable id, truthKind (established, claim or plan), truth, linked entityIds, knownBy character/NPC IDs, optional observableDescription, discoveryHints and disclosures. Each disclosure records recipient ({type:"party"} or {type:"character", id}), text, kind (observed, reported, inferred or confirmed) and nonempty evidence. Include only actual starting knowledge in disclosures; a player's out-of-character premise is not automatically their character's knowledge. Keep these records compact and DM-only. Verify relevant knowledgeFacts in resume_campaign before the opening; the ledger is not automatically published to players.
+
 Call record_scene for the opening situation and resume_campaign to verify setup. Report the campaign folder, saved revision and any pending journal delivery. Do not create a GitHub repository, push data or start external hosting as part of initialization.
 
 Build a playable opening in stages, using the player's answers already available in context:

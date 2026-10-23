@@ -7,6 +7,10 @@ Read campaign_status and relevant current entities. Finish saving any resolved m
 
 Use record_scene for unsaved narrative details. Then call checkpoint_session with a concise player-facing summary and unresolved choices. Put secrets and future plans only in dmNotes. The checkpoint updates the current scene summary and unresolved list; it does not end combat, restore resources or advance time automatically.
 
+Keep the player recap within what the characters learned. Attribute NPC testimony, preserve unresolved player theories as theories, and do not turn DM plans into established events. Keep discovery-relevant secrets in dmNotes until play reveals them. Write fictional recaps without internal IDs, revisions, status dumps, tool/journal details or logs; provide any required save confirmation separately.
+
+After resolving pending mechanical actions, save any remaining consequential discoveries with set_knowledge through apply_campaign_changes. Read existing facts with get_campaign_knowledge and preserve their fields and disclosures when replacing them. A private checkpoint note supplies historical context; it does not update the current knowledge ledger by itself.
+
 Reuse the operationId and exact input after an uncertain response. On a revision conflict, read current state before creating a replacement operation. A journal-pending result means authoritative history is saved; retry delivery without repeating gameplay.
 
 Call resume_campaign with audience=party to verify the resume point. Report the saved revision, current location or encounter, next pending choice and any storage delivery limitation. Never say the entire conversation was archived: records contain the scene details explicitly saved by the DM.

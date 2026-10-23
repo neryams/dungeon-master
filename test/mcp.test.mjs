@@ -31,7 +31,10 @@ test('MCP exposes only domain tools, validates input and reports revision confli
   for (const edge of [[], ['from'], ['from', 'to', 'extra'], ['from', '../invalid']])
     assert.equal(MapEdge.safeParse(edge).success, false);
   const tools = advertised.map((t) => t.name);
-  assert.equal(tools.length, 31);
+  assert.equal(tools.length, 32);
+  const knowledgeTool = advertised.find((tool) => tool.name === 'get_campaign_knowledge');
+  assert.ok(knowledgeTool);
+  assert.equal(knowledgeTool.annotations.readOnlyHint, true);
   assert.ok(!tools.includes('write_entry'));
   assert.ok(!tools.includes('search_journal'));
   const result = await client.callTool({
@@ -44,6 +47,12 @@ test('MCP exposes only domain tools, validates input and reports revision confli
     },
   });
   assert.ok(!result.isError);
+  const hiddenKnowledge = await client.callTool({
+    name: 'get_campaign_knowledge',
+    arguments: { id: 'secret', audience: 'party' },
+  });
+  assert.equal(hiddenKnowledge.isError, true);
+  assert.match(hiddenKnowledge.content[0].text, /NOT_FOUND/);
   const conflict = await client.callTool({
     name: 'apply_campaign_changes',
     arguments: {
