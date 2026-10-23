@@ -5,7 +5,7 @@ import electron from 'electron';
 import { mkdtemp, mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { fixture, apply, FileJournal } from './helpers.mjs';
+import { fixture, apply, FileJournal, notifyDesktop } from './helpers.mjs';
 import { CampaignStore } from '../dist/store.js';
 import { CampaignService } from '../dist/service.js';
 import { JournalAdapter } from '../dist/journal.js';
@@ -709,6 +709,7 @@ The boards creak.
     const revision = (await store.read()).state.revision;
     await unlink(background);
     await apply(service, [{ type: 'damage', id: 'mara', amount: 2 }]);
+    await notifyDesktop(store);
     await page.waitForFunction(
       (r) => document.getElementById('revision').textContent.includes(`r${r}`),
       revision + 1,
@@ -813,6 +814,7 @@ The boards creak.
       reason: 'Prepare the starting map',
       entity: example.bridgeMap,
     });
+    await notifyDesktop(setupStore);
     await page.waitForFunction(() =>
       document.getElementById('setup-progress').textContent.includes('Map saved'),
     );
@@ -854,6 +856,7 @@ The boards creak.
       reason: 'Opening verified for the UI fixture',
       mode: 'reviewed',
     });
+    await notifyDesktop(setupStore);
     await page.locator('#setup-guide').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('.party-pane').isVisible(), true);
     assert.equal(await page.locator('.map-pane').isVisible(), true);

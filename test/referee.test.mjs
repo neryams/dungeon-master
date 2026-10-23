@@ -570,3 +570,146 @@ test('section citations survive replay, export and exact retries; invalid new ci
     cited.citations,
   );
 });
+
+test('roll visibility defaults are independent from planned visibility', async (t) => {
+  const { service, store } = await setup(t);
+
+  await prepare(service, 'dm-planned');
+  await rule(service, 'dm-planned', {
+    ...ruling,
+    rolls: [
+      {
+        id: 'check',
+        expression: '1d20+3',
+        mode: 'normal',
+        purpose: 'Private procedure',
+        visibility: 'dm',
+        when: 'Immediately',
+        optional: false,
+      },
+    ],
+  });
+  const dmPlan = await service.execute('get_action', { actionId: 'dm-planned' });
+  assert.equal(dmPlan.action.ruling.rolls[0].visibility, 'dm');
+  const dmPurpose = dmPlan.action.ruling.rolls[0].purpose;
+  const omittedVisibility = await mutate(service, 'roll_dice', {
+    actionId: 'dm-planned',
+    stepId: 'check',
+    expression: '1d20+3',
+    mode: 'reported',
+    reportedTotal: 8,
+    purpose: dmPurpose,
+  });
+  assert.equal(omittedVisibility.roll.visibility, 'party');
+  await mutate(service, 'approve_action_effects', {
+    actionId: 'dm-planned',
+    approval: { reasoning: 'Resolve the check', referee, citations, changes: [] },
+  });
+  await mutate(service, 'commit_action', { actionId: 'dm-planned' });
+
+  await prepare(service, 'party-planned');
+  await rule(service, 'party-planned', {
+    ...ruling,
+    rolls: [
+      {
+        id: 'check',
+        expression: '1d20+3',
+        mode: 'normal',
+        purpose: 'Check',
+        visibility: 'party',
+        when: 'Immediately',
+        optional: false,
+      },
+    ],
+  });
+  const explicitlyPrivate = await mutate(service, 'roll_dice', {
+    actionId: 'party-planned',
+    stepId: 'check',
+    expression: '1d20+3',
+    mode: 'reported',
+    reportedTotal: 8,
+    purpose: 'Check',
+    visibility: 'dm',
+  });
+  assert.equal(explicitlyPrivate.roll.visibility, 'dm');
+  await mutate(service, 'approve_action_effects', {
+    actionId: 'party-planned',
+    approval: { reasoning: 'Resolve the check', referee, citations, changes: [] },
+  });
+  await mutate(service, 'commit_action', { actionId: 'party-planned' });
+
+  await prepare(service, 'amended-plan');
+  await rule(service, 'amended-plan', { ...ruling, rolls: [] });
+  await mutate(service, 'amend_action_rolls', {
+    actionId: 'amended-plan',
+    referee,
+    citations,
+    rolls: [
+      {
+        id: 'followup',
+        expression: '1d6',
+        purpose: 'Followup check',
+        when: 'If needed',
+        optional: true,
+      },
+    ],
+  });
+  assert.equal(
+    (await service.execute('get_action', { actionId: 'amended-plan' })).action.ruling.rolls[0]
+      .visibility,
+    'party',
+  );
+  await mutate(service, 'approve_action_effects', {
+    actionId: 'amended-plan',
+    approval: {
+      reasoning: 'The optional check was unnecessary',
+      referee,
+      citations,
+      changes: [],
+      skippedRolls: [{ stepId: 'followup', reason: 'Not required' }],
+    },
+  });
+  await mutate(service, 'commit_action', { actionId: 'amended-plan' });
+
+  await mutate(service, 'administer_campaign', {
+    purpose: 'world_preparation',
+    ruling: 'Resolve a public table check.',
+    roll: {
+      expression: '1d20',
+      mode: 'reported',
+      reportedTotal: 12,
+      purpose: 'Initiative check',
+    },
+  });
+  const events = await store.read();
+  const adminRoll = events.events.findLast(
+    (event) => event.payload.roll?.purpose === 'Initiative check',
+  );
+  assert.equal(adminRoll.payload.roll.visibility, 'party');
+
+  await prepare(service, 'explicitly-hidden');
+  await rule(service, 'explicitly-hidden', {
+    ...ruling,
+    rolls: [
+      {
+        id: 'check',
+        expression: '1d20+3',
+        mode: 'normal',
+        purpose: 'Private procedure',
+        visibility: 'dm',
+        when: 'Immediately',
+        optional: false,
+      },
+    ],
+  });
+  const explicitlyHidden = await mutate(service, 'roll_dice', {
+    actionId: 'explicitly-hidden',
+    stepId: 'check',
+    expression: '1d20+3',
+    mode: 'reported',
+    reportedTotal: 8,
+    purpose: 'Private procedure',
+    visibility: 'dm',
+  });
+  assert.equal(explicitlyHidden.roll.visibility, 'dm');
+});

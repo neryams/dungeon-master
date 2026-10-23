@@ -1,4 +1,4 @@
-import { Preferences, WorkerReply, dispatchDesktop } from '#desktop/contracts';
+import { Preferences, WorkerReply, DesktopEvent, dispatchDesktop } from '#desktop/contracts';
 import type { DesktopApi, WorkerApi } from '#desktop/contracts';
 import type { ChildProcess } from 'node:child_process';
 import { app, BrowserWindow, ipcMain, dialog, session, shell } from 'electron';
@@ -67,6 +67,11 @@ else {
       });
       worker.stderr?.on('data', () => {});
       worker.on('message', (raw: unknown) => {
+        const update = DesktopEvent.safeParse(raw);
+        if (update.success) {
+          if (window && !window.isDestroyed()) window.webContents.send('table:update', update.data);
+          return;
+        }
         const parsed = WorkerReply.safeParse(raw);
         if (!parsed.success) return;
         const { id, result, error } = parsed.data;
@@ -114,10 +119,16 @@ else {
       try {
         prefs = Preferences.parse(JSON.parse(await readFile(prefsPath, 'utf8')));
       } catch {}
-      async function savePrefs() {
-        await mkdir(app.getPath('userData'), { recursive: true });
-        await writeFile(prefsPath + '.tmp', JSON.stringify(prefs), { mode: 0o600 });
-        await rename(prefsPath + '.tmp', prefsPath);
+      let savingPrefs: Promise<void> = Promise.resolve();
+      function savePrefs() {
+        const contents = JSON.stringify(prefs);
+        const write = savingPrefs.then(async () => {
+          await mkdir(app.getPath('userData'), { recursive: true });
+          await writeFile(prefsPath + '.tmp', contents, { mode: 0o600 });
+          await rename(prefsPath + '.tmp', prefsPath);
+        });
+        savingPrefs = write.catch(() => {});
+        return write;
       }
       const executable = (provider = prefs.provider ?? 'antigravity') =>
         provider === 'antigravity' ? prefs.executable : prefs.codexExecutable;
@@ -141,7 +152,7 @@ else {
           prefs.models = { ...prefs.models, [provider]: model };
         }
       }
-      const actions: DesktopApi = {
+      const actions: Omit<DesktopApi, 'onUpdate'> = {
         preferences: async () => prefs,
         localModels: (settings) => call('localModels', settings),
         configureLocal: async (settings) => {

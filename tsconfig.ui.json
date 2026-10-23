@@ -16,6 +16,7 @@
     "desktop/markers.ts",
     "desktop/narration.ts",
     "desktop/narration-audio.ts",
+    "desktop/dice-feedback.ts",
     "desktop/globals.d.ts",
     "desktop/vendor/*.d.ts"
   ],

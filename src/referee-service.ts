@@ -75,7 +75,7 @@ export const refereeInputs = {
           mode: z.enum(['normal', 'advantage', 'disadvantage', 'reported']).default('normal'),
           reportedTotal: z.number().int().safe().optional(),
           purpose: text,
-          visibility: z.enum(['dm', 'party']).default('dm'),
+          visibility: z.enum(['dm', 'party']).default('party'),
         })
         .strict()
         .optional(),

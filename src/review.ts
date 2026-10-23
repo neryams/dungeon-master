@@ -186,8 +186,7 @@ export function validateReview(state: State, p: Payload): void {
       p.roll.stepId !== spec.id ||
       p.roll.expression !== spec.expression ||
       (p.roll.mode !== 'reported' && p.roll.mode !== spec.mode) ||
-      p.roll.purpose !== spec.purpose ||
-      p.roll.visibility !== spec.visibility
+      p.roll.purpose !== spec.purpose
     )
       fail('Roll differs from recorded procedure');
     return;

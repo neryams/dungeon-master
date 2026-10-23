@@ -358,6 +358,11 @@
         <div id="transcript" role="log" aria-label="Public table conversation">
           <p class="conversation-empty">Describe your party or send an action.</p>
         </div>
+        <div id="active-turn" class="active-turn" hidden>
+          <span class="active-turn-mark" aria-hidden="true">✦</span>
+          <span id="active-turn-phase" role="status" aria-live="polite">The DM is thinking</span>
+          <time id="active-turn-elapsed">0:00</time>
+        </div>
         <div id="session-status" role="status">
           <span id="status-dot" class="small-dot"></span
           ><span id="status-text">Connect DM to send an action.</span>
@@ -383,6 +388,25 @@
         </form>
       </section>
     </main>
+    <section id="dice-feedback" class="dice-feedback" aria-label="Dice result" hidden>
+      <div class="dice-feedback-heading">
+        <span class="eyebrow">DICE RESULT</span
+        ><button id="dice-dismiss" class="quiet" type="button" aria-label="Dismiss dice result">
+          ×
+        </button>
+      </div>
+      <div id="dice-label" class="dice-label"></div>
+      <div id="dice-notation" class="dice-notation"></div>
+      <div id="dice-total" class="dice-total" aria-hidden="true">…</div>
+      <div id="dice-breakdown" class="dice-breakdown"></div>
+      <div
+        id="dice-announcement"
+        class="visually-hidden"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
+    </section>
     <div id="notice" role="alert" hidden>
       <span id="notice-text"></span><button id="dismiss" aria-label="Dismiss notice">×</button>
     </div>

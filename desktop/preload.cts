@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { DesktopApi } from '#desktop/contracts';
-function invoke<K extends keyof DesktopApi>(
+import type { DesktopApi, DesktopEvent } from '#desktop/contracts';
+function invoke<K extends keyof Omit<DesktopApi, 'onUpdate'>>(
   method: K,
   ...args: Parameters<DesktopApi[K]>
 ): ReturnType<DesktopApi[K]> {
@@ -8,6 +8,11 @@ function invoke<K extends keyof DesktopApi>(
   return ipcRenderer.invoke('table:call', method, args) as ReturnType<DesktopApi[K]>;
 }
 const api: DesktopApi = {
+  onUpdate: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, update: DesktopEvent) => callback(update);
+    ipcRenderer.on('table:update', listener);
+    return () => ipcRenderer.removeListener('table:update', listener);
+  },
   preferences: () => invoke('preferences'),
   localModels: (settings) => invoke('localModels', settings),
   configureLocal: (settings) => invoke('configureLocal', settings),

@@ -8,19 +8,44 @@ import { importGeneratedArt } from './art.js';
 import { CampaignService, ToolName } from '../service.js';
 import { JournalAdapter, McpJournal } from '../journal.js';
 import { createMcpServer } from '../server.js';
+import { DesktopActivity } from './activity.js';
+import { notifyActivity } from './activity-bus.js';
 
 const root = process.argv[process.argv.indexOf('--campaign') + 1];
 const token = process.env.DM_HOTSEAT_OWNER_TOKEN;
 if (!root || !token) throw new Error('Desktop campaign owner required');
 const store = await CampaignStore.open(root);
-async function checkOwner() {
+async function checkOwner(): Promise<{ endpoint?: string }> {
   const owner = JSON.parse(
     await readFile(await safePath(store.root, '.dm/hotseat/owner.json'), 'utf8'),
   );
   if (owner.token !== token || !Number.isSafeInteger(owner.pid) || owner.pid <= 0)
     throw new Error('Desktop session ended');
   process.kill(owner.pid, 0);
+  return owner;
 }
+async function announce(
+  kind: 'activity' | 'changed',
+  activity?: import('./activity.js').ActivitySnapshot,
+  requestId?: string,
+  operationId?: string,
+) {
+  try {
+    const owner = await checkOwner();
+    await notifyActivity(owner.endpoint, {
+      token: token!,
+      kind,
+      ...(activity ? { activity } : {}),
+      ...(requestId ? { requestId } : {}),
+      ...(operationId ? { operationId } : {}),
+    });
+  } catch {
+    /* Feedback is disposable; tool results remain authoritative. */
+  }
+}
+const activity = new DesktopActivity(store, token, (snapshot, requestId) =>
+  announce('activity', snapshot, requestId),
+);
 await checkOwner();
 class OwnedService extends CampaignService {
   private memory =
@@ -28,8 +53,24 @@ class OwnedService extends CampaignService {
   override async execute(name: ToolName, raw: unknown) {
     await checkOwner();
     await this.memory?.before(name, raw);
-    const result = await super.execute(name, raw);
-    this.memory?.after(name, raw, result);
+    const op =
+      raw &&
+      typeof raw === 'object' &&
+      typeof (raw as { operationId?: unknown }).operationId === 'string'
+        ? (raw as { operationId: string }).operationId.slice(0, 100)
+        : undefined;
+    await activity.beginTool(name, raw).catch(() => {});
+    let result: unknown;
+    try {
+      result = await super.execute(name, raw);
+      this.memory?.after(name, raw, result);
+    } catch (error) {
+      await activity.finishTool(op, error).catch(() => {});
+      await announce('changed', undefined, undefined, op);
+      throw error;
+    }
+    await activity.finishTool(op).catch(() => {});
+    await announce('changed', undefined, undefined, op);
     if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
       const rendered = result as { image?: { data: string }; path?: string };
       if (rendered.image && rendered.path) {

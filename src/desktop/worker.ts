@@ -3,6 +3,14 @@ import { fileURLToPath } from 'node:url';
 import { DesktopHost } from './host.js';
 
 const host = new DesktopHost({ source: fileURLToPath(new URL('../..', import.meta.url)) });
+host.subscribe((event) => {
+  if (!process.connected) return;
+  try {
+    process.send?.(event);
+  } catch {
+    /* The window may close during a tool result. */
+  }
+});
 process.on('message', async (raw: unknown) => {
   const parsed = WorkerEnvelope.safeParse(raw);
   if (!parsed.success) return;
