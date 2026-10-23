@@ -326,6 +326,26 @@ test('desktop MCP transport stops after ownership is revoked; regenerated worksp
       .id,
     'test',
   );
+  const publicRoll = await client.callTool({
+    name: 'roll_dice',
+    arguments: {
+      operationId: 'desktop-wrapper-public-roll',
+      expectedRevision: 0,
+      reason: 'Visible hotseat roll',
+      expression: '1d20+2',
+      purpose: 'Perception check',
+      visibility: 'party',
+    },
+  });
+  assert.equal(publicRoll.isError, undefined);
+  const activityFeed = JSON.parse(
+    await readFile(join(store.root, '.dm/hotseat/activity.json'), 'utf8'),
+  );
+  assert.equal(activityFeed.ownerToken, owner.token);
+  assert.equal(activityFeed.rolls[0].status, 'complete');
+  assert.equal(activityFeed.rolls[0].label, 'Perception Check');
+  assert.equal(activityFeed.rolls[0].total, publicRoll.structuredContent.roll.total);
+  assert.doesNotMatch(JSON.stringify(activityFeed), /reason|Visible hotseat roll/);
   await apply(service, [
     {
       type: 'put_entity',

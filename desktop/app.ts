@@ -20,6 +20,7 @@ import {
   type NarrationVoice,
 } from './narration.js';
 import { NarrationAudio } from './narration-audio.js';
+import { DiceFeedback } from './dice-feedback.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -139,6 +140,16 @@ const tags = {
   'setup-activity': 'div',
   'setup-activity-detail': 'p',
   'session-status': 'div',
+  'active-turn': 'div',
+  'active-turn-phase': 'span',
+  'active-turn-elapsed': 'time',
+  'dice-feedback': 'section',
+  'dice-label': 'div',
+  'dice-notation': 'div',
+  'dice-total': 'div',
+  'dice-breakdown': 'div',
+  'dice-announcement': 'div',
+  'dice-dismiss': 'button',
   'status-dot': 'span',
   'status-text': 'span',
   recovery: 'div',
@@ -154,6 +165,18 @@ const tags = {
 } as const;
 const $ = elements(tags);
 const api = window.table;
+const diceFeedback = new DiceFeedback(
+  {
+    panel: $('dice-feedback'),
+    label: $('dice-label'),
+    notation: $('dice-notation'),
+    total: $('dice-total'),
+    breakdown: $('dice-breakdown'),
+    announcement: $('dice-announcement'),
+    dismiss: $('dice-dismiss'),
+  },
+  () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+);
 let state: CampaignSnapshot,
   selected: string | undefined,
   chosenParent: string | undefined,
@@ -191,6 +214,7 @@ let speechInstallState: SpeechInstallState | undefined;
 let firstSpeechPromptChecked = false;
 let speechSetupPoll: number | undefined;
 let speechInstallBusy = false;
+let resolvingSince: number | undefined;
 const narration = new NarrationController(
   {
     synthesize: (message, voice, part) => {
@@ -736,6 +760,17 @@ async function renderMap() {
 }
 function renderState() {
   if (!state.campaign) return;
+  const resolving = state.stage === 'resolving';
+  if (resolving && resolvingSince === undefined) resolvingSince = Date.now();
+  if (!resolving) resolvingSince = undefined;
+  $('active-turn').hidden = !resolving;
+  if (resolving) {
+    $('active-turn-phase').textContent = state.activity?.phase || 'The DM is thinking';
+    const elapsed = Math.floor((Date.now() - (resolvingSince ?? Date.now())) / 1000);
+    $('active-turn-elapsed').textContent =
+      `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+  }
+  diceFeedback.observe(state.activity?.rolls ?? [], resolving);
   const settingUp = state.reviewMode === 'setup';
   const generating = settingUp && state.stage === 'resolving';
   $('setup-activity').hidden = !generating;
@@ -884,6 +919,8 @@ async function connect(fresh = false) {
 export function showCampaign(snapshot: DesktopSnapshot) {
   if (!snapshot.campaign) throw new Error('No campaign is open');
   ++viewGeneration;
+  resolvingSince = snapshot.stage === 'resolving' ? Date.now() : undefined;
+  diceFeedback.reset(snapshot.activity?.rolls ?? []);
   state = snapshot;
   selected = undefined;
   shownRevision = -1;
@@ -1141,6 +1178,8 @@ on('recent', async () => {
 on('campaigns', async () => {
   ++viewGeneration;
   narration.leave();
+  diceFeedback.cancel();
+  resolvingSince = undefined;
   $('play').hidden = true;
   $('welcome').hidden = false;
   renderNarration();

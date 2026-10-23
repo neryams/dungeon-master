@@ -8,11 +8,13 @@ import { importGeneratedArt } from './art.js';
 import { CampaignService, ToolName } from '../service.js';
 import { JournalAdapter, McpJournal } from '../journal.js';
 import { createMcpServer } from '../server.js';
+import { DesktopActivity } from './activity.js';
 
 const root = process.argv[process.argv.indexOf('--campaign') + 1];
 const token = process.env.DM_HOTSEAT_OWNER_TOKEN;
 if (!root || !token) throw new Error('Desktop campaign owner required');
 const store = await CampaignStore.open(root);
+const activity = new DesktopActivity(store, token);
 async function checkOwner() {
   const owner = JSON.parse(
     await readFile(await safePath(store.root, '.dm/hotseat/owner.json'), 'utf8'),
@@ -28,8 +30,22 @@ class OwnedService extends CampaignService {
   override async execute(name: ToolName, raw: unknown) {
     await checkOwner();
     await this.memory?.before(name, raw);
-    const result = await super.execute(name, raw);
-    this.memory?.after(name, raw, result);
+    const op =
+      raw &&
+      typeof raw === 'object' &&
+      typeof (raw as { operationId?: unknown }).operationId === 'string'
+        ? (raw as { operationId: string }).operationId.slice(0, 100)
+        : undefined;
+    await activity.beginTool(name, raw).catch(() => {});
+    let result: unknown;
+    try {
+      result = await super.execute(name, raw);
+      this.memory?.after(name, raw, result);
+    } catch (error) {
+      await activity.finishTool(op, error).catch(() => {});
+      throw error;
+    }
+    await activity.finishTool(op).catch(() => {});
     if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
       const rendered = result as { image?: { data: string }; path?: string };
       if (rendered.image && rendered.path) {

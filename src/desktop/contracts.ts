@@ -157,6 +157,19 @@ export type IntentInput = z.infer<typeof IntentInput>;
 export type LanAdminInput = z.infer<typeof LanAdminInput>;
 export type Stage = 'disconnected' | 'connecting' | 'ready' | 'resolving' | 'attention';
 export type PlayerView = ReturnType<typeof playerView>;
+export interface CampaignActivity {
+  phase?: string;
+  rolls: {
+    id: string;
+    label: string;
+    notation: string;
+    mode?: 'normal' | 'advantage' | 'disadvantage' | 'reported';
+    status: 'rolling' | 'complete' | 'failed';
+    total?: number;
+    dice?: number[];
+    modifier?: number;
+  }[];
+}
 export type CampaignSnapshot = PlayerView & {
   root: string;
   table: TableTurn[];
@@ -168,6 +181,7 @@ export type CampaignSnapshot = PlayerView & {
   provider?: Provider;
   model?: string;
   speechEligibleRevisions?: number[];
+  activity?: CampaignActivity;
 };
 export type DesktopSnapshot =
   CampaignSnapshot | { campaign: null; stage: Stage; detail: string; table: TableTurn[] };

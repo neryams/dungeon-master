@@ -29,7 +29,7 @@
     "desktop:smoke": "node scripts/smoke-packaged-desktop.mjs",
     "test:desktop-package": "npm run build && node --test test/desktop-package.test.mjs",
     "speech:setup": "npm run build && node scripts/setup-speech.mjs",
-    "test:desktop": "npm run build && node --test test/desktop-ui.mjs test/narration-ui.mjs test/speech-install-ui.mjs",
+    "test:desktop": "npm run build && node --test test/desktop-ui.mjs test/narration-ui.mjs test/speech-install-ui.mjs test/dice-feedback-ui.mjs",
     "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs",
     "test:lan": "npm run build && node --test test/lan-ui.mjs",
     "test:codex": "npm run build && node --test test/integration/codex.mjs",

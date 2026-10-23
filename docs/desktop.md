@@ -59,6 +59,14 @@ Only `publish_table_message` responses enter the public transcript. Raw CLI outp
 
 The desktop-only `import_generated_map_art` tool copies bounded PNG/JPEG/WebP output from the connected provider into content-addressed campaign assets; Antigravity accepts only its connected conversation directory. Codex accepts only exact saved image paths reported by successful native image-generation events in the active thread/turn, bound to the desktop owner. Its allowlist resets on reconnect; already imported campaign assets remain available. Both reject symlinks and invalid images. Reference PNGs are mirrored into the campaign’s hotseat reference area for native image conditioning. Registration still uses the existing typed `register_map_art` transaction. No shell permission, extra global file grant or model API is needed. The ordinary ChatGPT plugin keeps its existing host file-handling workflow.
 
+## Feedback while the DM works
+
+The Electron host shows a compact activity card during a turn, with elapsed time and public cues such as checking rules, consulting campaign notes, and saving outcomes. These are tool activity cues, not a percentage complete or a view into private reasoning.
+
+Public dice rolls open a nonblocking popup. A plain number briefly randomizes, then settles on the saved total with its dice notation and breakdown. Consecutive rolls queue automatically; Dismiss hides the current presentation. Reduced-motion settings skip the randomizing animation, and physically reported rolls display their recorded total directly. The animation is presentation only: it never rolls dice again or delays the campaign transaction.
+
+DM-only rolls remain hidden. Roll labels recognize a small set of exact check names, such as Perception and Wisdom Save; other purposes use “Dice roll” so private procedure notes never appear. Opening a campaign does not replay old rolls. Interrupted rolls without a confirmed saved result show an unavailable result. Feedback is currently limited to the Electron host; the plugin, read-only panel, and LAN player windows retain their existing interfaces.
+
 ## Stop, restart and recovery
 
 **Stop DM** stops this app's owned CLI process tree. Saved events remain intact. If a turn ends without a published response, fails, times out or is interrupted, the app marks it for attention. Review the map and sheet, reconnect, and ask for a recap before taking another action. Do not resubmit uncertain damage or dice requests as new actions.
