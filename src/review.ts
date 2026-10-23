@@ -42,10 +42,20 @@ export function mechanical(state: State, c: Change): boolean {
       return false;
     case 'put_entity': {
       const previous = state.entities[c.entity.id];
-      return [previous, c.entity].some(
+      const touchesMechanics = [previous, c.entity].some(
         (e) =>
           !!e &&
           (!!e.character || !!e.item || !!e.map || ['character', 'item', 'map'].includes(e.kind)),
+      );
+      if (!touchesMechanics) return false;
+      if (!previous) return true;
+      return (
+        previous.kind !== c.entity.kind ||
+        previous.visibility !== c.entity.visibility ||
+        previous.knowledge !== c.entity.knowledge ||
+        canonical(previous.character) !== canonical(c.entity.character) ||
+        canonical(previous.item) !== canonical(c.entity.item) ||
+        canonical(previous.map) !== canonical(c.entity.map)
       );
     }
     default:

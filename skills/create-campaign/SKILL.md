@@ -17,7 +17,7 @@ Once campaign tools are available, call campaign_status. Confirm it is the inten
 
 Frame the opening from the characters' perspective: include what they observe and what their background or skills naturally tell them about the starting situation, while withholding hidden motives and overarching secrets they have not yet uncovered. Ground the scene with clear interactive hooks and open momentum rather than a predetermined solution menu.
 
-Store the overarching campaign plan, hidden motives, and secret truths in a separate private journal record (record_scene with visibility=dm) so they can be retrieved through search_campaign_history and read_campaign_record during play without cluttering the active resume snapshot. Keep immediate NPC motives for characters present in the opening scene in set_interaction.
+Store the overarching campaign plan, hidden motives, and secret truths in a separate private journal record (record_scene with visibility=dm) so they can be retrieved through search_campaign_history and read_campaign_record during play without cluttering the active resume snapshot. On party-visible entities and scenes, keep description/summary to what the characters currently perceive or know, and place unrevealed secrets on entity/scene dmNotes (or set_interaction knows/wants for NPCs).
 
 Call record_scene for the opening situation and resume_campaign to verify setup. Report the campaign folder, saved revision and any pending journal delivery. Do not create a GitHub repository, push data or start external hosting as part of initialization.
 

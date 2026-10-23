@@ -170,6 +170,17 @@ test('fresh resume retains world state but party view omits DM entities, rolls a
         },
       },
     },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'flask',
+        kind: 'item',
+        name: 'Glass Flask',
+        description: 'A stoppered vial with bitter residue.',
+        dmNotes: 'SECRET nightshade poison from Lord Vance',
+        item: { owner: 'hero', quantity: 1 },
+      },
+    },
     { type: 'set_session', session: 's1' },
     {
       type: 'set_scene',
@@ -177,15 +188,17 @@ test('fresh resume retains world state but party view omits DM entities, rolls a
         id: 'hall',
         title: 'Hall',
         present: ['hero', 'traitor', 'innkeeper'],
+        dmNotes: 'SECRET ambush waiting behind the tapestry',
         unresolved: ['Who opens the door?'],
       },
     },
   ]);
   await record(service, 'The duke promised a boat.');
+  await record(service, 'The duke promised a faster brigantine.', 'party');
   await record(service, 'SECRET betrayal plot details stay in the journal', 'dm');
   await service.execute('checkpoint_session', {
     operationId: randomUUID(),
-    expectedRevision: 3,
+    expectedRevision: 4,
     reason: 'Close session',
     summary: 'The party waits in the hall.',
     dmNotes: 'SECRET betrayal awaits.',
@@ -197,18 +210,39 @@ test('fresh resume retains world state but party view omits DM entities, rolls a
     false,
   );
   assert.deepEqual(
+    dmPacket.entities.map((e) => e.id).sort(),
+    ['flask', 'hero', 'innkeeper'],
+  );
+  assert.deepEqual(
+    dmPacket.hiddenEntities.map((e) => e.id),
+    ['traitor'],
+  );
+  assert.equal(
+    dmPacket.entities.find((e) => e.id === 'flask').dmNotes,
+    'SECRET nightshade poison from Lord Vance',
+  );
+  assert.equal(dmPacket.scene.dmNotes, 'SECRET ambush waiting behind the tapestry');
+  assert.deepEqual(
     dmPacket.interactions.map((i) => i.id),
     ['innkeeper'],
   );
   const publicPacket = await service.execute('resume_campaign', { audience: 'party' });
   assert.equal(JSON.stringify(publicPacket).includes('SECRET'), false);
+  assert.equal('hiddenEntities' in publicPacket, false);
   assert.equal(publicPacket.scene.unresolved[0], 'Who opens the door?');
-  assert.equal((await store.read()).state.revision, 4);
-  assert.equal(publicPacket.entities[0].character.hp, 10);
+  assert.equal((await store.read()).state.revision, 5);
+  assert.equal(publicPacket.entities.find((e) => e.id === 'hero').character.hp, 10);
   const search = await service.execute('search_campaign_history', {
     query: 'duke',
     audience: 'party',
   });
   assert.equal(JSON.stringify(search).includes('SECRET'), false);
-  assert.ok(search.hits.length > 0);
+  assert.ok(search.hits.length >= 2);
+  assert.ok(search.hits[0].revision > search.hits[1].revision);
+  assert.equal(typeof search.hits[0].timestamp, 'string');
+  const readRecord = await service.execute('read_campaign_record', {
+    reference: search.hits[0].reference,
+    audience: 'party',
+  });
+  assert.equal(readRecord.revision, search.hits[0].revision);
 });

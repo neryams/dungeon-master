@@ -615,17 +615,28 @@ export class CampaignService {
         relevant.add(e.id);
     for (const e of Object.values(state.entities))
       if (e.item?.owner && relevant.has(e.item.owner)) relevant.add(e.id);
-    const entities = Object.values(state.entities).filter((e) => relevant.has(e.id));
+    const allEntities = Object.values(state.entities).filter((e) => relevant.has(e.id));
+    const entities =
+      audience === 'dm'
+        ? allEntities.filter((e) => e.visibility === 'party' && e.knowledge !== 'plan')
+        : allEntities;
+    const hiddenEntities =
+      audience === 'dm'
+        ? allEntities.filter((e) => e.visibility !== 'party' || e.knowledge === 'plan')
+        : [];
     const recent = events
-      .flatMap((e) => e.payload.records)
-      .filter((r) => audience === 'dm' || r.visibility === 'party')
-      .slice(-10)
-      .map((r) => ({
-        reference: `record:${r.id}`,
-        title: r.title,
-        kind: r.kind,
-        visibility: r.visibility,
-      }));
+      .flatMap((e) =>
+        e.payload.records
+          .filter((r) => audience === 'dm' || r.visibility === 'party')
+          .map((r) => ({
+            reference: `record:${r.id}`,
+            title: r.title,
+            kind: r.kind,
+            visibility: r.visibility,
+            revision: e.sequence,
+          })),
+      )
+      .slice(-10);
     const rolls = events
       .flatMap((e) =>
         e.payload.roll && (audience === 'dm' || !e.payload.review) ? [e.payload.roll] : [],
@@ -661,6 +672,12 @@ export class CampaignService {
       encounter: state.encounter,
       entities: entities.slice(0, 100),
       entitiesTruncated: entities.length > 100,
+      ...(audience === 'dm'
+        ? {
+            hiddenEntities: hiddenEntities.slice(0, 100),
+            hiddenEntitiesTruncated: hiddenEntities.length > 100,
+          }
+        : {}),
       entityCount: Object.keys(state.entities).length,
       ...(audience === 'dm'
         ? {
