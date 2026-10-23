@@ -1,6 +1,16 @@
 # Electron tabletop
 
-## Launch and setup
+## macOS installer
+
+The initial distributable targets **Apple silicon Macs (arm64)**. Open the DMG, drag **Dungeon Master** to Applications, then launch it from Applications. The installer bundles Electron, Node.js, application dependencies, rules and skills. No source checkout, npm, Python or uv installation is required to launch the app or use its optional narration installer.
+
+Git is still required to create campaign repositories. Install and sign in to the chosen Codex or Antigravity CLI separately; local mode additionally needs Ollama. The app does not install or authenticate those providers. Use **Choose executable** if a provider is not detected.
+
+Current local builds are unsigned development previews. Public macOS releases still require Developer ID signing and Apple notarization; generating a DMG does not complete those steps. Do not disable system security settings to install an untrusted build. Automatic updates, Intel Mac installers, Windows installers and Linux installers are not provided by this initial packaging target.
+
+First launch offers optional **Narration setup**. Skip it to use the app without spoken DM messages. No speech runtime or model is downloaded until you accept and choose to install. You can return to **Narration setup** later from the top bar.
+
+## Launch from source
 
 Install Node 22.12 or newer, Git, and either Codex CLI or Antigravity CLI. For Codex, run `codex login` and sign in with ChatGPT. For Antigravity, run `agy` and finish its sign-in. Select **Codex CLI** or **Antigravity CLI** under **DM provider**. From this checkout, run:
 
@@ -9,7 +19,7 @@ npm ci
 npm run desktop
 ```
 
-The desktop detects an executable on PATH or under `~/.local/bin`. Choose **Choose executable** if needed. Detection checks the version and provider protocol support; authentication and campaign access are verified when connecting through an actual `campaign_status` call. That connection check consumes a small CLI turn. The app never reads or copies authentication tokens and makes no direct model API calls.
+The desktop detects an executable on PATH or under `~/.local/bin`. Choose **Choose executable** if needed. Detection checks the version and provider protocol support; authentication and campaign access are verified when connecting through an actual `campaign_status` call. That connection check consumes a small CLI turn. The DM connection never reads or copies provider authentication tokens and makes no direct model API calls.
 
 After detecting a hosted provider, **Model** lists the models reported by that CLI: Antigravity's `agy models` or Codex's app-server model catalogue. Choose a specific model or leave **CLI default** to use the CLI's configuration. **Refresh** queries the catalogue again without starting a conversation or generating text. Each hosted provider remembers its own choice. Model availability and image generation depend on the installed CLI and account; an unavailable model reports an error rather than silently selecting another. If discovery fails, the configured CLI default remains usable.
 
@@ -80,7 +90,7 @@ npm run package:plugin
 
 ## Scope
 
-Implemented: source-launched Electron app, Codex and Antigravity connection, new/open campaigns, public transcript, hotseat and LAN play, exact party information, map rendering, native artwork import and interruption recovery. Linux is the verified platform; signed installers, auto-updates, bundled Node, individual player accounts, click-to-move, and streamed public text are not implemented.
+Implemented: source-launched Electron app, an unsigned macOS arm64 installer with bundled Node, optional Phonon narration setup, Codex and Antigravity connection, new/open campaigns, public transcript, hotseat and LAN play, exact party information, map rendering, native artwork import and interruption recovery. Signed/notarized releases, auto-updates, individual player accounts, click-to-move, and streamed public text are not implemented.
 
 | Capability                                                                        | ChatGPT/Codex plugin                 | Electron: Codex / Antigravity                                          |
 | --------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
@@ -110,6 +120,41 @@ All players see the same party-visible information and public holding area. Ther
 `npm run test:lan` exercises phone/desktop browser layouts and reconnect/retry behavior using installed Chrome (`DM_CHROME` overrides its path). `npm run test:antigravity` now also exercises real LAN group input, a targeted reply, Send now, and native map generation with the host's authenticated account. It uses isolated temporary campaign/journal workspaces and restores its permission change if no concurrent settings edit occurred.
 
 CLI turns allow up to ten minutes for native image generation and tool work. The host can stop an active turn at any time; timeout/stop preserves committed state and never automatically retries the CLI request.
+
+## DM narration
+
+The host app can read new public DM messages aloud during a running campaign with local Phonon 40M speech. Choose **Easton** or **Zoey** above the conversation. Changing voices stops the current reading; the next message or **Read aloud** uses the new voice. **Skip reading** stops the current message, including any remaining parts. **Mute narration** stops playback and disables automatic reading until you enable it again. Voice and mute preferences persist in this Electron profile's local storage.
+
+Each DM message has a **Read aloud** button during play. Manual replay works while automatic narration is muted and does not unmute it. Opening a campaign does not read its old messages. Campaign setup has no speech controls or automatic narration, and messages published during setup do not get queued when play begins. Leaving a campaign stops narration. Speech is host-only; LAN guests do not receive audio or speech controls.
+
+Open **Narration setup**, review the linked Phonon model and **CC BY-NC 4.0** license, and explicitly acknowledge noncommercial use and the attribution/license conditions. The application remains MIT-licensed; that does not grant commercial rights to the model. Choose **Skip for now** to continue without speech. Declining is remembered and does not prevent campaign play.
+
+Phonon 40M is gated on Hugging Face. Open **Model access**, accept its access conditions with your Hugging Face account, and supply a read token authorized for that model in the setup's password field, or use your existing local Hugging Face login. The app clears the field after submission and uses the credential only for the current download; it does not save it in preferences, consent receipts, logs or campaign records. The in-app acknowledgement does not replace the model host's access approval. Network/access failures leave the app usable and installation can be retried or cancelled.
+
+After acceptance, the installer downloads a checksum-verified setup tool, a private Python runtime, pinned speech packages, the pinned Phonon 40M model, and Easton/Zoey voices. These live under `~/.cache/dungeon-master/speech` (`DM_SPEECH_HOME` overrides this directory). A versioned consent receipt and model/voice provenance are stored there alongside license notices. No model weights are bundled with the app. Subsequent narration uses local assets with Hub access disabled. Generated audio remains in memory and does not enter campaign history.
+
+For source-development automation, build first and explicitly acknowledge the same terms:
+
+```bash
+npm run build
+npm run speech:setup -- --accept-phonon-noncommercial
+```
+
+This command uses the same installer and consent policy. It uses the configured Hugging Face login or `HF_TOKEN` for the authorized download; never include credentials in source files or issue reports. Run without the acceptance flag to see the license information without downloading.
+
+The first reading loads the engine. Long messages play in prose chunks, omitting Markdown formatting, link destinations and code blocks. This is English narration; fantasy names and unusual spellings may be pronounced imperfectly. An unavailable engine reports a status beside the controls and leaves campaign play usable. Retry a message after installing the engine with **Read aloud**.
+
+## Building a macOS distributable
+
+```bash
+npm ci
+npm run desktop:dist
+npm run desktop:smoke -- --launch
+```
+
+Build on an Apple silicon Mac. `desktop:dist` stages an allowlisted payload, installs production dependencies, downloads and verifies the pinned official Node distribution, and creates a DMG and ZIP under ignored `release/`. It excludes development journals, campaign data, credentials and speech weights. Third-party notices and dependency license files are retained. `desktop:smoke` tests the packaged Node/worker/native dependencies and a temporary campaign; `--launch` also checks the packaged Electron UI with an isolated profile. It does not start or reconfigure the user's journal daemon.
+
+The build does not publish artifacts or sign them. Release owners must configure signing and notarization, review the included dependency notices, and test on a clean target machine before public distribution. Provider installation and login remain explicit user steps.
 
 ## Developing the desktop
 

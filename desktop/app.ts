@@ -8,10 +8,18 @@ import type {
   LocalSettings,
   ModelCatalog,
   Provider,
+  SpeechInstallState,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
 import { markerBadge } from './markers.js';
+import {
+  NarrationController,
+  type NarrationMessage,
+  type NarrationSnapshot,
+  type NarrationVoice,
+} from './narration.js';
+import { NarrationAudio } from './narration-audio.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -20,6 +28,20 @@ const tags = {
   campaigns: 'button',
   connection: 'button',
   stop: 'button',
+  'speech-settings': 'button',
+  'speech-dialog': 'dialog',
+  'speech-intro': 'p',
+  'speech-license-link': 'button',
+  'speech-model-link': 'button',
+  'speech-access-link': 'button',
+  'speech-token-link': 'button',
+  'speech-consent': 'input',
+  'speech-token': 'input',
+  'speech-token-label': 'label',
+  'speech-status': 'p',
+  'speech-install': 'button',
+  'speech-cancel': 'button',
+  'speech-close': 'button',
   'model-dialog': 'dialog',
   'model-current': 'p',
   'switch-model': 'select',
@@ -104,6 +126,11 @@ const tags = {
   'review-mode': 'span',
   encounter: 'div',
   transcript: 'div',
+  'narration-controls': 'div',
+  'narration-voice': 'select',
+  'narration-mute': 'button',
+  'narration-skip': 'button',
+  'narration-status': 'span',
   'conversation-label': 'span',
   'setup-guide': 'div',
   'setup-progress': 'p',
@@ -144,6 +171,235 @@ let modelSaving: Promise<void> = Promise.resolve();
 let dialogModel: string | undefined;
 let modelSwitching = false;
 let dialogRequest = 0;
+let viewGeneration = 0;
+const narrationStorageKey = 'dungeon-master.narration.v1';
+function savedNarration(): { enabled: boolean; voice: NarrationVoice } {
+  try {
+    const saved = JSON.parse(localStorage.getItem(narrationStorageKey) ?? 'null');
+    if (saved && typeof saved.enabled === 'boolean' && ['Easton', 'Zoey'].includes(saved.voice))
+      return { enabled: saved.enabled, voice: saved.voice };
+  } catch {
+    /* Missing or inaccessible storage uses the documented defaults. */
+  }
+  return { enabled: true, voice: 'Easton' };
+}
+const narrationAudio = new NarrationAudio();
+let narrationAvailable: boolean | undefined;
+let speechInstallState: SpeechInstallState | undefined;
+let firstSpeechPromptChecked = false;
+let speechSetupPoll: number | undefined;
+let speechInstallBusy = false;
+const narration = new NarrationController(
+  {
+    synthesize: (message, voice, part) => {
+      if (speechInstallState?.phase !== 'ready')
+        return Promise.reject(new Error('Narration setup is not complete.'));
+      return api.speech({
+        campaignId: message.campaignId,
+        turnId: message.turnId,
+        revision: message.revision,
+        voice,
+        part,
+      });
+    },
+    cancelSynthesis: () => api.cancelSpeech(),
+    play: (audio) => narrationAudio.play(audio),
+    stopAudio: () => narrationAudio.stop(),
+    onChange: () => renderNarration(),
+  },
+  savedNarration(),
+);
+function saveNarration() {
+  const { enabled, voice } = narration.getState();
+  try {
+    localStorage.setItem(narrationStorageKey, JSON.stringify({ enabled, voice }));
+  } catch {
+    notice('Your narration preference could not be saved on this computer.');
+  }
+}
+function narrationSnapshot(snapshot: CampaignSnapshot): NarrationSnapshot {
+  const eligible = new Set(snapshot.speechEligibleRevisions ?? []);
+  return {
+    campaignKey: `${snapshot.root}:${snapshot.campaign.id}`,
+    active: snapshot.reviewMode !== 'setup' && !$('play').hidden,
+    messages: snapshot.table.flatMap((turn) =>
+      turn.messages.map((message) => ({
+        id: `${turn.id}:${message.revision}`,
+        campaignId: snapshot.campaign.id,
+        turnId: turn.id,
+        revision: message.revision,
+        eligible: speechInstallState?.phase === 'ready' && eligible.has(message.revision),
+      })),
+    ),
+  };
+}
+function renderNarration() {
+  const current = narration.getState();
+  const active = !!state?.campaign && state.reviewMode !== 'setup' && !$('play').hidden;
+  $('narration-controls').hidden = !active;
+  $('narration-voice').value = current.voice;
+  $('narration-mute').textContent = current.enabled ? 'Mute narration' : 'Enable narration';
+  $('narration-mute').setAttribute('aria-pressed', String(!current.enabled));
+  $('narration-skip').disabled = !['preparing', 'reading'].includes(current.activity);
+  $('narration-status').textContent =
+    current.activity === 'error'
+      ? errorMessage(current.error).replace(/^Error invoking remote method '[^']+': Error: /, '')
+      : current.activity === 'preparing'
+        ? `Preparing ${current.voice}…`
+        : current.activity === 'reading'
+          ? `Reading · ${current.voice}${current.enabled ? '' : ' · Automatic narration muted'}`
+          : !current.enabled
+            ? 'Automatic narration muted'
+            : narrationAvailable === false
+              ? 'Narration is not installed on this computer.'
+              : `New DM messages will be read by ${current.voice}.`;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.message-read')) {
+    const reading =
+      button.dataset.messageId === current.currentId &&
+      ['preparing', 'reading'].includes(current.activity);
+    button.textContent = reading ? 'Stop reading' : 'Read aloud';
+    button.setAttribute(
+      'aria-label',
+      reading ? 'Stop reading this message' : `Read this message aloud with ${current.voice}`,
+    );
+    button.setAttribute('aria-pressed', String(reading));
+    button.disabled = speechInstallState?.phase !== 'ready';
+  }
+}
+async function checkNarration() {
+  try {
+    speechInstallState = await api.speechSetupStatus();
+    narrationAvailable = speechInstallState.phase === 'ready';
+  } catch {
+    narrationAvailable = false;
+  }
+  updateSpeechSetupDialog();
+  renderNarration();
+}
+function updateSpeechSetupDialog() {
+  const current = speechInstallState;
+  if (!current) return;
+  $('speech-consent').disabled = current.phase === 'installing';
+  $('speech-token').disabled = current.phase === 'installing';
+  $('speech-install').disabled =
+    speechInstallBusy ||
+    current.phase === 'installing' ||
+    current.phase === 'ready' ||
+    !$('speech-consent').checked;
+  $('speech-install').textContent =
+    current.phase === 'error' ? 'Agree & retry installation' : 'Agree & install narration';
+  $('speech-cancel').hidden = current.phase !== 'installing';
+  $('speech-close').disabled = false;
+  $('speech-close').textContent =
+    current.phase === 'ready'
+      ? 'Done'
+      : current.phase === 'installing'
+        ? 'Continue playing'
+        : 'Skip for now';
+  $('speech-token-label').hidden = current.phase === 'ready';
+  $('speech-consent').closest('label')!.hidden = current.phase === 'ready';
+  $('speech-intro').textContent =
+    current.phase === 'ready'
+      ? 'Narration is installed and ready. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
+      : 'Dungeon Master can read new DM messages aloud with a local Phonon voice. The speech model downloads to this computer and runs locally. Text is sent to the local speech engine only. You can skip this and play normally, or set it up later from Narration setup.';
+  $('speech-status').textContent =
+    current.phase === 'installing'
+      ? safeSpeechDetail(current.detail) ||
+        'Installing narration… This can take a few minutes. You can keep playing while it installs.'
+      : current.phase === 'error'
+        ? safeSpeechDetail(current.detail) ||
+          'Narration could not be installed. Check model access and try again.'
+        : current.phase === 'declined'
+          ? 'Narration is off. You can still play normally and set it up later.'
+          : current.phase === 'ready'
+            ? safeSpeechDetail(current.detail) || 'Narration is ready.'
+            : safeSpeechDetail(current.detail) ||
+              'Optional: install local narration when you are ready.';
+  if (!firstSpeechPromptChecked) {
+    firstSpeechPromptChecked = true;
+    if (current.phase === 'unconfigured') {
+      if (current.accepted) $('speech-consent').checked = true;
+      $('speech-dialog').showModal();
+      $('speech-install').disabled = !current.accepted;
+    }
+  }
+  if (current.phase === 'installing') monitorSpeechSetup();
+  renderNarration();
+}
+function safeSpeechDetail(detail: string) {
+  return detail.replace(/hf_[A-Za-z0-9_-]{10,}/g, '[hidden token]');
+}
+function monitorSpeechSetup() {
+  if (speechSetupPoll !== undefined) return;
+  speechSetupPoll = window.setInterval(() => {
+    void api
+      .speechSetupStatus()
+      .then((next) => {
+        speechInstallState = next;
+        narrationAvailable = next.phase === 'ready';
+        updateSpeechSetupDialog();
+        if (next.phase !== 'installing') {
+          window.clearInterval(speechSetupPoll);
+          speechSetupPoll = undefined;
+        }
+      })
+      .catch((error) => {
+        $('speech-status').textContent = safeSpeechDetail(errorMessage(error));
+        if (speechSetupPoll !== undefined) window.clearInterval(speechSetupPoll);
+        speechSetupPoll = undefined;
+      });
+  }, 1000);
+}
+function showSpeechSetup() {
+  if (!speechInstallState) void checkNarration().then(() => $('speech-dialog').showModal());
+  else {
+    if (speechInstallState.phase === 'installing') monitorSpeechSetup();
+    $('speech-dialog').showModal();
+  }
+}
+async function skipSpeechSetup() {
+  if (speechInstallState?.phase === 'unconfigured' && !speechInstallState.accepted)
+    speechInstallState = await api.declineSpeech();
+  $('speech-token').value = '';
+  if (speechInstallState?.phase === 'declined') $('speech-consent').checked = false;
+  if (state?.campaign) narration.reset(narrationSnapshot(state));
+  updateSpeechSetupDialog();
+  $('speech-dialog').close();
+}
+async function installSpeech() {
+  if (!speechInstallState || !$('speech-consent').checked || speechInstallBusy) return;
+  const token = $('speech-token').value.trim() || undefined;
+  $('speech-token').value = '';
+  speechInstallBusy = true;
+  updateSpeechSetupDialog();
+  try {
+    speechInstallState = await api.installSpeech({
+      accepted: true,
+      licenseRevision: speechInstallState.licenseRevision,
+      ...(token ? { token } : {}),
+    });
+    narrationAvailable = speechInstallState.phase === 'ready';
+    updateSpeechSetupDialog();
+    if (speechInstallState.phase === 'installing') monitorSpeechSetup();
+  } catch (error) {
+    $('speech-status').textContent = safeSpeechDetail(errorMessage(error));
+  } finally {
+    speechInstallBusy = false;
+    updateSpeechSetupDialog();
+  }
+}
+async function cancelSpeechSetup() {
+  speechInstallState = await api.cancelSpeechInstall();
+  if (speechSetupPoll !== undefined) window.clearInterval(speechSetupPoll);
+  speechSetupPoll = undefined;
+  $('speech-token').value = '';
+  $('speech-consent').checked = false;
+  narrationAvailable = speechInstallState.phase === 'ready';
+  updateSpeechSetupDialog();
+}
+async function openSpeechInfo(link: 'license' | 'model' | 'token') {
+  await api.openSpeechLink(link);
+}
 function notice(error: unknown) {
   $('notice-text').textContent = errorMessage(error).replace(
     /^Error invoking remote method '[^']+': Error: /,
@@ -264,7 +520,7 @@ function renderQuests() {
     container.append(node('p', 'Objectives and active quests will appear here.', 'help'));
 }
 function renderTranscript() {
-  const key = JSON.stringify(state.table);
+  const key = JSON.stringify([state.reviewMode, state.table]);
   if (key === transcriptKey) return;
   transcriptKey = key;
   const log = $('transcript');
@@ -294,7 +550,28 @@ function renderTranscript() {
   }
   for (const turn of state.table) {
     message(turn.speaker, turn.text, turn.revision, true);
-    for (const m of turn.messages) message('Dungeon Master', m.text, m.revision);
+    for (const m of turn.messages) {
+      const article = message('Dungeon Master', m.text, m.revision);
+      if (state.reviewMode !== 'setup') {
+        const ref: NarrationMessage = {
+          id: `${turn.id}:${m.revision}`,
+          campaignId: state.campaign.id,
+          turnId: turn.id,
+          revision: m.revision,
+          eligible: true,
+        };
+        const button = node('button', 'Read aloud', 'quiet message-read');
+        button.type = 'button';
+        button.dataset.messageId = ref.id;
+        button.addEventListener('click', () => {
+          const current = narration.getState();
+          if (current.currentId === ref.id && ['preparing', 'reading'].includes(current.activity))
+            narration.skip();
+          else narration.replay(ref);
+        });
+        article.append(button);
+      }
+    }
     if (turn.status === 'interrupted')
       log.append(
         node('p', 'Turn interrupted · Check saved outcomes before continuing.', 'interrupted'),
@@ -548,14 +825,19 @@ function renderState() {
     }
   }
   renderTranscript();
+  narration.observe(narrationSnapshot(state));
+  renderNarration();
   void renderMap();
 }
 async function refresh() {
   if (polling) return;
   polling = true;
+  const view = viewGeneration;
   try {
     const snapshot = await api.snapshot();
+    if (view !== viewGeneration || $('play').hidden) return;
     if (snapshot.campaign) {
+      if (snapshot.root !== state.root || snapshot.revision < state.revision) return;
       state = snapshot;
       renderState();
     }
@@ -579,6 +861,7 @@ async function connect(fresh = false) {
 }
 export function showCampaign(snapshot: DesktopSnapshot) {
   if (!snapshot.campaign) throw new Error('No campaign is open');
+  ++viewGeneration;
   state = snapshot;
   selected = undefined;
   shownRevision = -1;
@@ -591,6 +874,8 @@ export function showCampaign(snapshot: DesktopSnapshot) {
   pendingSubmission = undefined;
   $('welcome').hidden = true;
   $('play').hidden = false;
+  narration.reset(narrationSnapshot(snapshot));
+  void checkNarration();
   $('action').value = '';
   $('acting-as').textContent = 'Table';
   $('notice').hidden = true;
@@ -616,6 +901,19 @@ async function checkProvider(path?: string) {
 }
 on('dismiss', () => {
   $('notice').hidden = true;
+});
+on('speech-settings', showSpeechSetup);
+on('speech-close', skipSpeechSetup);
+on('speech-install', installSpeech);
+on('speech-cancel', cancelSpeechSetup);
+on('speech-license-link', () => openSpeechInfo('license'));
+on('speech-model-link', () => openSpeechInfo('model'));
+on('speech-access-link', () => openSpeechInfo('model'));
+on('speech-token-link', () => openSpeechInfo('token'));
+$('speech-consent').addEventListener('change', updateSpeechSetupDialog);
+$('speech-dialog').addEventListener('cancel', (event) => {
+  event.preventDefault();
+  void skipSpeechSetup().catch(notice);
 });
 $('provider').onchange = () => {
   void (async () => {
@@ -819,9 +1117,12 @@ on('recent', async () => {
   if (recent) await enter(await api.open(recent));
 });
 on('campaigns', async () => {
-  await api.stop();
+  ++viewGeneration;
+  narration.leave();
   $('play').hidden = true;
   $('welcome').hidden = false;
+  renderNarration();
+  await api.stop();
   $('connection').hidden = true;
   $('stop').hidden = true;
   $('campaigns').hidden = true;
@@ -960,6 +1261,7 @@ on('center-map', () => {
   return renderMap();
 });
 async function start() {
+  void checkNarration();
   const preferences = await api.preferences();
   recent = preferences.recent;
   $('recent').hidden = !recent;
@@ -973,6 +1275,21 @@ async function start() {
   await checkProvider();
 }
 void start().catch(notice);
+on('narration-mute', () => {
+  narration.setEnabled(!narration.getState().enabled);
+  saveNarration();
+});
+on('narration-skip', () => narration.skip());
+$('narration-voice').addEventListener('change', () => {
+  const voice = $('narration-voice').value;
+  if (voice !== 'Easton' && voice !== 'Zoey') return;
+  narration.setVoice(voice);
+  saveNarration();
+});
+window.addEventListener('beforeunload', () => {
+  narration.leave();
+  narrationAudio.close();
+});
 setInterval(() => {
   if (!$('play').hidden) void refresh();
 }, 1000);

@@ -1,10 +1,10 @@
 import { Preferences, WorkerReply, dispatchDesktop } from '#desktop/contracts';
 import type { DesktopApi, WorkerApi } from '#desktop/contracts';
 import type { ChildProcess } from 'node:child_process';
-import { app, BrowserWindow, ipcMain, dialog, session } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, session, shell } from 'electron';
 import { fork } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { join } from 'node:path';
+import { join, dirname, delimiter } from 'node:path';
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -22,7 +22,9 @@ const pending = new Map<
     timer: ReturnType<typeof setTimeout>;
   }
 >();
-const nodePath = process.env.DM_DESKTOP_NODE;
+const nodePath = app.isPackaged
+  ? join(process.resourcesPath, 'node', 'bin', process.platform === 'win32' ? 'node.exe' : 'node')
+  : process.env.DM_DESKTOP_NODE;
 // XWayland works on desktops where Chromium's native Wayland startup stalls.
 // A native Wayland session can opt in with DM_DESKTOP_OZONE=wayland.
 if (process.platform === 'linux' && (process.env.DISPLAY || process.env.DM_DESKTOP_OZONE))
@@ -48,7 +50,17 @@ else {
         // JSON IPC is portable across Electron's and the external Node worker's V8 versions.
         serialization: 'json',
         stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined },
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: undefined,
+          PATH: [
+            dirname(nodePath),
+            process.env.PATH,
+            ...(process.platform === 'darwin' ? ['/opt/homebrew/bin', '/usr/local/bin'] : []),
+          ]
+            .filter(Boolean)
+            .join(delimiter),
+        },
       });
       worker.stderr?.on('data', () => {});
       worker.on('message', (raw: unknown) => {
@@ -243,6 +255,21 @@ else {
         beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),
+        speech: (input) => call('speech', input),
+        speechStatus: () => call('speechStatus'),
+        cancelSpeech: () => call('cancelSpeech'),
+        speechSetupStatus: () => call('speechSetupStatus'),
+        installSpeech: (input) => call('installSpeech', input),
+        declineSpeech: () => call('declineSpeech'),
+        cancelSpeechInstall: () => call('cancelSpeechInstall'),
+        openSpeechLink: async (link) => {
+          const urls = {
+            license: 'https://creativecommons.org/licenses/by-nc/4.0/',
+            model: 'https://huggingface.co/gradium/phonon-40m-en',
+            token: 'https://huggingface.co/settings/tokens',
+          };
+          await shell.openExternal(urls[link]);
+        },
         stop: () => call('stop'),
         startLan: () => call('startLan'),
         stopLan: () => call('stopLan'),
@@ -305,6 +332,7 @@ else {
           contextIsolation: true,
           sandbox: true,
           webSecurity: true,
+          autoplayPolicy: 'no-user-gesture-required',
         },
       });
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

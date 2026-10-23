@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+release/
 *.tgz
 .journal-rag/
 # Generated machine-local MCP paths; recreate with npm run journal:setup.
