@@ -67,6 +67,12 @@ Public dice rolls open a nonblocking popup. A plain number briefly randomizes, t
 
 DM-only rolls remain hidden. Roll labels recognize a small set of exact check names, such as Perception and Wisdom Save; other purposes use “Dice roll” so private procedure notes never appear. Opening a campaign does not replay old rolls. Interrupted rolls without a confirmed saved result show an unavailable result. Feedback is currently limited to the Electron host; the plugin, read-only panel, and LAN player windows retain their existing interfaces.
 
+## Performance diagnostics
+
+Desktop sessions write private timing metadata under the campaign's `.dm/hotseat/` directory. `performance.jsonl` records request and provider boundaries; `performance-backend.jsonl` records campaign-tool execution and publication. Join records by `requestId` and sort by timestamp to compare submission-to-publication with submission-to-completion. A turn can publish before its remaining bookkeeping finishes. Provider tool intervals include provider overhead; backend intervals measure the desktop campaign service. These intervals can overlap and should not simply be added together.
+
+Logs contain timestamps, bounded identifiers, selected provider/model when known, tool names, status and elapsed milliseconds. They exclude prompts, narration, tool arguments/results and raw provider stderr. CLI-default model identity may be unknown. Logging is best-effort, bounded and separate from authoritative events, exports and player views; missing records do not imply missing gameplay operations. Time outside tool intervals includes model processing, delegation, scheduling and network waits; these logs cannot distinguish those causes without provider telemetry.
+
 ## Stop, restart and recovery
 
 **Stop DM** stops this app's owned CLI process tree. Saved events remain intact. If a turn ends without a published response, fails, times out or is interrupted, the app marks it for attention. Review the map and sheet, reconnect, and ask for a recap before taking another action. Do not resubmit uncertain damage or dice requests as new actions.

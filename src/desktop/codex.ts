@@ -5,7 +5,7 @@ import { constants } from 'node:fs';
 import { join, delimiter, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import type { LocalSettings } from './contracts.js';
-import type { AgentDriver, AgentResult } from './antigravity.js';
+import type { AgentDriver, AgentResult, ProviderTiming } from './antigravity.js';
 
 const execute = promisify(execFile);
 const REASONING_EFFORTS = new Set([
@@ -75,6 +75,7 @@ export interface CodexOptions {
   progress?: (text: string) => void;
   onConversation?: (id: string) => void | Promise<void>;
   onImage?: (path: string) => void | Promise<void>;
+  onTiming?: (event: ProviderTiming) => void;
   prefixArgs?: string[]; // Protocol tests only, never exposed through IPC.
 }
 
@@ -103,18 +104,22 @@ export class CodexSession implements AgentDriver {
     toolFailures: number;
     tools: Set<string>;
     campaignIds: Set<string>;
+    requestId?: string;
+    startedAt: number;
+    toolStarts: Map<string, number>;
+    sawEvent: boolean;
   };
   constructor(private options: CodexOptions) {}
 
-  run(prompt: string): Promise<AgentResult> {
-    return this.begin(prompt);
+  run(prompt: string, requestId?: string): Promise<AgentResult> {
+    return this.begin(prompt, requestId);
   }
   /** Used for explicit context maintenance; automatic compaction uses the same native engine. */
   compact(): Promise<AgentResult> {
     if (!this.threadId) return Promise.reject(new Error('Connect before compacting context.'));
     return this.begin();
   }
-  private begin(prompt?: string): Promise<AgentResult> {
+  private begin(prompt?: string, requestId?: string): Promise<AgentResult> {
     if (this.closed)
       return Promise.reject(
         new Error('The Codex session is stopped. Reconnect before continuing.'),
@@ -140,8 +145,13 @@ export class CodexSession implements AgentDriver {
         toolFailures: 0,
         tools: new Set(),
         campaignIds: new Set(),
+        requestId,
+        startedAt: Date.now(),
+        toolStarts: new Map(),
+        sawEvent: false,
       };
     });
+    this.emitTiming({ kind: 'provider-dispatch', requestId });
     void this.dispatch(prompt).catch(() =>
       this.abort(
         new Error(
@@ -152,6 +162,13 @@ export class CodexSession implements AgentDriver {
       ),
     );
     return result;
+  }
+  private emitTiming(event: ProviderTiming) {
+    try {
+      this.options.onTiming?.(event);
+    } catch {
+      /* Telemetry is best-effort. */
+    }
   }
   private async dispatch(prompt?: string) {
     if (!this.child) {
@@ -424,10 +441,49 @@ export class CodexSession implements AgentDriver {
     if (!this.pending || !p || p.threadId !== this.threadId) return;
     if (message.method === 'turn/started' && !this.turnId) this.turnId = p.turn?.id;
     if (!this.turnId || (p.turnId ?? p.turn?.id) !== this.turnId) return;
+    if (!this.pending.sawEvent) {
+      this.pending.sawEvent = true;
+      this.emitTiming({
+        kind: 'provider-first-event',
+        requestId: this.pending.requestId,
+        elapsedMs: Date.now() - this.pending.startedAt,
+      });
+    }
     if (message.method === 'item/started' && p.item?.type === 'contextCompaction')
       this.options.progress?.('Compacting DM context; campaign history stays saved…');
+    if (
+      message.method === 'item/started' &&
+      p.item?.type === 'mcpToolCall' &&
+      p.item.server === this.options.serverName
+    ) {
+      const key = typeof p.item.id === 'string' ? p.item.id : undefined;
+      if (key && !this.pending.toolStarts.has(key)) {
+        if (this.pending.toolStarts.size >= 64)
+          this.pending.toolStarts.delete(this.pending.toolStarts.keys().next().value!);
+        this.pending.toolStarts.set(key, Date.now());
+      }
+      this.emitTiming({
+        kind: 'provider-tool-start',
+        requestId: this.pending.requestId,
+        tool: p.item.tool,
+        callId: key,
+      });
+    }
     if (message.method === 'item/completed') {
       const item = p.item;
+      if (item?.type === 'mcpToolCall' && item.server === this.options.serverName) {
+        const key = typeof item.id === 'string' ? item.id : '';
+        const started = this.pending.toolStarts.get(key);
+        if (key) this.pending.toolStarts.delete(key);
+        this.emitTiming({
+          kind: 'provider-tool-end',
+          requestId: this.pending.requestId,
+          tool: item.tool,
+          callId: key,
+          ...(started ? { elapsedMs: Date.now() - started } : {}),
+          status: item.status === 'failed' || item.error || item.result?.isError ? 'error' : 'ok',
+        });
+      }
       if (
         this.options.local &&
         item?.type === 'mcpToolCall' &&

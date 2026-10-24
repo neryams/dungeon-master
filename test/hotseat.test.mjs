@@ -185,24 +185,37 @@ readline.createInterface({ input: process.stdin }).on('line', text => {
  if (request === 'bad') { process.stdout.write('not json\\n'); return; }
  line({event:'init', conversation_id:'conversation-1'});
  line({event:'step_update',step_update:{step_type:'agent_response',text_delta:'PRIVATE_SECRET'}});
- line({event:'step_update',step_update:{step_type:'tool',state:'DONE',tool_name:'dm_campaign_status',tool_info:{output:'PRIVATE_SECRET'}}});
+   line({event:'step_update',step_update:{id:'call-1',step_type:'tool',state:'RUNNING',tool_name:'dm_campaign_status'}});
+   line({event:'step_update',step_update:{id:'call-2',step_type:'tool',state:'RUNNING',tool_name:'dm_campaign_status'}});
+   line({event:'step_update',step_update:{id:'call-2',step_type:'tool',state:'DONE',tool_name:'dm_campaign_status',tool_info:{output:'PRIVATE_SECRET'}}});
+   line({event:'step_update',step_update:{id:'call-1',step_type:'tool',state:'DONE',tool_name:'dm_campaign_status',tool_info:{output:'PRIVATE_SECRET'}}});
  const result=JSON.stringify({event:'result',result:{status: request === 'fail' ? 'ERROR' : 'SUCCESS', response:'PRIVATE_SECRET'}})+'\\n';
  process.stdout.write(result.slice(0,20)); setTimeout(()=>process.stdout.write(result.slice(20)),5);
 });`,
   );
   const progress = [];
+  const timings = [];
   const session = new AntigravitySession({
     executable: process.execPath,
     prefixArgs: [fixturePath],
     cwd: parent,
     progress: (s) => progress.push(s),
     timeoutMs: 1000,
+    onTiming: (event) => {
+      timings.push(event);
+      if (event.kind === 'provider-tool-end') throw Error('diagnostic writer failure');
+    },
   });
   t.after(() => session.close());
-  const result = await session.run('hello');
+  const result = await session.run('hello', 'request-1');
   assert.deepEqual(result.tools, ['dm_campaign_status']);
   assert.equal(result.conversationId, 'conversation-1');
   assert.doesNotMatch(JSON.stringify([result, progress]), /PRIVATE_SECRET/);
+  assert.deepEqual(
+    timings.filter((event) => event.kind === 'provider-tool-end').map((event) => event.callId),
+    ['call-2', 'call-1'],
+  );
+  assert(timings.every((event) => event.requestId === 'request-1'));
   assert.equal((await session.run('second')).conversationId, 'conversation-1');
   await assert.rejects(session.run('fail'), /did not complete/);
   const hanging = session.run('hang');
@@ -275,7 +288,15 @@ test('coordinator serializes actions, deduplicates dispatch, requires public out
   for (let i = 0; i < 100 && (await host.snapshot()).stage === 'resolving'; i++) await delay(5);
   assert.equal((await host.snapshot()).table[0].status, 'completed');
   finish = undefined;
-  await host.submit({ id: 'no-public-output', text: 'Look again' });
+  for (let i = 0; i < 100; i++) {
+    try {
+      await host.submit({ id: 'no-public-output', text: 'Look again' });
+      break;
+    } catch (error) {
+      if (i === 99) throw error;
+      await delay(5);
+    }
+  }
   for (let i = 0; i < 100 && !finish; i++) await delay(5);
   finish.resolve({ tools: [], campaignIds: [] });
   for (let i = 0; i < 100 && (await host.snapshot()).stage === 'resolving'; i++) await delay(5);
@@ -283,6 +304,26 @@ test('coordinator serializes actions, deduplicates dispatch, requires public out
   assert.equal(failed.stage, 'attention');
   assert.equal(failed.table[1].status, 'interrupted');
   assert.equal(runs, 3);
+  for (let i = 0; i < 100; i++) {
+    const text = await readFile(join(store.root, '.dm/hotseat/performance.jsonl'), 'utf8').catch(
+      () => '',
+    );
+    if (text.includes('request-interrupted')) break;
+    await delay(5);
+  }
+  const timing = (await readFile(join(store.root, '.dm/hotseat/performance.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  assert.deepEqual(
+    timing.filter((item) => item.requestId === 'single').map((item) => item.kind),
+    ['request-start', 'request-complete'],
+  );
+  assert.deepEqual(
+    timing.filter((item) => item.requestId === 'no-public-output').map((item) => item.kind),
+    ['request-start', 'request-interrupted'],
+  );
+  assert(timing.every((item) => !('prompt' in item) && !('args' in item) && !('result' in item)));
 });
 
 test('stopping during connection never starts an agent later', async (t) => {

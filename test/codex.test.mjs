@@ -52,7 +52,7 @@ createInterface({input:process.stdin}).on('line', line => {
  if(text==='bad') return process.stdout.write('not json\\n');
  if(text==='approval') return send({id:999,method:'item/commandExecution/requestApproval',params:{threadId:'thread-1',turnId:id}});
  const output={campaign:{schemaVersion:1,id:'test'},revision:0,journal:{}};
- const item={type:'mcpToolCall',server:'campaign',tool:'campaign_status',status:'completed',result:{content:[{type:'text',text:JSON.stringify(output)}]}};
+ const item={id:'call-1',type:'mcpToolCall',server:'campaign',tool:'campaign_status',status:'completed',result:{content:[{type:'text',text:JSON.stringify(output)}]}};
  if(text==='tool-errors'||text==='recover-errors') {
    for(let i=0;i<9;i++) send({method:'item/completed',params:{threadId:'thread-1',turnId:id,item:text==='recover-errors'&&i===5?item:{...item,status:i%2?'failed':'completed',result:{isError:true},error:i%2?{message:'PRIVATE_SECRET'}:null}}});
  }
@@ -65,7 +65,12 @@ createInterface({input:process.stdin}).on('line', line => {
    send({method:'item/completed',params:{threadId:'other',turnId:id,item:{type:'imageGeneration',status:'completed',savedPath:'/unrelated.png'}}});
    send({method:'item/completed',params:{threadId:'thread-1',turnId:id,item:{type:'imageGeneration',status:'completed',savedPath:'/generated.png'}}});
  }
- if(text!=='fake') send({method:'item/completed',params:{threadId:'thread-1',turnId:id,item}});
+ if(text!=='fake') {
+   send({method:'item/started',params:{threadId:'unrelated',turnId:id,item}});
+   send({method:'item/started',params:{threadId:'thread-1',turnId:'stale-turn',item}});
+   send({method:'item/started',params:{threadId:'thread-1',turnId:id,item}});
+   send({method:'item/completed',params:{threadId:'thread-1',turnId:id,item}});
+ }
  const done=JSON.stringify({method:'turn/completed',params:{threadId:'thread-1',turn:{id,status:text==='fail'?'failed':'completed',error:{message:'PRIVATE_SECRET'}}}})+'\\n';
  if(text.startsWith('autocompact')) setTimeout(()=>process.stdout.write(done),25);
  else {process.stdout.write(done.slice(0,17));setTimeout(()=>process.stdout.write(done.slice(17)),5);}
@@ -87,16 +92,25 @@ createInterface({input:process.stdin}).on('line', line => {
   return { driver, parent, progress };
 }
 
-test('Codex protocol authenticates, scopes configuration, correlates events and never exposes raw output', async (t) => {
-  const { driver, parent, progress } = await driverFixture(t);
-  const result = await driver.run('hello');
+test('Codex protocol authenticates, scopes configuration, correlates timing events and never exposes raw output', async (t) => {
+  const timings = [];
+  const { driver, parent, progress } = await driverFixture(t, {
+    onTiming: (event) => {
+      timings.push(event);
+      throw Error('diagnostic writer failure');
+    },
+  });
+  const result = await driver.run('hello', 'request-1');
   assert.deepEqual(result, {
     conversationId: 'thread-1',
     tools: ['campaign_status'],
     campaignIds: ['test'],
   });
-  assert.deepEqual((await driver.run('fake')).campaignIds, []);
   assert.doesNotMatch(JSON.stringify([result, progress]), /PRIVATE_SECRET/);
+  assert.equal(timings.filter((event) => event.kind === 'provider-first-event').length, 1);
+  assert.equal(timings.find((event) => event.kind === 'provider-tool-end')?.callId, 'call-1');
+  assert(timings.every((event) => event.requestId === 'request-1'));
+  assert.deepEqual((await driver.run('fake')).campaignIds, []);
   const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
     .trim()
     .split('\n')

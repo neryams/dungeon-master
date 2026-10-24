@@ -140,9 +140,17 @@ export interface AgentResult {
   campaignIds: string[];
 }
 export interface AgentDriver {
-  run(prompt: string): Promise<AgentResult>;
+  run(prompt: string, requestId?: string): Promise<AgentResult>;
   close(): Promise<void>;
 }
+export type ProviderTiming = {
+  kind: 'provider-dispatch' | 'provider-first-event' | 'provider-tool-start' | 'provider-tool-end';
+  requestId?: string;
+  tool?: string;
+  elapsedMs?: number;
+  callId?: string;
+  status?: 'ok' | 'error';
+};
 export class AntigravitySession implements AgentDriver {
   private child?: ChildProcessWithoutNullStreams;
   private pending?: {
@@ -151,6 +159,10 @@ export class AntigravitySession implements AgentDriver {
     timer: NodeJS.Timeout;
     tools: Set<string>;
     campaignIds: Set<string>;
+    requestId?: string;
+    startedAt: number;
+    toolStarts: Map<string, number>;
+    sawEvent: boolean;
   };
   private buffer = '';
   private conversationId?: string;
@@ -165,11 +177,12 @@ export class AntigravitySession implements AgentDriver {
       timeoutMs?: number;
       progress?: (text: string) => void;
       onConversation?: (id: string) => void | Promise<void>;
+      onTiming?: (event: ProviderTiming) => void;
       prefixArgs?: string[]; // Used by protocol contract tests, never exposed through desktop IPC.
     },
   ) {}
 
-  run(prompt: string): Promise<AgentResult> {
+  run(prompt: string, requestId?: string): Promise<AgentResult> {
     if (this.pending) return Promise.reject(new Error('The DM is already resolving an action'));
     if (this.closing) return Promise.reject(new Error('The DM session is stopping'));
     if (!this.child) this.start();
@@ -182,7 +195,18 @@ export class AntigravitySession implements AgentDriver {
         );
         void this.close();
       }, this.options.timeoutMs ?? 600000);
-      this.pending = { resolve, reject, timer, tools: new Set(), campaignIds: new Set() };
+      this.pending = {
+        resolve,
+        reject,
+        timer,
+        tools: new Set(),
+        campaignIds: new Set(),
+        requestId,
+        startedAt: Date.now(),
+        toolStarts: new Map(),
+        sawEvent: false,
+      };
+      this.emitTiming({ kind: 'provider-dispatch', requestId });
       this.child!.stdin.write(
         JSON.stringify({ event: 'user', message: { content: prompt } }) + '\n',
         (error) => {
@@ -190,6 +214,13 @@ export class AntigravitySession implements AgentDriver {
         },
       );
     });
+  }
+  private emitTiming(event: ProviderTiming) {
+    try {
+      this.options.onTiming?.(event);
+    } catch {
+      /* Telemetry is best-effort. */
+    }
   }
   private start() {
     const args = [
@@ -253,6 +284,14 @@ export class AntigravitySession implements AgentDriver {
     });
   }
   private receive(event: any) {
+    if (this.pending && !this.pending.sawEvent) {
+      this.pending.sawEvent = true;
+      this.emitTiming({
+        kind: 'provider-first-event',
+        requestId: this.pending.requestId,
+        elapsedMs: Date.now() - this.pending.startedAt,
+      });
+    }
     const id =
       event.conversation_id ?? event.init?.conversation_id ?? event.result?.conversation_id;
     if (typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
@@ -266,7 +305,32 @@ export class AntigravitySession implements AgentDriver {
       const info = event.step_update.tool_info;
       const name = event.step_update.tool_name ?? info?.name;
       if (typeof name === 'string') {
+        const id =
+          typeof event.step_update.id === 'string' ? event.step_update.id.slice(0, 100) : undefined;
+        if (event.step_update.state === 'RUNNING' || event.step_update.state === 'STARTED') {
+          if (id && this.pending && !this.pending.toolStarts.has(id)) {
+            if (this.pending.toolStarts.size >= 64)
+              this.pending.toolStarts.delete(this.pending.toolStarts.keys().next().value!);
+            this.pending.toolStarts.set(id, Date.now());
+          }
+          this.emitTiming({
+            kind: 'provider-tool-start',
+            requestId: this.pending?.requestId,
+            tool: name.slice(0, 100),
+            callId: id,
+          });
+        }
         if (event.step_update.state === 'DONE' && !info?.error) {
+          const started = id ? this.pending?.toolStarts.get(id) : undefined;
+          if (id) this.pending?.toolStarts.delete(id);
+          this.emitTiming({
+            kind: 'provider-tool-end',
+            requestId: this.pending?.requestId,
+            tool: name.slice(0, 100),
+            callId: id,
+            ...(started ? { elapsedMs: Date.now() - started } : {}),
+            status: 'ok',
+          });
           this.pending?.tools.add(name);
           // agy 1.4 routes MCP through call_mcp_tool; its name is not the domain tool name.
           // Recognize readiness from the actual campaign tool result, never assistant prose.
@@ -285,6 +349,18 @@ export class AntigravitySession implements AgentDriver {
               /* Other MCP tool outputs are irrelevant to readiness. */
             }
           }
+        }
+        if (event.step_update.state === 'DONE' && info?.error) {
+          const started = id ? this.pending?.toolStarts.get(id) : undefined;
+          if (id) this.pending?.toolStarts.delete(id);
+          this.emitTiming({
+            kind: 'provider-tool-end',
+            requestId: this.pending?.requestId,
+            tool: name.slice(0, 100),
+            callId: id,
+            ...(started ? { elapsedMs: Date.now() - started } : {}),
+            status: 'error',
+          });
         }
         this.options.progress?.(
           name.includes('publish_table_message')

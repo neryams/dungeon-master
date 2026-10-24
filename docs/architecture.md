@@ -110,6 +110,10 @@ The worker sends typed unsolicited events over its existing child-process IPC co
 
 `.dm/hotseat/activity.json` remains a bounded, disposable recovery cache. The host merges concurrent producers by operation ID and does not downgrade a complete roll to pending. Snapshot recovery reconciles missed notifications from that cache. Campaign history remains authoritative, and no event schema or gameplay transaction changes. The renderer queues new public roll presentations, animates decorative numbers, then shows the saved total. Opening or leaving a campaign resets presentation state; reduced motion skips flickering. A failed notification never causes a gameplay retry or a new dice roll.
 
+### Desktop performance diagnostics
+
+Performance diagnostics are separate from public activity and authoritative campaign events. `src/desktop/performance.ts` writes bounded, private JSONL timing metadata under `.dm/hotseat`; the host and provider adapters record request/provider boundaries, while the desktop MCP wrapper records tool execution and publication. Request IDs connect the two timelines without recording prompts or tool payloads. Diagnostic failures do not change gameplay results. Provider tool intervals include orchestration overhead and can overlap backend intervals; remaining wall time is not a direct inference-time measurement. See the desktop performance diagnostics guide for interpretation.
+
 ### Local speech
 
 `src/desktop/speech-runtime.ts` owns local speech synthesis. The packaged app selects its native engine and pinned assets through `DM_BUNDLED_SPEECH`, set by Electron main to `Resources/speech`. The speech bundle is read-only; versioned consent remains in the user cache. `src/desktop/speech-install.ts` validates bundled resources and enables playback after acknowledgement without network access, Python installation or HF credentials. Decline remains durable. Source-development launches retain the private Python downloader fallback and its explicit acceptance/authentication requirements. No speech assets or consent are shared with campaign history.
