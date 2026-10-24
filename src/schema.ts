@@ -336,8 +336,36 @@ export const Roll = z
     total: Int,
     purpose: Text,
     visibility: Visibility,
+    characterId: Id.optional(),
+    source: z.enum(['digital', 'physical']).optional(),
   })
   .strict();
+export const PendingRoll = z
+  .object({
+    id: Id,
+    operationId: Id,
+    tableRequestId: Id.optional(),
+    characterId: Id,
+    expression: z.string().min(1).max(40),
+    mode: z.enum(['normal', 'advantage', 'disadvantage']),
+    purpose: Text,
+    actionId: Id.optional(),
+    stepId: Id.optional(),
+    admin: z
+      .object({
+        actionId: Id.optional(),
+        purpose: z.enum(['override', 'delegation_unavailable', 'world_preparation', 'correction']),
+        closeAction: z.boolean(),
+        reason: Text,
+        ruling: Text,
+        publicExplanation: Text,
+        eventId: Id.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type PendingRoll = z.infer<typeof PendingRoll>;
 export const ReviewMode = z.enum(['legacy', 'setup', 'reviewed']);
 const RequiredText = z.string().trim().min(1).max(20000);
 export const RuleCitation = z
@@ -538,6 +566,8 @@ export const Payload = z
     changes: z.array(Change).max(100).default([]),
     records: z.array(JournalRecord).max(10).default([]),
     roll: Roll.optional(),
+    rollRequest: PendingRoll.optional(),
+    completesRoll: Id.optional(),
     corrects: Id.optional(),
     review: ReviewOperation.optional(),
     table: TableOperation.optional(),
@@ -574,6 +604,7 @@ export const CampaignConfig = z
 export type CampaignConfig = z.infer<typeof CampaignConfig>;
 export interface State {
   revision: number;
+  pendingRolls?: Record<string, PendingRoll>;
   table?: TableTurn[];
   gathering?: Gathering;
   reviewMode?: z.infer<typeof ReviewMode>;

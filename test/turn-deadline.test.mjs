@@ -131,3 +131,66 @@ test('provider timeout failures use the shared typed error', () => {
   assert.match(error.message, /Codex timed out/);
   assert.ok(error instanceof Error);
 });
+
+test('waiting for player dice defers timeout, then resumes the ordinary deadline', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let waiting = true;
+  let timedOut = 0;
+  const deadline = new TurnDeadline({
+    timeoutMs: 10,
+    requestId: 'dice-request',
+    isAwaitingPlayerRoll: async (id) => {
+      assert.equal(id, 'dice-request');
+      return waiting;
+    },
+    onTimeout: () => timedOut++,
+  });
+  deadline.start();
+  t.mock.timers.tick(10);
+  await flushMicrotasks();
+  assert.equal(timedOut, 0);
+  waiting = false;
+  t.mock.timers.tick(10);
+  await flushMicrotasks();
+  assert.equal(timedOut, 1);
+});
+
+test('cancellation wins over a pending player dice lookup', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let resolveWaiting;
+  let timedOut = false;
+  const deadline = new TurnDeadline({
+    timeoutMs: 5,
+    requestId: 'dice-request',
+    isAwaitingPlayerRoll: () =>
+      new Promise((resolve) => {
+        resolveWaiting = resolve;
+      }),
+    onTimeout: () => (timedOut = true),
+  });
+  deadline.start();
+  t.mock.timers.tick(5);
+  await flushMicrotasks();
+  deadline.cancel();
+  resolveWaiting(true);
+  await flushMicrotasks();
+  t.mock.timers.tick(100);
+  assert.equal(timedOut, false);
+});
+
+test('a stalled player dice lookup cannot disable the provider deadline', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let timedOut = false;
+  const deadline = new TurnDeadline({
+    timeoutMs: 5,
+    requestId: 'dice-request',
+    isAwaitingPlayerRoll: () => new Promise(() => {}),
+    onTimeout: () => (timedOut = true),
+  });
+  deadline.start();
+  t.mock.timers.tick(5);
+  await flushMicrotasks();
+  t.mock.timers.tick(1000);
+  await flushMicrotasks();
+  assert.equal(timedOut, true);
+});

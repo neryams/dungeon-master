@@ -206,6 +206,7 @@ export class AntigravitySession implements AgentDriver {
       env?: NodeJS.ProcessEnv;
       timeoutMs?: number;
       finishingGraceMs?: number;
+      isAwaitingPlayerRoll?: (requestId: string) => Promise<boolean>;
       hasPublishedResponse?: (requestId: string) => Promise<boolean>;
       progress?: (text: string) => void;
       onConversation?: (id: string) => void | Promise<void>;
@@ -224,6 +225,7 @@ export class AntigravitySession implements AgentDriver {
         finishingGraceMs: this.options.finishingGraceMs,
         requestId,
         hasPublishedResponse: this.options.hasPublishedResponse,
+        isAwaitingPlayerRoll: this.options.isAwaitingPlayerRoll,
         onFinishingGrace: () => {
           this.emitTiming({
             kind: 'provider-finishing-grace',

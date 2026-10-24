@@ -29,6 +29,14 @@
       <section id="table" class="view">
         <p id="turn"></p>
         <div id="transcript" aria-live="polite"></div>
+        <section id="roll-prompt" class="roll-prompt" aria-label="Dice requested by the DM" hidden>
+          <h2 id="roll-prompt-title">Dice requested</h2>
+          <p id="roll-prompt-detail"></p>
+          <p id="roll-prompt-help" class="help"></p>
+          <div id="roll-inputs" class="roll-inputs"></div>
+          <p id="roll-error" class="roll-error" role="alert" hidden></p>
+          <button id="roll-submit" type="button">Roll dice</button>
+        </section>
         <section class="holding">
           <h2>Group intentions</h2>
           <div id="intentions"></div>

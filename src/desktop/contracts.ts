@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { GroupAction, Id, Viewport } from '../schema.js';
 import type { State, TableTurn } from '../schema.js';
 import type { playerView } from '../player-view.js';
+import { SubmitRollInput } from './player-roll.js';
+export { SubmitRollInput } from './player-roll.js';
 
 export const SubmitInput = z
   .object({
@@ -157,6 +159,29 @@ export type IntentInput = z.infer<typeof IntentInput>;
 export type LanAdminInput = z.infer<typeof LanAdminInput>;
 export type Stage = 'disconnected' | 'connecting' | 'ready' | 'resolving' | 'attention';
 export type PlayerView = ReturnType<typeof playerView>;
+export interface RollCard {
+  id: string;
+  revision: number;
+  characterId?: string;
+  characterName?: string;
+  label: string;
+  notation: string;
+  mode: 'normal' | 'advantage' | 'disadvantage' | 'reported';
+  dice: number[];
+  modifier: number;
+  total: number;
+  source: 'digital' | 'physical';
+}
+export interface PendingRollCard {
+  id: string;
+  characterId: string;
+  characterName: string;
+  label: string;
+  notation: string;
+  mode: 'normal' | 'advantage' | 'disadvantage';
+  dieCount: number;
+  dieSides: number;
+}
 export interface CampaignActivity {
   phase?: string;
   rolls: {
@@ -205,6 +230,8 @@ export const DesktopEvent = z
   .strict();
 export type DesktopEvent = z.infer<typeof DesktopEvent>;
 export type CampaignSnapshot = PlayerView & {
+  pendingRolls: PendingRollCard[];
+  rollHistory: RollCard[];
   root: string;
   table: TableTurn[];
   gathering?: State['gathering'];
@@ -236,6 +263,8 @@ export interface LanStatus {
   players: Player[];
 }
 export type LanSnapshot = PlayerView & {
+  pendingRolls: PendingRollCard[];
+  rollHistory: RollCard[];
   table: TableTurn[];
   gathering?: State['gathering'];
   stage: Stage;
@@ -257,6 +286,9 @@ export interface WorkerApi {
     model?: string,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
+  submitRoll(
+    input: z.input<typeof SubmitRollInput>,
+  ): Promise<{ id: string; duplicate: boolean; roll?: unknown }>;
   beginSetup(): Promise<void>;
   snapshot(): Promise<DesktopSnapshot>;
   map(input: MapInput): Promise<MapResult>;
@@ -299,6 +331,7 @@ export interface LanRequests {
   map: MapInput;
   claim: z.infer<typeof LanClaimInput>;
   intent: IntentInput;
+  roll: z.input<typeof SubmitRollInput>;
 }
 export interface LanResponses {
   join: { token: string; clientId: string };
@@ -306,6 +339,7 @@ export interface LanResponses {
   map: MapResult;
   claim: { ok: boolean };
   intent: { ok: boolean; duplicate?: boolean };
+  roll: { id: string; duplicate: boolean; roll?: unknown };
 }
 export const WorkerEnvelope = z
   .object({ id: z.number().int().safe(), method: z.string(), args: z.array(z.unknown()) })
@@ -400,6 +434,8 @@ export async function dispatchWorker(
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
+    case 'submitRoll':
+      return api.submitRoll(...z.tuple([SubmitRollInput]).parse(raw));
     case 'beginSetup':
       z.tuple([]).parse(raw);
       return api.beginSetup();

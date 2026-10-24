@@ -266,6 +266,7 @@ else {
           return call('connect', executable(provider), fresh, provider, prefs.local, model);
         },
         submit: (input) => call('submit', input),
+        submitRoll: (input) => call('submitRoll', input),
         beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),

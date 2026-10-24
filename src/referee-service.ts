@@ -76,6 +76,7 @@ export const refereeInputs = {
           reportedTotal: z.number().int().safe().optional(),
           purpose: text,
           visibility: z.enum(['dm', 'party']).default('party'),
+          characterId: Id.optional(),
         })
         .strict()
         .optional(),
@@ -316,6 +317,7 @@ export async function executeReferee(
                   mode: p.roll.mode,
                   purpose: p.roll.purpose,
                   visibility: p.roll.visibility,
+                  ...(p.roll.characterId ? { characterId: p.roll.characterId } : {}),
                   ...(p.roll.mode === 'reported'
                     ? { dice: [], modifier: 0, total: p.roll.reportedTotal! }
                     : rollDice(p.roll.expression, p.roll.mode)),

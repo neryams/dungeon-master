@@ -215,3 +215,62 @@ article > small {
   display: block;
   margin-bottom: 0.4rem;
 }
+.roll-prompt {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid #697052;
+  border-radius: 8px;
+}
+.roll-prompt h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+.roll-prompt p {
+  margin: 5px 0 10px;
+}
+.roll-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+.roll-inputs label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.roll-inputs input {
+  width: 100px;
+}
+.roll-error {
+  color: #ffb4a9;
+}
+.roll-card {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #697052;
+  border-radius: 8px;
+}
+.roll-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.roll-card-caption,
+.roll-card-title small {
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+.roll-card-total {
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .roll-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roll-inputs input {
+    width: 100%;
+  }
+}

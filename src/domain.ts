@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Change, Entity, Event, Payload, State, Roll } from './schema.js';
 import { z } from 'zod';
-import { validateReview, reduceReview } from './review.js';
+import { validateReview, reduceReview, actionStatus } from './review.js';
 import { reduceTable } from './table.js';
 
 export class CampaignError extends Error {
@@ -15,6 +15,17 @@ export class CampaignError extends Error {
 }
 export function fail(message: string): never {
   throw new CampaignError('INVALID_CHANGE', message);
+}
+export function isPlayerCharacter(state: State, id: string): boolean {
+  const entity = state.entities[id];
+  return (
+    !!entity &&
+    entity.kind === 'character' &&
+    !!entity.character &&
+    entity.visibility === 'party' &&
+    entity.knowledge !== 'plan' &&
+    (state.party === undefined || state.party.includes(id))
+  );
 }
 export function validateState(state: State): void {
   const has = (id: string) => {
@@ -129,6 +140,51 @@ export function validateState(state: State): void {
 export function applyPayload(before: State, payload: Payload): State {
   validateReview(before, payload);
   const state = structuredClone(before);
+  if (payload.rollRequest) {
+    const request = payload.rollRequest;
+    if (payload.roll || payload.completesRoll || state.pendingRolls?.[request.id])
+      fail('Invalid pending roll request');
+    if (!isPlayerCharacter(state, request.characterId))
+      fail('Player roll requires a party character');
+    rollDice(request.expression, request.mode, () => 0);
+    state.pendingRolls ??= {};
+    state.pendingRolls[request.id] = structuredClone(request);
+  }
+  if (payload.completesRoll) {
+    const request = state.pendingRolls?.[payload.completesRoll];
+    if (!request || !payload.roll) fail('Pending roll result is missing its request');
+    if (
+      payload.roll.characterId !== request.characterId ||
+      payload.roll.visibility !== 'party' ||
+      payload.roll.expression !== request.expression ||
+      payload.roll.purpose !== request.purpose ||
+      payload.roll.actionId !== request.actionId ||
+      payload.roll.stepId !== request.stepId ||
+      (payload.roll.mode !== request.mode && payload.roll.mode !== 'reported')
+    )
+      fail('Roll result differs from the pending request');
+    if (payload.roll.mode === 'reported') fail('Pending player rolls require raw dice faces');
+    const minimum = rollDice(request.expression, request.mode, () => 0);
+    const sides = Number(/^\d+d(\d+)/.exec(request.expression)![1]);
+    if (
+      payload.roll.dice.length !== minimum.dice.length ||
+      payload.roll.dice.some((d) => !Number.isSafeInteger(d) || d < 1 || d > sides)
+    )
+      fail('Invalid player dice faces');
+    let face = 0;
+    const checked = rollDice(
+      request.expression,
+      request.mode,
+      () => payload.roll!.dice[face++] - 1,
+    );
+    if (
+      checked.modifier !== payload.roll.modifier ||
+      checked.total !== payload.roll.total ||
+      !payload.roll.source
+    )
+      fail('Invalid player roll total');
+    delete state.pendingRolls![request.id];
+  }
   const entity = (id: string) => state.entities[id] ?? fail(`Unknown entity: ${id}`);
   const character = (id: string) => entity(id).character ?? fail(`No character properties: ${id}`);
   const item = (id: string) => entity(id).item ?? fail(`Not an item: ${id}`);
@@ -323,6 +379,23 @@ export function applyPayload(before: State, payload: Payload): State {
     }
   }
   reduceReview(state, payload);
+  if (state.pendingRolls)
+    for (const [id, request] of Object.entries(state.pendingRolls)) {
+      const action = request.actionId && state.actions?.[request.actionId];
+      const administrativeAction =
+        request.admin?.actionId && state.actions?.[request.admin.actionId];
+      if (
+        !isPlayerCharacter(state, request.characterId) ||
+        (request.actionId &&
+          (!action ||
+            actionStatus(state, action) !== 'ruled' ||
+            action.rolls.some((r) => r.stepId === request.stepId))) ||
+        (request.admin?.actionId &&
+          (!administrativeAction ||
+            ['resolved', 'cancelled', 'superseded'].includes(administrativeAction.status)))
+      )
+        delete state.pendingRolls[id];
+    }
   reduceTable(state, payload);
   validateState(state);
   return state;
@@ -405,6 +478,7 @@ export function partyState(state: State): State {
   // Conversation is exposed explicitly by the hotseat projection, not generic party tools.
   delete out.table;
   delete out.gathering;
+  delete out.pendingRolls;
   const visible = (id: string) =>
     out.entities[id]?.visibility === 'party' && out.entities[id]?.knowledge !== 'plan';
   for (const [id, e] of Object.entries(out.entities))

@@ -11,6 +11,7 @@ import { createMcpServer } from '../server.js';
 import { DesktopActivity } from './activity.js';
 import { notifyActivity } from './activity-bus.js';
 import { appendPerformanceRecord } from './performance.js';
+import { requestPlayerRoll, requestAdministrativePlayerRoll } from './player-roll.js';
 
 const root = process.argv[process.argv.indexOf('--campaign') + 1];
 const token = process.env.DM_HOTSEAT_OWNER_TOKEN;
@@ -66,9 +67,50 @@ class OwnedService extends CampaignService {
     try {
       owner = await checkOwner();
       await this.memory?.before(name, raw);
-      await activity.beginTool(name, raw).catch(() => {});
       try {
-        result = await super.execute(name, raw);
+        if (name === 'roll_dice' || name === 'administer_campaign') {
+          const request =
+            name === 'roll_dice'
+              ? await requestPlayerRoll(store, raw)
+              : await requestAdministrativePlayerRoll(store, raw);
+          if (request) {
+            await announce('changed', undefined, undefined, op);
+            for (;;) {
+              await checkOwner();
+              const { events, state } = await store.read();
+              const completed = events.find((e) => e.payload.completesRoll === request.id);
+              if (completed) {
+                result =
+                  name === 'administer_campaign'
+                    ? {
+                        revision: completed.sequence,
+                        event: completed,
+                        duplicate: false,
+                        warnings: [],
+                      }
+                    : {
+                        revision: completed.sequence,
+                        eventId: completed.id,
+                        duplicate: false,
+                        roll: completed.payload.roll,
+                        warnings: [],
+                      };
+                break;
+              }
+              if (!state.pendingRolls?.[request.id])
+                throw new Error(
+                  'Player roll was cancelled because the action changed. Review the saved action before continuing.',
+                );
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+          } else {
+            await activity.beginTool(name, raw).catch(() => {});
+            result = await super.execute(name, raw);
+          }
+        } else {
+          await activity.beginTool(name, raw).catch(() => {});
+          result = await super.execute(name, raw);
+        }
         this.memory?.after(name, raw, result);
       } catch (error) {
         await activity.finishTool(op, error).catch(() => {});

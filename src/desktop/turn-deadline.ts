@@ -14,6 +14,7 @@ export interface TurnDeadlineOptions {
   timeoutMs: number;
   requestId?: string;
   finishingGraceMs?: number;
+  isAwaitingPlayerRoll?: (requestId: string) => Promise<boolean>;
   hasPublishedResponse?: (requestId: string) => Promise<boolean>;
   onFinishingGrace?: () => void;
   onTimeout: () => void;
@@ -46,8 +47,16 @@ export class TurnDeadline {
 
   private async expire(): Promise<void> {
     if (this.cancelled) return;
+    if (this.options.requestId && this.options.isAwaitingPlayerRoll) {
+      const waiting = await this.check(this.options.isAwaitingPlayerRoll);
+      if (this.cancelled) return;
+      if (waiting) {
+        this.start();
+        return;
+      }
+    }
     if (!this.graceGranted && this.options.requestId && this.options.hasPublishedResponse) {
-      const published = await this.checkPublication();
+      const published = await this.check(this.options.hasPublishedResponse);
       if (published && !this.cancelled) {
         this.graceGranted = true;
         try {
@@ -68,9 +77,8 @@ export class TurnDeadline {
     if (!this.cancelled) this.options.onTimeout();
   }
 
-  private async checkPublication(): Promise<boolean> {
+  private async check(check: (requestId: string) => Promise<boolean>): Promise<boolean> {
     const requestId = this.options.requestId;
-    const check = this.options.hasPublishedResponse;
     if (!requestId || !check) return false;
 
     let timer: NodeJS.Timeout | undefined;

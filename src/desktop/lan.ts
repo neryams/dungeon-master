@@ -10,6 +10,7 @@ import {
   MapInput,
   LanJoinInput,
   LanClaimInput,
+  SubmitRollInput,
 } from './contracts.js';
 import type { LanSnapshot, LanStatus, LanResponses } from './contracts.js';
 import type { DesktopHost } from './host.js';
@@ -62,6 +63,7 @@ export class LanGame {
           'dom.js',
           'markdown.js',
           'markdown.css',
+          'roll-cards.js',
           'vendor/markdown-it.js',
         ].map(
           async (file) =>
@@ -138,6 +140,15 @@ export class LanGame {
           return send(200, await this.serial(() => this.claim(client, input)));
         if (path === '/api/intent')
           return send(200, await this.serial(() => this.intent(client, input)));
+        if (path === '/api/roll') {
+          if (!client.characterId) return send(409, { error: 'Claim a character first' });
+          return send(
+            200,
+            await this.serial(() =>
+              this.host.submitRoll(SubmitRollInput.parse(input), client.characterId),
+            ),
+          );
+        }
         return send(404, { error: 'Not found' });
       } catch (error) {
         // Never forward filesystem, CLI, or internal service error text over LAN.
@@ -188,6 +199,8 @@ export class LanGame {
       maps: s.maps,
       encounter: s.encounter,
       table: s.table,
+      pendingRolls: s.pendingRolls.filter((r) => r.characterId === client.characterId),
+      rollHistory: s.rollHistory,
       gathering: s.gathering,
       stage: s.stage,
       players: this.players(),

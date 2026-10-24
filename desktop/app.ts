@@ -22,6 +22,7 @@ import {
 } from './narration.js';
 import { NarrationAudio } from './narration-audio.js';
 import { DiceFeedback } from './dice-feedback.js';
+import { rollCard } from './roll-cards.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -130,6 +131,13 @@ const tags = {
   'review-mode': 'span',
   encounter: 'div',
   transcript: 'div',
+  'roll-prompt': 'section',
+  'roll-prompt-title': 'h2',
+  'roll-prompt-detail': 'p',
+  'roll-prompt-help': 'p',
+  'roll-inputs': 'div',
+  'roll-error': 'p',
+  'roll-submit': 'button',
   'narration-controls': 'div',
   'narration-voice': 'select',
   'narration-mute': 'button',
@@ -193,6 +201,10 @@ let state: CampaignSnapshot,
   submitting = false,
   pendingSubmission: SubmitInput | undefined;
 let modelRequest = 0;
+let manualRollValues = new Map<string, string[]>();
+let rollSubmission: { id: string; dice?: number[] } | undefined;
+let rollSubmitting = false;
+let renderedRollPromptId: string | undefined;
 let modelSaving: Promise<void> = Promise.resolve();
 let dialogModel: string | undefined;
 let modelSwitching = false;
@@ -599,11 +611,11 @@ function renderQuests() {
     container.append(node('p', 'Objectives and active quests will appear here.', 'help'));
 }
 function renderTranscript() {
-  const key = JSON.stringify([state.reviewMode, state.table]);
+  const key = JSON.stringify([state.reviewMode, state.table, state.rollHistory]);
   if (key === transcriptKey) return;
   transcriptKey = key;
   const log = $('transcript');
-  if (!state.table?.length) {
+  if (!state.table?.length && !state.rollHistory?.length) {
     log.replaceChildren(
       node(
         'p',
@@ -627,39 +639,61 @@ function renderTranscript() {
     log.append(article);
     return article;
   }
+  const items: { revision: number; order: number; render: () => void }[] = [];
   for (const turn of state.table) {
-    message(turn.speaker, turn.text, turn.revision, true);
-    for (const m of turn.messages) {
-      const article = message(
-        m.delivery === 'progress' ? 'Dungeon Master · in progress' : 'Dungeon Master',
-        m.text,
-        m.revision,
-      );
-      if (state.reviewMode !== 'setup') {
-        const ref: NarrationMessage = {
-          id: `${turn.id}:${m.revision}`,
-          campaignId: state.campaign.id,
-          turnId: turn.id,
-          revision: m.revision,
-          eligible: true,
-        };
-        const button = node('button', 'Read aloud', 'quiet message-read');
-        button.type = 'button';
-        button.dataset.messageId = ref.id;
-        button.addEventListener('click', () => {
-          const current = narration.getState();
-          if (current.currentId === ref.id && ['preparing', 'reading'].includes(current.activity))
-            narration.skip();
-          else narration.replay(ref);
-        });
-        article.append(button);
-      }
-    }
+    items.push({
+      revision: turn.revision,
+      order: 0,
+      render: () => message(turn.speaker, turn.text, turn.revision, true),
+    });
+    for (const m of turn.messages)
+      items.push({
+        revision: m.revision,
+        order: 1,
+        render: () => {
+          const article = message(
+            m.delivery === 'progress' ? 'Dungeon Master · in progress' : 'Dungeon Master',
+            m.text,
+            m.revision,
+          );
+          if (state.reviewMode !== 'setup') {
+            const ref: NarrationMessage = {
+              id: `${turn.id}:${m.revision}`,
+              campaignId: state.campaign.id,
+              turnId: turn.id,
+              revision: m.revision,
+              eligible: true,
+            };
+            const button = node('button', 'Read aloud', 'quiet message-read');
+            button.type = 'button';
+            button.dataset.messageId = ref.id;
+            button.addEventListener('click', () => {
+              const current = narration.getState();
+              if (
+                current.currentId === ref.id &&
+                ['preparing', 'reading'].includes(current.activity)
+              )
+                narration.skip();
+              else narration.replay(ref);
+            });
+            article.append(button);
+          }
+        },
+      });
     if (turn.status === 'interrupted')
-      log.append(
-        node('p', 'Turn interrupted · Check saved outcomes before continuing.', 'interrupted'),
-      );
+      items.push({
+        revision: turn.revision,
+        order: 2,
+        render: () =>
+          log.append(
+            node('p', 'Turn interrupted · Check saved outcomes before continuing.', 'interrupted'),
+          ),
+      });
   }
+  for (const roll of state.rollHistory ?? [])
+    items.push({ revision: roll.revision, order: 3, render: () => log.append(rollCard(roll)) });
+  items.sort((a, b) => a.revision - b.revision || a.order - b.order);
+  for (const item of items) item.render();
   if (nearBottom) log.scrollTop = log.scrollHeight;
 }
 function mapDimensions(map?: PlayerView['maps'][number]) {
@@ -820,7 +854,9 @@ function renderState() {
   $('active-turn').hidden = !resolving;
   $('session-status').hidden = resolving && !state.lanHosted;
   if (resolving) {
-    $('active-turn-phase').textContent = state.activity?.phase || 'The DM is thinking';
+    $('active-turn-phase').textContent = state.pendingRolls?.length
+      ? 'Waiting for player dice'
+      : state.activity?.phase || 'The DM is thinking';
     renderElapsed();
   }
   diceFeedback.observe(state.activity?.rolls ?? [], resolving);
@@ -843,6 +879,7 @@ function renderState() {
               : 'Turning your ideas into characters, places, and the opening adventure.';
   }
   $('play').classList.toggle('setup-flow', settingUp);
+  renderRollPrompt();
   $('setup-guide').hidden = !settingUp;
   $('conversation-label').textContent = settingUp ? 'Campaign creation' : 'Chat';
   $('action').placeholder = settingUp
@@ -938,6 +975,116 @@ function renderState() {
   narration.observe(narrationSnapshot(state));
   renderNarration();
   void renderMap();
+}
+function renderRollPrompt() {
+  const prompts = state.pendingRolls ?? [];
+  const prompt = state.lanHosted ? undefined : prompts[0];
+  const panel = $('roll-prompt');
+  panel.hidden = !prompt;
+  if (!prompt) {
+    rollSubmission = undefined;
+    renderedRollPromptId = undefined;
+    return;
+  }
+  if (renderedRollPromptId !== prompt.id) {
+    $('roll-error').hidden = true;
+    renderedRollPromptId = prompt.id;
+  }
+  if (rollSubmission && rollSubmission.id !== prompt.id) rollSubmission = undefined;
+  $('roll-prompt-title').textContent = `${prompt.characterName} · ${prompt.label}`;
+  $('roll-prompt-detail').textContent = `${prompt.notation} · ${prompt.mode}`;
+  const count = prompt.mode === 'normal' ? prompt.dieCount : Math.max(2, prompt.dieCount);
+  $('roll-prompt-help').textContent =
+    prompt.mode === 'advantage'
+      ? `Enter ${count} raw d${prompt.dieSides} face${count === 1 ? '' : 's'}. The highest face is used before the modifier.`
+      : prompt.mode === 'disadvantage'
+        ? `Enter ${count} raw d${prompt.dieSides} faces. The lowest face is used before the modifier.`
+        : `Enter ${prompt.dieCount} raw d${prompt.dieSides} face${prompt.dieCount === 1 ? '' : 's'} before the modifier, or roll digitally.`;
+  if (state.stage === 'attention' || state.stage === 'disconnected')
+    $('roll-prompt-help').textContent +=
+      ' This saved roll can be submitted during recovery; it will not restart the DM.';
+  const inputs = $('roll-inputs');
+  const prior = manualRollValues.get(prompt.id) ?? [];
+  if (inputs.childElementCount !== count || inputs.dataset.promptId !== prompt.id) {
+    inputs.replaceChildren();
+    inputs.dataset.promptId = prompt.id;
+    for (let i = 0; i < count; i++) {
+      const label = document.createElement('label');
+      label.textContent = `Die ${i + 1} face (1–${prompt.dieSides})`;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '1';
+      input.max = String(prompt.dieSides);
+      input.step = '1';
+      input.inputMode = 'numeric';
+      input.setAttribute('aria-label', `Die ${i + 1} face, from 1 to ${prompt.dieSides}`);
+      input.value = prior[i] ?? '';
+      input.addEventListener('input', () => {
+        const values = [...inputs.querySelectorAll('input')].map(
+          (el) => (el as HTMLInputElement).value,
+        );
+        manualRollValues.set(prompt.id, values);
+        $('roll-error').hidden = true;
+        $('roll-submit').textContent = values.some(Boolean) ? 'Submit physical dice' : 'Roll dice';
+      });
+      label.append(input);
+      inputs.append(label);
+    }
+  }
+  for (const [i, input] of [...inputs.querySelectorAll('input')].entries()) {
+    (input as HTMLInputElement).value = prior[i] ?? '';
+    (input as HTMLInputElement).disabled = !!rollSubmission || rollSubmitting;
+  }
+  $('roll-submit').textContent = rollSubmitting
+    ? 'Submitting…'
+    : rollSubmission
+      ? 'Retry same roll'
+      : prior.some(Boolean)
+        ? 'Submit physical dice'
+        : 'Roll dice';
+  $('roll-submit').disabled = rollSubmitting;
+}
+async function submitRequestedRoll() {
+  const prompt = state.pendingRolls?.[0];
+  if (!prompt || state.lanHosted || rollSubmitting) return;
+  const values = [...$('roll-inputs').querySelectorAll('input')].map((el) =>
+    (el as HTMLInputElement).value.trim(),
+  );
+  const supplied = values.some(Boolean);
+  let dice: number[] | undefined;
+  if (supplied) {
+    if (values.some((v) => !v)) {
+      $('roll-error').textContent = 'Enter every die face, or clear all fields to roll digitally.';
+      $('roll-error').hidden = false;
+      return;
+    }
+    dice = values.map(Number);
+    if (dice.some((n) => !Number.isInteger(n) || n < 1 || n > prompt.dieSides)) {
+      $('roll-error').textContent = `Each face must be from 1 to ${prompt.dieSides}.`;
+      $('roll-error').hidden = false;
+      return;
+    }
+  }
+  rollSubmission ??= { id: prompt.id, ...(dice ? { dice } : {}) };
+  rollSubmitting = true;
+  renderRollPrompt();
+  try {
+    await api.submitRoll(rollSubmission);
+    manualRollValues.delete(prompt.id);
+    rollSubmission = undefined;
+    $('roll-error').hidden = true;
+    await refresh();
+  } catch (e) {
+    $('roll-error').textContent = errorMessage(
+      e instanceof TypeError
+        ? new Error('Connection lost. Retry this exact roll to recover its saved result.')
+        : e,
+    );
+    $('roll-error').hidden = false;
+  } finally {
+    rollSubmitting = false;
+    renderRollPrompt();
+  }
 }
 async function refresh() {
   if (polling) {
@@ -1353,6 +1500,7 @@ $('action-form').addEventListener('submit', async (event) => {
     await refresh();
   }
 });
+$('roll-submit').addEventListener('click', () => void submitRequestedRoll());
 $('action').addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault();
