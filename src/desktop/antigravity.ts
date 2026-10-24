@@ -7,6 +7,28 @@ import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import lockfile from 'proper-lockfile';
 import { atomicWrite, safePath, CampaignStore } from '../store.js';
+import { ANTIGRAVITY_REFEREE_MODEL_OPTIONS } from './referee-model.js';
+import { AgentTimeoutError, TurnDeadline } from './turn-deadline.js';
+
+const REFEREE_TOOLS = new Set([
+  'run_workflow',
+  'prepare_action',
+  'get_action',
+  'record_action_ruling',
+  'amend_action_rolls',
+  'approve_action_effects',
+  'commit_action',
+  'cancel_action',
+  'supersede_action',
+  'administer_campaign',
+  'search_rules',
+  'list_rule_sections',
+  'read_rules',
+]);
+const ALLOWED_CHILD_MODELS = new Set([
+  'inherit',
+  ...ANTIGRAVITY_REFEREE_MODEL_OPTIONS.map((option) => option.id),
+]);
 
 const execute = promisify(execFile);
 export async function detectAntigravity(explicit?: string) {
@@ -140,17 +162,37 @@ export interface AgentResult {
   campaignIds: string[];
 }
 export interface AgentDriver {
-  run(prompt: string): Promise<AgentResult>;
+  run(prompt: string, requestId?: string): Promise<AgentResult>;
   close(): Promise<void>;
 }
+export type ProviderTiming = {
+  kind:
+    | 'provider-dispatch'
+    | 'provider-first-event'
+    | 'provider-tool-start'
+    | 'provider-tool-end'
+    | 'provider-finishing-grace';
+  requestId?: string;
+  model?: string;
+  childModel?: string;
+  tool?: string;
+  elapsedMs?: number;
+  callId?: string;
+  status?: 'ok' | 'error';
+};
 export class AntigravitySession implements AgentDriver {
   private child?: ChildProcessWithoutNullStreams;
   private pending?: {
     resolve: (r: AgentResult) => void;
     reject: (e: Error) => void;
-    timer: NodeJS.Timeout;
+    deadline: TurnDeadline;
     tools: Set<string>;
     campaignIds: Set<string>;
+    requestId?: string;
+    startedAt: number;
+    toolStarts: Map<string, number>;
+    completedToolCalls: Set<string>;
+    sawEvent: boolean;
   };
   private buffer = '';
   private conversationId?: string;
@@ -163,26 +205,52 @@ export class AntigravitySession implements AgentDriver {
       model?: string;
       env?: NodeJS.ProcessEnv;
       timeoutMs?: number;
+      finishingGraceMs?: number;
+      hasPublishedResponse?: (requestId: string) => Promise<boolean>;
       progress?: (text: string) => void;
       onConversation?: (id: string) => void | Promise<void>;
+      onTiming?: (event: ProviderTiming) => void;
       prefixArgs?: string[]; // Used by protocol contract tests, never exposed through desktop IPC.
     },
   ) {}
 
-  run(prompt: string): Promise<AgentResult> {
+  run(prompt: string, requestId?: string): Promise<AgentResult> {
     if (this.pending) return Promise.reject(new Error('The DM is already resolving an action'));
     if (this.closing) return Promise.reject(new Error('The DM session is stopping'));
     if (!this.child) this.start();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.fail(
-          new Error(
-            'The DM timed out. Saved changes remain intact. Review the table before continuing.',
-          ),
-        );
-        void this.close();
-      }, this.options.timeoutMs ?? 600000);
-      this.pending = { resolve, reject, timer, tools: new Set(), campaignIds: new Set() };
+      const deadline = new TurnDeadline({
+        timeoutMs: this.options.timeoutMs ?? 600000,
+        finishingGraceMs: this.options.finishingGraceMs,
+        requestId,
+        hasPublishedResponse: this.options.hasPublishedResponse,
+        onFinishingGrace: () => {
+          this.emitTiming({
+            kind: 'provider-finishing-grace',
+            requestId,
+            model: this.options.model,
+          });
+          this.options.progress?.('The DM saved a response and is finishing up…');
+        },
+        onTimeout: () => {
+          this.fail(new AgentTimeoutError('Antigravity'));
+          void this.close();
+        },
+      });
+      this.pending = {
+        resolve,
+        reject,
+        deadline,
+        tools: new Set(),
+        campaignIds: new Set(),
+        requestId,
+        startedAt: Date.now(),
+        toolStarts: new Map(),
+        completedToolCalls: new Set(),
+        sawEvent: false,
+      };
+      deadline.start();
+      this.emitTiming({ kind: 'provider-dispatch', requestId, model: this.options.model });
       this.child!.stdin.write(
         JSON.stringify({ event: 'user', message: { content: prompt } }) + '\n',
         (error) => {
@@ -190,6 +258,13 @@ export class AntigravitySession implements AgentDriver {
         },
       );
     });
+  }
+  private emitTiming(event: ProviderTiming) {
+    try {
+      this.options.onTiming?.(event);
+    } catch {
+      /* Telemetry is best-effort. */
+    }
   }
   private start() {
     const args = [
@@ -253,6 +328,15 @@ export class AntigravitySession implements AgentDriver {
     });
   }
   private receive(event: any) {
+    if (this.pending && !this.pending.sawEvent) {
+      this.pending.sawEvent = true;
+      this.emitTiming({
+        kind: 'provider-first-event',
+        requestId: this.pending.requestId,
+        model: this.options.model,
+        elapsedMs: Date.now() - this.pending.startedAt,
+      });
+    }
     const id =
       event.conversation_id ?? event.init?.conversation_id ?? event.result?.conversation_id;
     if (typeof id === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(id)) {
@@ -262,15 +346,101 @@ export class AntigravitySession implements AgentDriver {
         void this.close();
       });
     }
-    if (event.event === 'step_update' && event.step_update?.step_type === 'tool') {
-      const info = event.step_update.tool_info;
-      const name = event.step_update.tool_name ?? info?.name;
+    if (
+      event.event === 'step_update' &&
+      (event.step_update?.step_type === 'tool' || event.step_update?.tool_info != null)
+    ) {
+      const step = event.step_update;
+      const info = step.tool_info;
+      // The CLI stream documents canonical names under tool_info. Keep old aliases
+      // readable so persisted fixtures and earlier CLI builds continue to work.
+      const name = info?.name ?? step.tool_name;
       if (typeof name === 'string') {
-        if (event.step_update.state === 'DONE' && !info?.error) {
-          this.pending?.tools.add(name);
+        const proposedChildModel =
+          name === 'invoke_subagent' && typeof info?.parameters?.Model === 'string'
+            ? info.parameters.Model
+            : undefined;
+        const childModel =
+          proposedChildModel && ALLOWED_CHILD_MODELS.has(proposedChildModel)
+            ? proposedChildModel
+            : undefined;
+        const id =
+          typeof step.tool_call_id === 'string'
+            ? step.tool_call_id.slice(0, 100)
+            : typeof info?.tool_call_id === 'string'
+              ? info.tool_call_id.slice(0, 100)
+              : Number.isInteger(step.step_index) && step.step_index >= 0
+                ? `step-${step.step_index}`
+                : typeof step.id === 'string'
+                  ? step.id.slice(0, 100)
+                  : undefined;
+        const state = String(step.state ?? step.status ?? '').toLowerCase();
+        const starting = ['active', 'running', 'started', 'in_progress'].includes(state);
+        const failed =
+          ['error', 'failed', 'failure'].includes(state) ||
+          info?.error != null ||
+          step.error_details != null;
+        const ended =
+          ['done', 'completed', 'success', 'succeeded', 'error', 'failed', 'failure'].includes(
+            state,
+          ) ||
+          (info != null && Object.hasOwn(info, 'output'));
+        const alreadyCompleted = Boolean(id && this.pending?.completedToolCalls.has(id));
+        if (starting && !alreadyCompleted) {
+          let newStart = true;
+          if (id && this.pending && !this.pending.toolStarts.has(id)) {
+            if (this.pending.toolStarts.size >= 64)
+              this.pending.toolStarts.delete(this.pending.toolStarts.keys().next().value!);
+            this.pending.toolStarts.set(id, Date.now());
+          } else if (id && this.pending?.toolStarts.has(id)) {
+            newStart = false;
+          }
+          if (newStart)
+            this.emitTiming({
+              kind: 'provider-tool-start',
+              requestId: this.pending?.requestId,
+              model: this.options.model,
+              ...(childModel ? { childModel } : {}),
+              tool: name.slice(0, 100),
+              callId: id,
+            });
+        }
+        if (ended && !alreadyCompleted) {
+          if (id && this.pending && this.pending.completedToolCalls.size >= 128)
+            this.pending.completedToolCalls.delete(
+              this.pending.completedToolCalls.values().next().value!,
+            );
+          if (id) this.pending?.completedToolCalls.add(id);
+          const started = id ? this.pending?.toolStarts.get(id) : undefined;
+          if (id) this.pending?.toolStarts.delete(id);
+          const reportedDurationMs = [step.duration_ms, info?.duration_ms].find(
+            (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0,
+          );
+          const durationSeconds = step.duration_seconds ?? info?.duration_seconds;
+          const reportedDuration =
+            typeof reportedDurationMs === 'number'
+              ? reportedDurationMs
+              : typeof durationSeconds === 'number' && Number.isFinite(durationSeconds)
+                ? durationSeconds * 1000
+                : undefined;
+          this.emitTiming({
+            kind: 'provider-tool-end',
+            requestId: this.pending?.requestId,
+            model: this.options.model,
+            ...(childModel ? { childModel } : {}),
+            tool: name.slice(0, 100),
+            callId: id,
+            ...(typeof reportedDuration === 'number'
+              ? { elapsedMs: reportedDuration }
+              : started
+                ? { elapsedMs: Date.now() - started }
+                : {}),
+            status: failed ? 'error' : 'ok',
+          });
+          if (!failed) this.pending?.tools.add(name);
           // agy 1.4 routes MCP through call_mcp_tool; its name is not the domain tool name.
           // Recognize readiness from the actual campaign tool result, never assistant prose.
-          if (name === 'call_mcp_tool' || name.includes('campaign_status')) {
+          if (!failed && (name === 'call_mcp_tool' || name.includes('campaign_status'))) {
             try {
               const output =
                 typeof info?.output === 'string' ? JSON.parse(info.output) : info?.output;
@@ -287,10 +457,10 @@ export class AntigravitySession implements AgentDriver {
           }
         }
         this.options.progress?.(
-          name.includes('publish_table_message')
+          name === 'publish_table_message'
             ? 'Saving the DM response…'
-            : name.includes('rules')
-              ? 'Consulting the rules…'
+            : REFEREE_TOOLS.has(name)
+              ? 'Checking the rules…'
               : 'The DM is resolving your action…',
         );
       }
@@ -306,7 +476,7 @@ export class AntigravitySession implements AgentDriver {
     }
     const pending = this.pending;
     this.pending = undefined;
-    clearTimeout(pending.timer);
+    pending.deadline.cancel();
     pending.resolve({
       conversationId: this.conversationId,
       tools: [...pending.tools],
@@ -317,7 +487,7 @@ export class AntigravitySession implements AgentDriver {
     if (!this.pending) return;
     const pending = this.pending;
     this.pending = undefined;
-    clearTimeout(pending.timer);
+    pending.deadline.cancel();
     pending.reject(error);
   }
   close(): Promise<void> {

@@ -114,7 +114,7 @@ Everyone with the link sees the same party-visible state, not DM secrets or indi
 
 ## Rules referee
 
-New campaigns begin in setup mode and enter reviewed play after their opening is verified. The primary DM delegates a bounded rules check to a host subagent using the same model, records costs and success/failure procedures before rolling, then obtains approval of the exact effects before committing them. Dangerous but legal choices remain the player's choice; impossible actions do not become possible just because a player asks or rolls well.
+New campaigns begin in setup mode and enter reviewed play after their opening is verified. The primary DM delegates a bounded rules check to a host subagent, choosing a supported model for speed, cost-effectiveness and rules-checking capability, records costs and success/failure procedures before rolling, then obtains approval of the exact effects before committing them. Dangerous but legal choices remain the player's choice; impossible actions do not become possible just because a player asks or rolls well.
 
 The tools enforce that workflow and saved-state consistency. They do not supply a complete combat engine or prove that the reviewing agent interpreted the rules correctly. The primary DM can explicitly administer an override, correction or world-preparation change. If the host lacks delegation, it records a clearly marked DM fallback instead of pretending independent review occurred. No model API is called.
 

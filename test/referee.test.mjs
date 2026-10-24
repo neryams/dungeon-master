@@ -225,7 +225,18 @@ test('guards cover raw writes, replacement, movement, correction and administrat
     changes: [{ type: 'put_entity', entity: { ...hero, id: 'opponent' } }],
   });
   await apply(service, [
-    { type: 'set_scene', scene: { id: 'scene', title: 'A choice', present: ['hero'] } },
+    {
+      type: 'set_scene',
+      scene: { id: 'scene', title: 'A choice', present: ['hero'], dmNotes: 'Private scene note' },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        ...hero,
+        description: 'Updated public description after discovery',
+        dmNotes: 'Remaining private character secret',
+      },
+    },
   ]);
   await mutate(service, 'set_map_reveal', {
     mapId: 'grid',

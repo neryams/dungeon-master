@@ -183,6 +183,7 @@ export const Entity = z
     name: z.string().min(1).max(200),
     visibility: Visibility.default('party'),
     description: Text.default(''),
+    dmNotes: Text.optional(),
     knowledge: z.enum(['established', 'rumor', 'plan']).default('established'),
     references: z.array(Id).default([]),
     relationships: z.array(z.object({ target: Id, description: Text }).strict()).default([]),
@@ -219,6 +220,7 @@ export const Scene = z
     present: z.array(Id).default([]),
     map: Id.optional(),
     summary: Text.default(''),
+    dmNotes: Text.optional(),
     unresolved: z.array(Text).default([]),
     centralQuestion: Text.optional(),
     progress: z.array(Text).optional(),
@@ -499,6 +501,7 @@ export const TableOperation = z.discriminatedUnion('type', [
       type: z.literal('publish'),
       requestId: Id,
       text: RequiredText,
+      delivery: z.enum(['progress', 'response']).optional(),
       responseRequest: ResponseRequest.optional(),
     })
     .strict(),
@@ -526,7 +529,7 @@ export interface TableTurn {
   text: string;
   revision: number;
   status: 'pending' | 'completed' | 'interrupted';
-  messages: { text: string; revision: number }[];
+  messages: { text: string; revision: number; delivery?: 'progress' | 'response' }[];
   actions?: z.infer<typeof GroupAction>[];
   responseRequest?: z.infer<typeof ResponseRequest>;
 }

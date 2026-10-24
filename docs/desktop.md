@@ -67,6 +67,18 @@ Public dice rolls open a nonblocking popup. A plain number briefly randomizes, t
 
 DM-only rolls remain hidden. Roll labels recognize a small set of exact check names, such as Perception and Wisdom Save; other purposes use “Dice roll” so private procedure notes never appear. Opening a campaign does not replay old rolls. Interrupted rolls without a confirmed saved result show an unavailable result. Feedback is currently limited to the Electron host; the plugin, read-only panel, and LAN player windows retain their existing interfaces.
 
+## Turn pacing and referee selection
+
+During established play, the DM reuses fresh saved review packets and rules excerpts, keeps the same bounded referee through an action's two review stages, and requests post-commit sheets/maps when the response needs them. Hosted turns publish after mechanical changes and defer narrative bookkeeping to meaningful boundaries. Local Ollama mode retains its required memory checks and pre-publication continuity record. Creation guidance is included inline only while setup is needed; its skill remains available in the workspace.
+
+The main DM chooses a referee from the host's supported delegation models, favoring speed and cost-effectiveness for routine rules checks and escalating difficult rulings. Hosts without child-model selection use their default/inherited model; local mode stays within the configured provider. Model identity remains descriptive, and pre-roll rulings, actual saved rolls and exact-effect approvals remain required. These instructions guide the agent; the app does not automatically route model requests or guarantee a particular latency improvement.
+
+## Performance diagnostics
+
+Desktop sessions write private timing metadata under the campaign's `.dm/hotseat/` directory. `performance.jsonl` records request and provider boundaries; `performance-backend.jsonl` records campaign-tool execution and publication. Join records by `requestId` and sort by timestamp to compare submission-to-publication with submission-to-completion. A turn can publish before its remaining bookkeeping finishes. Provider tool intervals include provider overhead; backend intervals measure the desktop campaign service. These intervals can overlap and should not simply be added together.
+
+Logs contain timestamps, bounded identifiers, selected provider/model when known, tool names, status and elapsed milliseconds. They exclude prompts, narration, tool arguments/results and raw provider stderr. CLI-default model identity may be unknown. Logging is best-effort, bounded and separate from authoritative events, exports and player views; missing records do not imply missing gameplay operations. Time outside tool intervals includes model processing, delegation, scheduling and network waits; these logs cannot distinguish those causes without provider telemetry.
+
 ## Stop, restart and recovery
 
 **Stop DM** stops this app's owned CLI process tree. Saved events remain intact. If a turn ends without a published response, fails, times out or is interrupted, the app marks it for attention. Review the map and sheet, reconnect, and ask for a recap before taking another action. Do not resubmit uncertain damage or dice requests as new actions.
@@ -213,3 +225,11 @@ DM_LOCAL_ENDPOINT=http://127.0.0.1:11434 npm run test:local
 ```
 
 `DM_LOCAL_MODEL` selects another multimodal tool-capable model. The test defaults to the application's 64k budget and always checks explicit compaction and process resume. To stress automatic compaction, set `DM_LOCAL_CONTEXT=32768 DM_REQUIRE_AUTO_COMPACT=1`; this additionally requires an automatic compaction event. It seeds only synthetic temporary campaign data, isolates its journal daemon, and checks recall, exact damage and duplicate protection, image interpretation, compaction and process resume. It performs no direct model API calls. Set `DM_KEEP_LOCAL_TEST=1` to retain the temporary artifacts for inspection. Passing this scenario does not certify long-campaign quality or rules adjudication.
+
+### Long turns and public progress
+
+The normal provider deadline is ten minutes. If an authoritative final public response has already been saved, the provider gets one additional 90-second window to finish notes. Progress-only publications do not qualify. If that window expires, the table retains the completed response and any pending player choice; the provider disconnects with a follow-up-work timeout notice. Saved mechanics and messages are never replayed automatically. Other failures still interrupt the turn.
+
+For a long turn, the DM may publish one or two meaningful public narration beats with `publish_table_message(delivery="progress")`. Desktop and LAN tables show these immediately with an “in progress” label; enabled speech playback can read them aloud. They cannot carry a player response request or complete the turn. Omitted `delivery` means a normal response, including legacy messages. This is deliberate public prose, not streaming private model reasoning, and descriptions of outcomes still follow saved mechanical changes.
+
+Antigravity timing diagnostics correlate native `ACTIVE`/`DONE` tool steps by their step index and convert reported seconds to milliseconds. Logs distinguish progress publication, final publication, finishing grace, and a timeout after a saved response. Native referee invocations are included in the timing allowlist so their contribution can be compared with main-agent orchestration.

@@ -410,6 +410,7 @@ export function partyState(state: State): State {
   for (const [id, e] of Object.entries(out.entities))
     if (e.visibility !== 'party' || e.knowledge === 'plan') delete out.entities[id];
   for (const e of Object.values(out.entities)) {
+    delete e.dmNotes;
     e.references = e.references.filter(visible);
     e.relationships = e.relationships.filter((r) => visible(r.target));
     if (e.item?.owner && !visible(e.item.owner)) delete e.item.owner;
@@ -466,6 +467,7 @@ export function partyState(state: State): State {
     if (!out.encounter.participants.length) delete out.encounter;
   }
   if (out.scene) {
+    delete out.scene.dmNotes;
     out.scene.present = out.scene.present.filter(visible);
     if (out.scene.location && !visible(out.scene.location)) delete out.scene.location;
     if (out.scene.map && !visible(out.scene.map)) delete out.scene.map;

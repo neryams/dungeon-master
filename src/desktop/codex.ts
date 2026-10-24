@@ -5,7 +5,8 @@ import { constants } from 'node:fs';
 import { join, delimiter, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import type { LocalSettings } from './contracts.js';
-import type { AgentDriver, AgentResult } from './antigravity.js';
+import type { AgentDriver, AgentResult, ProviderTiming } from './antigravity.js';
+import { AgentTimeoutError, TurnDeadline } from './turn-deadline.js';
 
 const execute = promisify(execFile);
 const REASONING_EFFORTS = new Set([
@@ -72,9 +73,12 @@ export interface CodexOptions {
   localThinking?: boolean;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  finishingGraceMs?: number;
+  hasPublishedResponse?: (requestId: string) => Promise<boolean>;
   progress?: (text: string) => void;
   onConversation?: (id: string) => void | Promise<void>;
   onImage?: (path: string) => void | Promise<void>;
+  onTiming?: (event: ProviderTiming) => void;
   prefixArgs?: string[]; // Protocol tests only, never exposed through IPC.
 }
 
@@ -96,52 +100,64 @@ export class CodexSession implements AgentDriver {
   private pending?: {
     resolve: (value: AgentResult) => void;
     reject: (error: Error) => void;
-    timer: NodeJS.Timeout;
+    deadline: TurnDeadline;
     continuation: string;
     compacting: boolean;
     compacted: boolean;
     toolFailures: number;
     tools: Set<string>;
     campaignIds: Set<string>;
+    requestId?: string;
+    startedAt: number;
+    toolStarts: Map<string, number>;
+    sawEvent: boolean;
   };
   constructor(private options: CodexOptions) {}
 
-  run(prompt: string): Promise<AgentResult> {
-    return this.begin(prompt);
+  run(prompt: string, requestId?: string): Promise<AgentResult> {
+    return this.begin(prompt, requestId);
   }
   /** Used for explicit context maintenance; automatic compaction uses the same native engine. */
   compact(): Promise<AgentResult> {
     if (!this.threadId) return Promise.reject(new Error('Connect before compacting context.'));
     return this.begin();
   }
-  private begin(prompt?: string): Promise<AgentResult> {
+  private begin(prompt?: string, requestId?: string): Promise<AgentResult> {
     if (this.closed)
       return Promise.reject(
         new Error('The Codex session is stopped. Reconnect before continuing.'),
       );
     if (this.pending) return Promise.reject(new Error('The DM is already resolving an action'));
     const result = new Promise<AgentResult>((resolve, reject) => {
-      const timer = setTimeout(
-        () =>
-          this.abort(
-            new Error(
-              'Codex timed out. Saved changes remain intact; review the table before reconnecting.',
-            ),
-          ),
-        this.options.timeoutMs ?? 600000,
-      );
+      const deadline = new TurnDeadline({
+        timeoutMs: this.options.timeoutMs ?? 600000,
+        finishingGraceMs: this.options.finishingGraceMs,
+        requestId,
+        hasPublishedResponse: this.options.hasPublishedResponse,
+        onFinishingGrace: () => {
+          this.emitTiming({ kind: 'provider-finishing-grace', requestId });
+          this.options.progress?.('The DM saved a response and is finishing up…');
+        },
+        onTimeout: () => this.abort(new AgentTimeoutError('Codex')),
+      });
       this.pending = {
         resolve,
         reject,
-        timer,
+        deadline,
         continuation: continuationFor(prompt),
         compacting: prompt === undefined,
         compacted: false,
         toolFailures: 0,
         tools: new Set(),
         campaignIds: new Set(),
+        requestId,
+        startedAt: Date.now(),
+        toolStarts: new Map(),
+        sawEvent: false,
       };
+      deadline.start();
     });
+    this.emitTiming({ kind: 'provider-dispatch', requestId });
     void this.dispatch(prompt).catch(() =>
       this.abort(
         new Error(
@@ -152,6 +168,13 @@ export class CodexSession implements AgentDriver {
       ),
     );
     return result;
+  }
+  private emitTiming(event: ProviderTiming) {
+    try {
+      this.options.onTiming?.(event);
+    } catch {
+      /* Telemetry is best-effort. */
+    }
   }
   private async dispatch(prompt?: string) {
     if (!this.child) {
@@ -277,7 +300,7 @@ export class CodexSession implements AgentDriver {
         approvalPolicy: 'never',
         sandbox: 'read-only',
         config,
-        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. ${local ? 'This is a local multimodal model. In apply_campaign_changes, change.id means the EXISTING entity ID, not an operation ID. Example: changes=[{type:"damage",id:"existing-character-id",amount:2}]. The top-level operationId identifies the transaction. Use exact schema keys, not entityId for damage. Native image generation is unavailable. Existing registered map artwork is supported: render_location_map returns a PNG inline; inspect that image directly, never guess filesystem paths. Use schematic maps when no artwork is registered. Before each gameplay turn call resume_campaign (audience dm), search_campaign_history (audience dm, limit 3), and read_campaign_record for at least one returned hit or recentRecords reference if any exist. These local memory steps are mandatory even for sheet or map questions, overriding generic skill exemptions. Before publishing save a concise record_scene continuity note (aim for under 1500 characters), including decisions, promises and unresolved choices; keep secrets in separate visibility dm records. If retrieval is unavailable say so and use exact saved record references. Context compacts automatically: reload authoritative state and records afterward, preserving request and operation IDs.' : 'Native image generation is allowed.'} Native delegation of bounded rules-referee checks is allowed. Referees inherit the primary model and use the same campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
+        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. ${local ? 'This is a local multimodal model. In apply_campaign_changes, change.id means the EXISTING entity ID, not an operation ID. Example: changes=[{type:"damage",id:"existing-character-id",amount:2}]. The top-level operationId identifies the transaction. Use exact schema keys, not entityId for damage. Native image generation is unavailable. Existing registered map artwork is supported: render_location_map returns a PNG inline; inspect that image directly, never guess filesystem paths. Use schematic maps when no artwork is registered. Before each gameplay turn call resume_campaign (audience dm), search_campaign_history (audience dm, limit 3), and read_campaign_record for at least one returned hit or recentRecords reference if any exist. These local memory steps are mandatory even for sheet or map questions, overriding generic skill exemptions. Before publishing save a concise record_scene continuity note (aim for under 1500 characters), including decisions, promises and unresolved choices; keep secrets in separate visibility dm records. If retrieval is unavailable say so and use exact saved record references. Context compacts automatically: reload authoritative state and records afterward, preserving request and operation IDs.' : 'Native image generation is allowed.'} Native delegation of bounded rules-referee checks is allowed. Follow run-campaign for referee model selection through supported native delegation; referees use read-only campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
       };
       const resumed = this.options.conversationId;
       const response = await this.request(
@@ -424,10 +447,49 @@ export class CodexSession implements AgentDriver {
     if (!this.pending || !p || p.threadId !== this.threadId) return;
     if (message.method === 'turn/started' && !this.turnId) this.turnId = p.turn?.id;
     if (!this.turnId || (p.turnId ?? p.turn?.id) !== this.turnId) return;
+    if (!this.pending.sawEvent) {
+      this.pending.sawEvent = true;
+      this.emitTiming({
+        kind: 'provider-first-event',
+        requestId: this.pending.requestId,
+        elapsedMs: Date.now() - this.pending.startedAt,
+      });
+    }
     if (message.method === 'item/started' && p.item?.type === 'contextCompaction')
       this.options.progress?.('Compacting DM context; campaign history stays saved…');
+    if (
+      message.method === 'item/started' &&
+      p.item?.type === 'mcpToolCall' &&
+      p.item.server === this.options.serverName
+    ) {
+      const key = typeof p.item.id === 'string' ? p.item.id : undefined;
+      if (key && !this.pending.toolStarts.has(key)) {
+        if (this.pending.toolStarts.size >= 64)
+          this.pending.toolStarts.delete(this.pending.toolStarts.keys().next().value!);
+        this.pending.toolStarts.set(key, Date.now());
+      }
+      this.emitTiming({
+        kind: 'provider-tool-start',
+        requestId: this.pending.requestId,
+        tool: p.item.tool,
+        callId: key,
+      });
+    }
     if (message.method === 'item/completed') {
       const item = p.item;
+      if (item?.type === 'mcpToolCall' && item.server === this.options.serverName) {
+        const key = typeof item.id === 'string' ? item.id : '';
+        const started = this.pending.toolStarts.get(key);
+        if (key) this.pending.toolStarts.delete(key);
+        this.emitTiming({
+          kind: 'provider-tool-end',
+          requestId: this.pending.requestId,
+          tool: item.tool,
+          callId: key,
+          ...(started ? { elapsedMs: Date.now() - started } : {}),
+          status: item.status === 'failed' || item.error || item.result?.isError ? 'error' : 'ok',
+        });
+      }
       if (
         this.options.local &&
         item?.type === 'mcpToolCall' &&
@@ -539,7 +601,7 @@ export class CodexSession implements AgentDriver {
       void Promise.all([this.imageWrites, this.continuationWrites]).then(() => {
         if (this.pending !== pending || this.closed) return;
         this.pending = undefined;
-        clearTimeout(pending.timer);
+        pending.deadline.cancel();
         pending.resolve({
           conversationId: this.threadId,
           tools: [...pending.tools],
@@ -550,7 +612,7 @@ export class CodexSession implements AgentDriver {
   }
   private abort(error: Error) {
     if (this.pending) {
-      clearTimeout(this.pending.timer);
+      this.pending.deadline.cancel();
       this.pending.reject(error);
       this.pending = undefined;
     }
@@ -562,7 +624,7 @@ export class CodexSession implements AgentDriver {
     if (this.closing) return this.closing;
     this.closed = true;
     if (this.pending) {
-      clearTimeout(this.pending.timer);
+      this.pending.deadline.cancel();
       this.pending.reject(new Error('Codex session stopped. Check saved state before continuing.'));
       this.pending = undefined;
     }

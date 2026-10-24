@@ -165,10 +165,14 @@ export class JournalAdapter {
   async search(query: string, k: number, audience: 'dm' | 'party'): Promise<unknown> {
     // Do not forward arbitrary paths or expose raw journal data; only committed known records qualify.
     const events = await this.store.events();
-    const records = events.flatMap((e) => e.payload.records);
-    const allowed = new Map(
-      records.filter((r) => audience === 'dm' || r.visibility === 'party').map((r) => [r.id, r]),
-    );
+    const allowed = new Map<
+      string,
+      { record: JournalRecord; revision: number; timestamp: string }
+    >();
+    for (const e of events)
+      for (const r of e.payload.records)
+        if (audience === 'dm' || r.visibility === 'party')
+          allowed.set(r.id, { record: r, revision: e.sequence, timestamp: e.timestamp });
     const catalog = await this.catalog();
     const paths = new Map(
       [...catalog].filter(([id]) => allowed.has(id)).map(([id, r]) => [r.path, id]),
@@ -185,18 +189,28 @@ export class JournalAdapter {
           const file = String(hit.file ?? '');
           const id = paths.get(file);
           if (!id) return [];
+          const entry = allowed.get(id)!;
           // Refuse modified derived files rather than propagating uncommitted prose.
-          if (catalog.get(id)?.content !== journalContent(allowed.get(id)!)) return [];
+          if (catalog.get(id)?.content !== journalContent(entry.record)) return [];
           return [
             {
               recordId: id,
-              title: allowed.get(id)!.title,
+              title: entry.record.title,
               reference: `record:${id}`,
+              visibility: entry.record.visibility,
+              revision: entry.revision,
+              timestamp: entry.timestamp,
               heading: hit.heading,
               excerpt: hit.snippet ?? hit.text ?? hit.content,
               score: hit.score,
             },
           ];
+        })
+        .sort((a, b) => {
+          const scoreA = typeof a.score === 'number' ? a.score : 0;
+          const scoreB = typeof b.score === 'number' ? b.score : 0;
+          if (Math.abs(scoreA - scoreB) > 1e-6) return scoreB - scoreA;
+          return b.revision - a.revision;
         })
         .slice(0, k);
       return {
@@ -214,22 +228,25 @@ export class JournalAdapter {
     }
   }
   async read(id: string, audience: 'dm' | 'party'): Promise<unknown> {
-    const record = (await this.store.events())
-      .flatMap((e) => e.payload.records)
-      .find((r) => r.id === id && (audience === 'dm' || r.visibility === 'party'));
-    if (!record) throw new CampaignError('NOT_FOUND', 'Campaign record not found');
+    let found: { record: JournalRecord; revision: number; timestamp: string } | undefined;
+    for (const e of await this.store.events())
+      for (const r of e.payload.records)
+        if (r.id === id && (audience === 'dm' || r.visibility === 'party'))
+          found = { record: r, revision: e.sequence, timestamp: e.timestamp };
+    if (!found) throw new CampaignError('NOT_FOUND', 'Campaign record not found');
+    const { record, revision, timestamp } = found;
     const existing = (await this.catalog()).get(id);
     if (existing && existing.content === journalContent(record)) {
       await safePath(this.store.root, existing.path);
       try {
         const value = await this.backend.call('get_entry', { path: existing.path });
         if (value === existing.content)
-          return { ...record, reference: `record:${id}`, source: 'journal' };
+          return { ...record, revision, timestamp, reference: `record:${id}`, source: 'journal' };
       } catch {
         /* Durable event is the exact fallback. */
       }
     }
-    return { ...record, reference: `record:${id}`, source: 'event-history' };
+    return { ...record, revision, timestamp, reference: `record:${id}`, source: 'event-history' };
   }
   async health(): Promise<unknown> {
     const records = (await this.store.events()).flatMap((e) => e.payload.records),
