@@ -86,7 +86,7 @@ export const refereeDescriptions: Record<keyof typeof refereeInputs, string> = {
   configure_review:
     'Record an administrative transition to setup, reviewed play, or legacy mode. Close pending actions first.',
   prepare_action:
-    'Save a pending action and return a private, revision-bound review packet. Delegate its rules check to a bounded host referee using the primary model.',
+    'Save a pending action and return a private, revision-bound review packet. Pass the returned packet to a bounded host referee; select a supported model prioritizing speed, cost-effectiveness and rules-checking capability.',
   get_action:
     'Read a saved action, its rolls and review stage; DM view includes fresh context and stale status. Party view returns only an authored public explanation.',
   record_action_ruling:

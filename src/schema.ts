@@ -501,6 +501,7 @@ export const TableOperation = z.discriminatedUnion('type', [
       type: z.literal('publish'),
       requestId: Id,
       text: RequiredText,
+      delivery: z.enum(['progress', 'response']).optional(),
       responseRequest: ResponseRequest.optional(),
     })
     .strict(),
@@ -528,7 +529,7 @@ export interface TableTurn {
   text: string;
   revision: number;
   status: 'pending' | 'completed' | 'interrupted';
-  messages: { text: string; revision: number }[];
+  messages: { text: string; revision: number; delivery?: 'progress' | 'response' }[];
   actions?: z.infer<typeof GroupAction>[];
   responseRequest?: z.infer<typeof ResponseRequest>;
 }

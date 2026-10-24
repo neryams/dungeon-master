@@ -205,7 +205,11 @@ function render() {
       for (const x of t.actions)
         a.append(el('strong', nameOf(x.characterId)), markdownMessage(x.pass ? 'Pass' : x.text));
     else a.append(el('strong', t.speaker), markdownMessage(t.text));
-    for (const m of t.messages) a.append(el('strong', 'Dungeon Master'), markdownMessage(m.text));
+    for (const m of t.messages)
+      a.append(
+        el('strong', m.delivery === 'progress' ? 'Dungeon Master · in progress' : 'Dungeon Master'),
+        markdownMessage(m.text),
+      );
     transcript.append(a);
   }
   if (atBottom) transcript.scrollTop = transcript.scrollHeight;

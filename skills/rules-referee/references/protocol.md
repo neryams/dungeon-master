@@ -1,6 +1,6 @@
 # Referee protocol
 
-The host runs you as a bounded subagent using the primary model (omit model overrides when inheritance is supported). The primary DM passes your response to recording tools. The plugin does not run a model and cannot authenticate who authored a ruling.
+The host runs you as a bounded subagent. Prefer a supported faster child model, retaining read-only referee instructions and native tool restrictions where supported. Antigravity's installed workflow guide documents `flash` and `flash_lite` for `run_workflow` agent(); its `invoke_subagent` path has not demonstrated a model override. Use the registered bounded referee type with the documented workflow model option when available; otherwise use native delegation with its inherited model. Use a stronger supported tier only for a specific complex or unresolved ruling. Antigravity's `agy models` catalogue IDs are not child-tier values. Do not claim verified prices, speed improvements, or model execution without evidence. Keep the same referee context for both review stages when supported. The primary DM passes your response to recording tools. The plugin does not run a model and cannot authenticate who authored a ruling.
 
 For pre-roll review, return an object matching `record_action_ruling.ruling`:
 

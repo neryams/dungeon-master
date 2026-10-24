@@ -36,6 +36,7 @@ export const inputs = {
       ...metadata,
       requestId: Id,
       text: z.string().trim().min(1).max(20000),
+      delivery: z.enum(['progress', 'response']).optional(),
       responseRequest: ResponseRequest.optional(),
     })
     .strict(),
@@ -139,7 +140,7 @@ export type ToolName = keyof typeof inputs;
 export const descriptions: Record<ToolName, string> = {
   ...refereeDescriptions,
   publish_table_message:
-    'Publish public narration or a question to an active desktop hotseat request. Only use when the host supplies requestId. For resolved outcomes save mechanics first. For an unresolved decision or reaction, set responseRequest {characterIds,prompt,kind} and stop BEFORE committing the affected outcome; wait for those replies. Never include DM secrets, tool logs or private referee details. Reuse operationId and identical input on retry. Chat-only clients do not need this tool.',
+    'Publish deliberate public scene narration to an active desktop hotseat request. Omit delivery, or set delivery=response, for the public reply that completes your turn. Use delivery=progress only for a substantive story beat while continuing to resolve the request; progress does not finish the turn or activate a player prompt. Progress is public narration, never raw thoughts, tool logs, or private referee details. Only use when the host supplies requestId. For resolved outcomes save mechanics first. For an unresolved decision or reaction, set responseRequest {characterIds,prompt,kind} on a response and stop BEFORE committing the affected outcome; wait for those replies. Reuse operationId and identical input on retry. Chat-only clients do not need this tool.',
   get_character_sheet:
     'Read one character’s exact saved stats, complete visible owned inventory and regional/tactical map placements from one revision. Defaults to party audience. No journal or gameplay writes.',
   get_party_overview:
@@ -207,6 +208,7 @@ export class CampaignService {
               type: 'publish',
               requestId: i.requestId,
               text: i.text,
+              delivery: i.delivery,
               responseRequest: i.responseRequest,
             },
           })),

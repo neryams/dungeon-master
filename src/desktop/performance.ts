@@ -6,6 +6,9 @@ import lockfile from 'proper-lockfile';
 export type PerformanceKind =
   | 'request-start'
   | 'provider-dispatch'
+  | 'provider-finishing-grace'
+  | 'request-published-timeout'
+  | 'progress-publication'
   | 'provider-first-event'
   | 'provider-tool-start'
   | 'provider-tool-end'
@@ -19,6 +22,7 @@ export interface PerformanceRecord {
   requestId?: string;
   provider?: 'antigravity' | 'codex' | 'ollama';
   model?: string;
+  childModel?: string;
   tool?: string;
   status?: 'ok' | 'error' | 'interrupted';
   elapsedMs?: number;
@@ -28,6 +32,7 @@ export interface PerformanceRecord {
 
 const MAX_BYTES = 1024 * 1024;
 const ALLOWED_TOOLS = new Set([...Object.keys(inputs), 'import_generated_map_art']);
+const ALLOWED_CHILD_MODELS = new Set(['inherit', 'flash', 'flash_lite', 'pro']);
 let writeQueue: Promise<void> = Promise.resolve();
 let queuedWrites = 0;
 
@@ -56,10 +61,14 @@ async function appendRecord(campaignRoot: string, record: PerformanceRecord, fil
     if (typeof record.requestId === 'string') safe.requestId = record.requestId.slice(0, 100);
     if (record.provider) safe.provider = record.provider;
     if (typeof record.model === 'string') safe.model = record.model.slice(0, 100);
+    if (record.childModel && ALLOWED_CHILD_MODELS.has(record.childModel))
+      safe.childModel = record.childModel;
     if (
       record.tool &&
       (ALLOWED_TOOLS.has(record.tool) ||
-        /^(call_mcp_tool|read_file|send_message|image_gen|unknown)$/.test(record.tool))
+        /^(call_mcp_tool|read_file|send_message|define_subagent|invoke_subagent|run_workflow|image_gen|unknown)$/.test(
+          record.tool,
+        ))
     )
       safe.tool = record.tool;
     if (typeof record.callId === 'string') safe.callId = record.callId.slice(0, 100);

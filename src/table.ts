@@ -1,5 +1,10 @@
-import { Payload, State } from './schema.js';
+import { Payload, State, TableTurn } from './schema.js';
 import { fail } from './domain.js';
+
+/** Legacy messages without a delivery marker are completed public responses. */
+export function hasPublishedResponse(turn: Pick<TableTurn, 'messages'>): boolean {
+  return turn.messages.some((message) => message.delivery !== 'progress');
+}
 
 export function reduceTable(state: State, payload: Payload): void {
   const op = payload.table;
@@ -116,13 +121,16 @@ export function reduceTable(state: State, payload: Payload): void {
   if (!turn || turn.status !== 'pending') fail('Table request is not pending');
   if (op.type === 'publish') {
     if (turn.messages.length >= 30) fail('Too many messages in one table turn');
+    const delivery = op.delivery ?? 'response';
+    if (delivery === 'progress' && op.responseRequest)
+      fail('Progress messages cannot request a player response');
     if (op.responseRequest) {
       op.responseRequest.characterIds.forEach(visible);
       turn.responseRequest = op.responseRequest;
     }
-    turn.messages.push({ text: op.text, revision: state.revision + 1 });
+    turn.messages.push({ text: op.text, revision: state.revision + 1, delivery });
   } else {
-    if (op.status === 'completed' && !turn.messages.length)
+    if (op.status === 'completed' && !hasPublishedResponse(turn))
       fail('Publish a public response before completing a turn');
     turn.status = op.status;
     if (state.gathering || turn.responseRequest) {

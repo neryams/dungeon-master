@@ -630,7 +630,11 @@ function renderTranscript() {
   for (const turn of state.table) {
     message(turn.speaker, turn.text, turn.revision, true);
     for (const m of turn.messages) {
-      const article = message('Dungeon Master', m.text, m.revision);
+      const article = message(
+        m.delivery === 'progress' ? 'Dungeon Master · in progress' : 'Dungeon Master',
+        m.text,
+        m.revision,
+      );
       if (state.reviewMode !== 'setup') {
         const ref: NarrationMessage = {
           id: `${turn.id}:${m.revision}`,

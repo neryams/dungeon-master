@@ -128,8 +128,19 @@ test('desktop backend correlates successful, failed and publication timings with
   await client.callTool({
     name: 'publish_table_message',
     arguments: {
-      operationId: 'publish',
+      operationId: 'progress',
       expectedRevision: 1,
+      reason: 'PRIVATE_REASON',
+      requestId: 'timing-test',
+      text: 'PRIVATE_PROGRESS',
+      delivery: 'progress',
+    },
+  });
+  await client.callTool({
+    name: 'publish_table_message',
+    arguments: {
+      operationId: 'publish',
+      expectedRevision: 2,
       reason: 'PRIVATE_REASON',
       requestId: 'timing-test',
       text: 'PRIVATE_PROSE',
@@ -146,14 +157,19 @@ test('desktop backend correlates successful, failed and publication timings with
       .split('\n')
       .filter(Boolean)
       .map(JSON.parse);
-    if (rows.length >= 4) break;
+    if (rows.length >= 6) break;
     await delay(10);
   }
-  assert.equal(rows.length, 4);
+  assert.equal(rows.length, 6);
   assert(rows.every((row) => row.requestId === 'timing-test'));
   assert.equal(rows.find((row) => row.tool === 'get_campaign_entity').status, 'error');
   assert.equal(rows.find((row) => row.tool === 'publish_table_message').status, 'ok');
   assert.equal(rows.filter((row) => row.kind === 'first-publication').length, 1);
+  assert.equal(rows.filter((row) => row.kind === 'progress-publication').length, 1);
+  assert(
+    rows.findIndex((row) => row.kind === 'progress-publication') <
+      rows.findIndex((row) => row.kind === 'first-publication'),
+  );
   assert(rows.filter((row) => row.kind === 'backend-tool').every((row) => row.elapsedMs >= 0));
   assert.doesNotMatch(JSON.stringify(rows), /PRIVATE_/);
 });

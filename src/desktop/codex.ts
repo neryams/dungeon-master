@@ -6,6 +6,7 @@ import { join, delimiter, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import type { LocalSettings } from './contracts.js';
 import type { AgentDriver, AgentResult, ProviderTiming } from './antigravity.js';
+import { AgentTimeoutError, TurnDeadline } from './turn-deadline.js';
 
 const execute = promisify(execFile);
 const REASONING_EFFORTS = new Set([
@@ -72,6 +73,8 @@ export interface CodexOptions {
   localThinking?: boolean;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  finishingGraceMs?: number;
+  hasPublishedResponse?: (requestId: string) => Promise<boolean>;
   progress?: (text: string) => void;
   onConversation?: (id: string) => void | Promise<void>;
   onImage?: (path: string) => void | Promise<void>;
@@ -97,7 +100,7 @@ export class CodexSession implements AgentDriver {
   private pending?: {
     resolve: (value: AgentResult) => void;
     reject: (error: Error) => void;
-    timer: NodeJS.Timeout;
+    deadline: TurnDeadline;
     continuation: string;
     compacting: boolean;
     compacted: boolean;
@@ -126,19 +129,21 @@ export class CodexSession implements AgentDriver {
       );
     if (this.pending) return Promise.reject(new Error('The DM is already resolving an action'));
     const result = new Promise<AgentResult>((resolve, reject) => {
-      const timer = setTimeout(
-        () =>
-          this.abort(
-            new Error(
-              'Codex timed out. Saved changes remain intact; review the table before reconnecting.',
-            ),
-          ),
-        this.options.timeoutMs ?? 600000,
-      );
+      const deadline = new TurnDeadline({
+        timeoutMs: this.options.timeoutMs ?? 600000,
+        finishingGraceMs: this.options.finishingGraceMs,
+        requestId,
+        hasPublishedResponse: this.options.hasPublishedResponse,
+        onFinishingGrace: () => {
+          this.emitTiming({ kind: 'provider-finishing-grace', requestId });
+          this.options.progress?.('The DM saved a response and is finishing up…');
+        },
+        onTimeout: () => this.abort(new AgentTimeoutError('Codex')),
+      });
       this.pending = {
         resolve,
         reject,
-        timer,
+        deadline,
         continuation: continuationFor(prompt),
         compacting: prompt === undefined,
         compacted: false,
@@ -150,6 +155,7 @@ export class CodexSession implements AgentDriver {
         toolStarts: new Map(),
         sawEvent: false,
       };
+      deadline.start();
     });
     this.emitTiming({ kind: 'provider-dispatch', requestId });
     void this.dispatch(prompt).catch(() =>
@@ -294,7 +300,7 @@ export class CodexSession implements AgentDriver {
         approvalPolicy: 'never',
         sandbox: 'read-only',
         config,
-        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. ${local ? 'This is a local multimodal model. In apply_campaign_changes, change.id means the EXISTING entity ID, not an operation ID. Example: changes=[{type:"damage",id:"existing-character-id",amount:2}]. The top-level operationId identifies the transaction. Use exact schema keys, not entityId for damage. Native image generation is unavailable. Existing registered map artwork is supported: render_location_map returns a PNG inline; inspect that image directly, never guess filesystem paths. Use schematic maps when no artwork is registered. Before each gameplay turn call resume_campaign (audience dm), search_campaign_history (audience dm, limit 3), and read_campaign_record for at least one returned hit or recentRecords reference if any exist. These local memory steps are mandatory even for sheet or map questions, overriding generic skill exemptions. Before publishing save a concise record_scene continuity note (aim for under 1500 characters), including decisions, promises and unresolved choices; keep secrets in separate visibility dm records. If retrieval is unavailable say so and use exact saved record references. Context compacts automatically: reload authoritative state and records afterward, preserving request and operation IDs.' : 'Native image generation is allowed.'} Native delegation of bounded rules-referee checks is allowed. Referees inherit the primary model and use the same campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
+        developerInstructions: `You are the Dungeon Master. Use campaign MCP tools only from ${this.options.serverName}. ${local ? 'This is a local multimodal model. In apply_campaign_changes, change.id means the EXISTING entity ID, not an operation ID. Example: changes=[{type:"damage",id:"existing-character-id",amount:2}]. The top-level operationId identifies the transaction. Use exact schema keys, not entityId for damage. Native image generation is unavailable. Existing registered map artwork is supported: render_location_map returns a PNG inline; inspect that image directly, never guess filesystem paths. Use schematic maps when no artwork is registered. Before each gameplay turn call resume_campaign (audience dm), search_campaign_history (audience dm, limit 3), and read_campaign_record for at least one returned hit or recentRecords reference if any exist. These local memory steps are mandatory even for sheet or map questions, overriding generic skill exemptions. Before publishing save a concise record_scene continuity note (aim for under 1500 characters), including decisions, promises and unresolved choices; keep secrets in separate visibility dm records. If retrieval is unavailable say so and use exact saved record references. Context compacts automatically: reload authoritative state and records afterward, preserving request and operation IDs.' : 'Native image generation is allowed.'} Native delegation of bounded rules-referee checks is allowed. Follow run-campaign for referee model selection through supported native delegation; referees use read-only campaign tools. All state changes use campaign tools; never edit files, run shell, invoke raw journal tools, or call model APIs. Only publish_table_message is visible to players. Keep private narration and tool output out of public messages. If independent rules review is unavailable use the documented delegation_unavailable fallback.`,
       };
       const resumed = this.options.conversationId;
       const response = await this.request(
@@ -595,7 +601,7 @@ export class CodexSession implements AgentDriver {
       void Promise.all([this.imageWrites, this.continuationWrites]).then(() => {
         if (this.pending !== pending || this.closed) return;
         this.pending = undefined;
-        clearTimeout(pending.timer);
+        pending.deadline.cancel();
         pending.resolve({
           conversationId: this.threadId,
           tools: [...pending.tools],
@@ -606,7 +612,7 @@ export class CodexSession implements AgentDriver {
   }
   private abort(error: Error) {
     if (this.pending) {
-      clearTimeout(this.pending.timer);
+      this.pending.deadline.cancel();
       this.pending.reject(error);
       this.pending = undefined;
     }
@@ -618,7 +624,7 @@ export class CodexSession implements AgentDriver {
     if (this.closing) return this.closing;
     this.closed = true;
     if (this.pending) {
-      clearTimeout(this.pending.timer);
+      this.pending.deadline.cancel();
       this.pending.reject(new Error('Codex session stopped. Check saved state before continuing.'));
       this.pending = undefined;
     }

@@ -317,3 +317,39 @@ test('a pending setup check for an old campaign does not suppress the newly open
   assert.equal((await first.store.read()).state.table, undefined);
   await host.close();
 });
+
+test('established hosted play omits inline creation guidance while retaining gameplay and referee skills', async (t) => {
+  for (const provider of ['antigravity', 'codex']) {
+    const { store, service, parent } = await fixture(t);
+    await apply(service, [
+      { type: 'put_entity', entity: hero },
+      { type: 'set_party', members: ['hero'] },
+    ]);
+    let gameplayPrompt;
+    const host = testHost(store, parent, () => ({
+      run: async (prompt) => {
+        if (prompt.startsWith('Connection check'))
+          return { tools: ['campaign_status'], campaignIds: ['test'] };
+        gameplayPrompt = prompt;
+        await service.execute('publish_table_message', {
+          operationId: 'reply',
+          expectedRevision: (await store.read()).state.revision,
+          reason: 'Synthetic reply',
+          requestId: 'play',
+          text: 'The path is clear.',
+        });
+        return { tools: ['publish_table_message'], campaignIds: ['test'] };
+      },
+      close: async () => {},
+    }));
+    t.after(() => host.close());
+    await host.open(store.root);
+    await host.connect(undefined, false, provider);
+    await host.submit({ id: 'play', text: 'Look around.' });
+    await waitFor(host, (snapshot) => snapshot.stage === 'ready');
+    assert.doesNotMatch(gameplayPrompt, /name: create-campaign|Campaign setup contract/);
+    assert.match(gameplayPrompt, /name: run-campaign/);
+    assert.match(gameplayPrompt, /name: rules-referee/);
+    assert.match(gameplayPrompt, /name: create-map-art/);
+  }
+});

@@ -78,6 +78,7 @@ class OwnedService extends CampaignService {
       status = 'ok';
       if (
         name === 'publish_table_message' &&
+        (raw as { delivery?: string }).delivery !== 'progress' &&
         owner.activeRequestId &&
         !this.published.includes(owner.activeRequestId)
       ) {
@@ -89,6 +90,15 @@ class OwnedService extends CampaignService {
           'performance-backend.jsonl',
         );
       }
+      if (
+        name === 'publish_table_message' &&
+        (raw as { delivery?: string }).delivery === 'progress'
+      )
+        void appendPerformanceRecord(
+          store.root,
+          { kind: 'progress-publication', requestId: owner.activeRequestId },
+          'performance-backend.jsonl',
+        );
       await activity.finishTool(op).catch(() => {});
       await announce('changed', undefined, undefined, op);
       if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
