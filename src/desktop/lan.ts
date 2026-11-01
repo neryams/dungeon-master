@@ -64,6 +64,7 @@ export class LanGame {
           'markdown.js',
           'markdown.css',
           'roll-cards.js',
+          'dice-prompt-sound.js',
           'vendor/markdown-it.js',
         ].map(
           async (file) =>

@@ -18,6 +18,7 @@
     "desktop/narration-audio.ts",
     "desktop/dice-feedback.ts",
     "desktop/roll-cards.ts",
+    "desktop/dice-prompt-sound.ts",
     "desktop/globals.d.ts",
     "desktop/vendor/*.d.ts"
   ],

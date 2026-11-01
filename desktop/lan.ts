@@ -8,6 +8,10 @@ import type {
 import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
 import { rollCard } from './roll-cards.js';
+import { DicePromptSound } from './dice-prompt-sound.js';
+const dicePromptSound = new DicePromptSound();
+document.addEventListener('pointerdown', () => dicePromptSound.unlock(), { capture: true });
+document.addEventListener('keydown', () => dicePromptSound.unlock(), { capture: true });
 const tags = {
   title: 'strong',
   status: 'span',
@@ -356,6 +360,7 @@ function render() {
 }
 function renderRollPrompt() {
   const prompt = state.pendingRolls?.[0];
+  dicePromptSound.observe(state.campaign.id, prompt?.id);
   $('roll-prompt').hidden = !prompt;
   if (!prompt) {
     rollRequest = undefined;

@@ -23,6 +23,7 @@ import {
 import { NarrationAudio } from './narration-audio.js';
 import { DiceFeedback } from './dice-feedback.js';
 import { rollCard } from './roll-cards.js';
+import { DicePromptSound } from './dice-prompt-sound.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -174,6 +175,9 @@ const tags = {
 } as const;
 const $ = elements(tags);
 const api = window.table;
+const dicePromptSound = new DicePromptSound();
+document.addEventListener('pointerdown', () => dicePromptSound.unlock(), { capture: true });
+document.addEventListener('keydown', () => dicePromptSound.unlock(), { capture: true });
 const diceFeedback = new DiceFeedback(
   {
     panel: $('dice-feedback'),
@@ -979,6 +983,7 @@ function renderState() {
 function renderRollPrompt() {
   const prompts = state.pendingRolls ?? [];
   const prompt = state.lanHosted ? undefined : prompts[0];
+  dicePromptSound.observe(state.campaign.id, prompt?.id);
   const panel = $('roll-prompt');
   panel.hidden = !prompt;
   if (!prompt) {
