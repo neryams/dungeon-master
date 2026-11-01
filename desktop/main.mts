@@ -5,6 +5,7 @@ import { app, BrowserWindow, ipcMain, dialog, session, shell } from 'electron';
 import { fork } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join, dirname, delimiter } from 'node:path';
+import { existsSync } from 'node:fs';
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -53,9 +54,11 @@ else {
         env: {
           ...process.env,
           ELECTRON_RUN_AS_NODE: undefined,
-          DM_BUNDLED_SPEECH: app.isPackaged
-            ? join(process.resourcesPath, 'speech')
-            : process.env.DM_BUNDLED_SPEECH,
+          DM_BUNDLED_SPEECH:
+            app.isPackaged &&
+            existsSync(join(process.resourcesPath, 'speech', 'speech-assets.json'))
+              ? join(process.resourcesPath, 'speech')
+              : process.env.DM_BUNDLED_SPEECH,
           PATH: [
             dirname(nodePath),
             process.env.PATH,
@@ -277,7 +280,11 @@ else {
         declineSpeech: () => call('declineSpeech'),
         cancelSpeechInstall: () => call('cancelSpeechInstall'),
         openSpeechLink: async (link) => {
-          if (link === 'license' && app.isPackaged) {
+          if (
+            link === 'license' &&
+            app.isPackaged &&
+            existsSync(join(process.resourcesPath, 'speech', 'licenses', 'CC-BY-NC-4.0.txt'))
+          ) {
             const error = await shell.openPath(
               join(process.resourcesPath, 'speech', 'licenses', 'CC-BY-NC-4.0.txt'),
             );

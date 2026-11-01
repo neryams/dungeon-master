@@ -21,10 +21,28 @@ import { prepareSpeechBundle } from './package-speech.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(root, 'build/desktop-app');
 const runtimeDir = join(root, 'build/desktop-node');
+const speechDir = join(root, 'build/desktop-speech');
 export const NODE_VERSION = '22.23.3';
 export const NODE_SHA256 = '72d5d8832b41c9d9646197af614ffd751406ea4d215060eb91b98864e1919a3e';
-const nodeArchive = `node-v${NODE_VERSION}-darwin-arm64.tar.xz`;
-const nodeUrl = `https://nodejs.org/download/release/v${NODE_VERSION}/${nodeArchive}`;
+export const NODE_WIN_X64_SHA256 =
+  '2b0ff57b049cda1bbcea2240eec20467018713c1efe1f7360c2681859b90ed71';
+
+const NODE_TARGETS = {
+  'darwin-arm64': {
+    archive: `node-v${NODE_VERSION}-darwin-arm64.tar.xz`,
+    sha256: NODE_SHA256,
+    extractedBinary: 'bin/node',
+    stagedBinary: 'bin/node',
+    tarFlags: '-xJf',
+  },
+  'win32-x64': {
+    archive: `node-v${NODE_VERSION}-win-x64.zip`,
+    sha256: NODE_WIN_X64_SHA256,
+    extractedBinary: 'node.exe',
+    stagedBinary: 'bin/node.exe',
+    tarFlags: '-xf',
+  },
+};
 
 export const APP_FILES = [
   'README.md',
@@ -48,35 +66,40 @@ export const PLUGIN_DOCS = [
   'docs/cloud.md',
 ];
 
-function assertTarget() {
-  if (process.platform !== 'darwin' || process.arch !== 'arm64')
-    throw new Error('The initial desktop installer target is macOS on Apple silicon.');
+function resolveTarget(platform = process.platform, arch = process.arch) {
+  const target = NODE_TARGETS[`${platform}-${arch}`];
+  if (!target)
+    throw new Error(
+      `Desktop installer packaging supports macOS arm64 (darwin-arm64) and Windows x64 (win32-x64); got ${platform}-${arch}.`,
+    );
+  return target;
 }
 
-async function downloadNode(destination) {
-  const temporary = join(tmpdir(), `dm-node-${process.pid}-${Date.now()}.tar.xz`);
+async function downloadNode(destination, target = resolveTarget()) {
+  const url = `https://nodejs.org/download/release/v${NODE_VERSION}/${target.archive}`;
+  const temporary = join(tmpdir(), `dm-node-${process.pid}-${Date.now()}-${target.archive}`);
   try {
-    const response = await fetch(nodeUrl, { redirect: 'error' });
+    const response = await fetch(url, { redirect: 'error' });
     if (!response.ok || !response.body)
       throw new Error(`Could not download the pinned Node.js runtime (${response.status}).`);
     await pipeline(response.body, createWriteStream(temporary, { mode: 0o600 }));
     const digest = createHash('sha256')
       .update(await readFile(temporary))
       .digest('hex');
-    if (digest !== NODE_SHA256)
+    if (digest !== target.sha256)
       throw new Error(`The downloaded Node.js archive failed its SHA-256 check (${digest}).`);
     const extraction = await mkdtemp(join(tmpdir(), 'dm-node-extract-'));
     try {
-      execFileSync('tar', ['-xJf', temporary, '-C', extraction, '--strip-components=1'], {
+      execFileSync('tar', [target.tarFlags, temporary, '-C', extraction, '--strip-components=1'], {
         stdio: 'ignore',
       });
-      const binary = join(destination, 'bin/node');
+      const binary = join(destination, target.stagedBinary);
       await mkdir(dirname(binary), { recursive: true });
-      await copyFile(join(extraction, 'bin/node'), binary);
+      await copyFile(join(extraction, target.extractedBinary), binary);
       await chmod(binary, 0o755);
       await copyFile(join(extraction, 'LICENSE'), join(destination, 'LICENSE'));
     } finally {
-      await rm(extraction, { recursive: true, force: true });
+      await rm(extraction, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   } finally {
     await rm(temporary, { force: true });
@@ -84,7 +107,7 @@ async function downloadNode(destination) {
 }
 
 async function stageApp() {
-  await rm(appDir, { recursive: true, force: true });
+  await rm(appDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   await mkdir(appDir, { recursive: true });
   for (const path of APP_FILES) {
     try {
@@ -109,9 +132,11 @@ async function stageApp() {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
-  execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  execFileSync(npmCmd, ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
     cwd: appDir,
     stdio: 'inherit',
+    shell: process.platform === 'win32',
     env: { ...process.env, npm_config_audit: 'false', npm_config_fund: 'false' },
   });
   await rm(join(appDir, 'package-lock.json'), { force: true });
@@ -151,18 +176,62 @@ async function stageApp() {
 }
 
 async function prepare() {
-  assertTarget();
+  const target = resolveTarget();
   await stageApp();
-  const speech = await prepareSpeechBundle({ sourceRoot: root });
-  if (!speech.included) throw new Error('The desktop release requires a complete Phonon bundle.');
-  await rm(runtimeDir, { recursive: true, force: true });
+  if (process.platform === 'darwin') {
+    const speech = await prepareSpeechBundle({ sourceRoot: root });
+    if (!speech.included) throw new Error('The desktop release requires a complete Phonon bundle.');
+  } else {
+    await rm(speechDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await mkdir(speechDir, { recursive: true });
+    console.log(
+      'Skipping macOS-only Phonon speech bundle on Windows; local speech remains optional.',
+    );
+  }
+  await rm(runtimeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   await mkdir(runtimeDir, { recursive: true });
-  await downloadNode(runtimeDir);
-  const node = join(runtimeDir, 'bin/node');
+  await downloadNode(runtimeDir, target);
+  const node = join(runtimeDir, target.stagedBinary);
   const output = execFileSync(node, ['--version'], { encoding: 'utf8' }).trim();
   if (output !== `v${NODE_VERSION}`)
     throw new Error(`Pinned Node runtime reported ${output}, expected v${NODE_VERSION}.`);
   console.log(`Staged app payload at ${appDir} with Node.js ${output}.`);
+
+  if (process.argv.includes('--dist')) {
+    const builderBin = join(
+      root,
+      'node_modules',
+      '.bin',
+      process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder',
+    );
+    const builderArgs =
+      process.platform === 'win32'
+        ? [
+            '--config',
+            'electron-builder.config.cjs',
+            '--win',
+            'nsis',
+            'zip',
+            '--x64',
+            '--publish',
+            'never',
+          ]
+        : [
+            '--config',
+            'electron-builder.config.cjs',
+            '--mac',
+            'dmg',
+            'zip',
+            '--arm64',
+            '--publish',
+            'never',
+          ];
+    execFileSync(builderBin, builderArgs, {
+      cwd: root,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await prepare();

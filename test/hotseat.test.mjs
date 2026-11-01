@@ -541,7 +541,11 @@ test('desktop MCP transport stops after ownership is revoked; regenerated worksp
   await assert.rejects(client.callTool({ name: 'campaign_status', arguments: {} }));
   const workspace = join(store.root, '.dm/hotseat/workspace');
   await mkdir(workspace, { recursive: true });
-  await symlink(parent, join(workspace, '.agents'));
+  await symlink(
+    parent,
+    join(workspace, '.agents'),
+    process.platform === 'win32' ? 'junction' : undefined,
+  );
   await assert.rejects(prepareWorkspace(store, resolve('.')), /Symlinks/);
 });
 
@@ -665,7 +669,11 @@ test('desktop imports only its conversation raster assets and renders background
   assert.deepEqual(await importGeneratedArt(store, image, brain), art);
   assert.deepEqual(await readFile(join(store.root, art.path)), await readFile(image));
   await assert.rejects(importGeneratedArt(store, join(parent, 'outside.png'), brain), /path/i);
-  await symlink(image, join(conversation, 'link.png'));
+  await symlink(
+    image,
+    join(conversation, 'link.png'),
+    process.platform === 'win32' ? 'junction' : undefined,
+  );
   await assert.rejects(
     importGeneratedArt(store, join(conversation, 'link.png'), brain),
     /Symlinks/,

@@ -7,7 +7,6 @@ import { AntigravitySession } from '../dist/desktop/antigravity.js';
 
 test('Antigravity tool_info events correlate repeated and parallel steps without exposing payloads', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'dm-agy-events-'));
-  t.after(() => rm(root, { recursive: true, force: true }));
   const cli = join(root, 'fake-agy.mjs');
   await writeFile(
     cli,
@@ -43,7 +42,10 @@ readline.createInterface({ input: process.stdin }).on('line', () => {
     onTiming: (event) => timings.push(event),
     progress: (text) => progress.push(text),
   });
-  t.after(() => session.close());
+  t.after(async () => {
+    await session.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  });
   const result = await session.run('synthetic protocol exercise', 'request-1');
 
   const starts = timings.filter((event) => event.kind === 'provider-tool-start');

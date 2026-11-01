@@ -49,7 +49,25 @@ export class FileJournal {
 }
 export async function fixture(t) {
   const parent = await mkdtemp(join(tmpdir(), 'dm-test-'));
-  t.after(() => rm(parent, { recursive: true, force: true }));
+  const cleanups = [
+    () => rm(parent, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }),
+  ];
+  const registerAfter = t.after.bind(t);
+  t.after = (fn) => {
+    cleanups.push(fn);
+  };
+  registerAfter(async () => {
+    let firstError;
+    while (cleanups.length) {
+      const fn = cleanups.pop();
+      try {
+        await fn();
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError) throw firstError;
+  });
   const store = await initialize(join(parent, 'campaign'), {
     schemaVersion: 1,
     id: 'test',

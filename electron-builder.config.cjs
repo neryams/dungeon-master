@@ -15,6 +15,11 @@ module.exports = {
     identity: null,
     hardenedRuntime: false,
   },
+  win: {
+    icon: 'build/dungeon-master.ico',
+    target: ['nsis', 'zip'],
+    signAndEditExecutable: false,
+  },
   dmg: {
     title: 'Dungeon Master',
     artifactName: '${productName}-${version}-${arch}.${ext}',
@@ -29,7 +34,7 @@ module.exports = {
     {
       from: 'build/desktop-node',
       to: 'node',
-      filter: ['bin/node', 'LICENSE'],
+      filter: ['bin/node', 'bin/node.exe', 'LICENSE'],
     },
   ],
 };

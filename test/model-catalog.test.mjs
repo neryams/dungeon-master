@@ -141,7 +141,7 @@ createInterface({ input: process.stdin }).on('line', line => {
     providerModels(process.execPath, 'codex', {
       prefixArgs: [hanging],
       cwd: parent,
-      timeoutMs: 100,
+      timeoutMs: 400,
     }),
     /timed out/,
   );
@@ -163,7 +163,7 @@ setInterval(() => {}, 1000);
     providerModels(process.execPath, 'antigravity', {
       prefixArgs: [agyHanging],
       cwd: parent,
-      timeoutMs: 100,
+      timeoutMs: 400,
     }),
     /Could not read available models/,
   );

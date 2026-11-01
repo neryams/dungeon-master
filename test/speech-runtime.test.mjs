@@ -83,7 +83,7 @@ test('speech runtime reports missing assets and validates bounded requests', asy
     await assert.rejects(runtime.synthesize('hello', 'Unknown'), /Unsupported speech voice/);
   } finally {
     runtime.close();
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -140,7 +140,7 @@ test('speech runtime replaces cancelled startup immediately and bounds malformed
     if (hadToken) process.env.HF_TOKEN = previousToken;
     else delete process.env.HF_TOKEN;
     runtime.close();
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -174,7 +174,7 @@ test('cancel invalidates a request awaiting asset checks without spawning it, th
     );
   } finally {
     runtime.close();
-    await rm(home, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -241,7 +241,9 @@ else {
     synthesisTimeoutMs: 3_000,
     spawn: (command, args, options) => {
       seen.push({ command, args, env: options.env });
-      return spawn(command, args, options);
+      return process.platform === 'win32'
+        ? spawn(process.execPath, [command, ...args], options)
+        : spawn(command, args, options);
     },
   });
   try {
@@ -267,8 +269,8 @@ else {
     if (hadToken) process.env.HF_TOKEN = previousToken;
     else delete process.env.HF_TOKEN;
     await Promise.all([
-      rm(bundle, { recursive: true, force: true }),
-      rm(home, { recursive: true, force: true }),
+      rm(bundle, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }),
+      rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }),
     ]);
   }
 });

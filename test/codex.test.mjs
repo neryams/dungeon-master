@@ -141,7 +141,7 @@ for (const [prompt, pattern] of [
   ['hang', /timed out/],
 ]) {
   test(`Codex fails closed on ${prompt} without retrying`, async (t) => {
-    const { driver } = await driverFixture(t, { timeoutMs: 250 });
+    const { driver } = await driverFixture(t, { timeoutMs: prompt === 'hang' ? 250 : 2000 });
     await assert.rejects(driver.run(prompt), pattern);
     await assert.rejects(driver.run('retry'), /stopped/);
   });
@@ -317,7 +317,7 @@ test('Codex artwork import accepts only observed raster paths for the current ow
     /connected Codex/,
   );
   const link = join(parent, 'symlink.png');
-  await symlink(image, link);
+  await symlink(image, link, process.platform === 'win32' ? 'junction' : undefined);
   await save([link]);
   await assert.rejects(
     importGeneratedArt(store, link, undefined, { ownerToken: 'owner' }),
