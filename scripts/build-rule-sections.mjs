@@ -3,7 +3,8 @@ import { parseFragment } from 'parse5';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-export const hash = (value) => createHash('sha256').update(value).digest('hex');
+export const hash = (value) =>
+  createHash('sha256').update(String(value).replaceAll('\r\n', '\n')).digest('hex');
 const md = new MarkdownIt({ html: true });
 const slug = (s) =>
   s
@@ -109,6 +110,7 @@ export function htmlText(html, warnings = []) {
   return visit(tree);
 }
 export function convert(file, raw, commit) {
+  raw = raw.replaceAll('\r\n', '\n');
   const lines = raw.split('\n'),
     tokens = md.parse(raw.replace(/^\uFEFF/, ''), {}),
     sections = [],

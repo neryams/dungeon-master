@@ -104,11 +104,15 @@ class OwnedService extends CampaignService {
       if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
         const rendered = result as { image?: { data: string }; path?: string };
         if (rendered.image && rendered.path) {
-          const dir = await safePath(store.root, '.dm/hotseat/workspace/map-references', false);
+          const workspaceDir =
+            process.env.DM_DESKTOP_PROVIDER === 'codex'
+              ? '.dm/hotseat/codex-workspace/map-references'
+              : '.dm/hotseat/workspace/map-references';
+          const dir = await safePath(store.root, workspaceDir, false);
           await mkdir(dir, { recursive: true });
           const path = await safePath(
             store.root,
-            `.dm/hotseat/workspace/map-references/${rendered.path.split('/').at(-1)}`,
+            `${workspaceDir}/${rendered.path.split('/').at(-1)}`,
             false,
           );
           await atomicWrite(path, Buffer.from(rendered.image.data, 'base64'));

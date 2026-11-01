@@ -36,11 +36,13 @@ export async function atomicWrite(path: string, value: string | Buffer): Promise
       await file.close();
     }
     await rename(tmp, path);
-    const dir = await open(resolve(path, '..'), 'r');
-    try {
-      await dir.sync();
-    } finally {
-      await dir.close();
+    if (process.platform !== 'win32') {
+      const dir = await open(resolve(path, '..'), 'r');
+      try {
+        await dir.sync();
+      } finally {
+        await dir.close();
+      }
     }
   } finally {
     await unlink(tmp).catch(() => {});

@@ -529,7 +529,11 @@ test('graph layout persists; explicit edge visibility hides connections between 
 test('art and derived-map paths reject symlinks and invalid sources without losing committed movement', async (t) => {
   const { service, store, parent } = await opening(t);
   await writeFile(join(parent, 'outside.png'), 'not an image');
-  await symlink(join(parent, 'outside.png'), join(store.root, 'assets', 'linked.png'));
+  await symlink(
+    join(parent, 'outside.png'),
+    join(store.root, 'assets', 'linked.png'),
+    process.platform === 'win32' ? 'junction' : undefined,
+  );
   await assert.rejects(
     call(service, 'register_map_art', {
       mapId: 'river-crossing',
@@ -546,7 +550,11 @@ test('art and derived-map paths reject symlinks and invalid sources without losi
     /supported image/,
   );
   await rm(join(store.root, '.dm', 'maps'), { recursive: true });
-  await symlink(parent, join(store.root, '.dm', 'maps'));
+  await symlink(
+    parent,
+    join(store.root, '.dm', 'maps'),
+    process.platform === 'win32' ? 'junction' : undefined,
+  );
   const result = await call(service, 'update_map_positions', {
     mapId: 'river-crossing',
     positions: [{ entityId: 'mara', x: 7, y: 6 }],

@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { APP_FILES, NODE_SHA256, NODE_VERSION, PLUGIN_DOCS } from '../scripts/package-desktop.mjs';
+import {
+  APP_FILES,
+  NODE_SHA256,
+  NODE_VERSION,
+  NODE_WIN_X64_SHA256,
+  PLUGIN_DOCS,
+} from '../scripts/package-desktop.mjs';
 
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const builder = createRequire(import.meta.url)('../electron-builder.config.cjs');
@@ -21,6 +27,17 @@ test('macOS installer has a reproducible, pinned arm64 external Node runtime', (
     packageJson.scripts['speech:setup'],
     /^npm run build && node scripts\/setup-speech\.mjs$/,
   );
+});
+
+test('Windows installer has a reproducible, pinned x64 external Node runtime', () => {
+  assert.equal(NODE_VERSION, '22.23.3');
+  assert.match(NODE_WIN_X64_SHA256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(builder.win.target, ['nsis', 'zip']);
+  assert.equal(builder.win.icon, 'build/dungeon-master.ico');
+  assert.equal(builder.win.signAndEditExecutable, false);
+  assert.ok(packageJson.scripts['desktop:dist'].includes('--x64'));
+  const nodeResource = builder.extraResources.find((item) => item.to === 'node');
+  assert.ok(nodeResource?.filter.includes('bin/node.exe'));
 });
 
 test('packaged payload has runtime assets and excludes development journals and caches', () => {

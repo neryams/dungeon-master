@@ -34,7 +34,7 @@ test('performance log keeps bounded timing metadata private and outside gameplay
     elapsedMs: 39,
     status: 'ok',
   });
-  assert.equal((await stat(path)).mode & 0o777, 0o600);
+  assert.equal((await stat(path)).mode & 0o777, process.platform === 'win32' ? 0o666 : 0o600);
   assert.doesNotMatch(await readFile(path, 'utf8'), /PRIVATE/);
 
   await appendPerformanceRecord(root, { kind: 'request-complete', requestId: 'x' });
@@ -78,7 +78,7 @@ test('performance rotation stays bounded with concurrent writes and refuses syml
   const target = join(root, 'untouched');
   await writeFile(target, 'original');
   await rm(path);
-  await symlink(target, path);
+  await symlink(target, path, process.platform === 'win32' ? 'junction' : undefined);
   await appendPerformanceRecord(root, { kind: 'request-complete' });
   assert.equal(await readFile(target, 'utf8'), 'original');
 });

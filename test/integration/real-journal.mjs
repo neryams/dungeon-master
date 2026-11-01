@@ -39,6 +39,10 @@ test(
       );
       const backend = new McpJournal(store.root, undefined, {
           TMPDIR: ipc,
+          TEMP: ipc,
+          TMP: ipc,
+          HOME: ipc,
+          USERPROFILE: ipc,
           JOURNAL_RAG_LOG_DIR: log,
           JOURNAL_RAG_DEVICE: 'cpu',
         }),
@@ -82,7 +86,7 @@ test(
           }
         }
       }
-      await rm(parent, { recursive: true, force: true });
+      await rm(parent, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   },
 );
