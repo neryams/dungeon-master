@@ -72,12 +72,33 @@ export function speechParts(markdownText: string): string[] {
     }
   }
 
-  const normalized = prose
+  const normalized = omitSpeechNotation(prose)
     .replace(/[\t\f\v ]+/gu, ' ')
     .replace(/ *\n+ */gu, '\n')
+    .replace(/ +([,.;:!?)\]])/gu, '$1')
     .trim();
   if (!normalized) return [];
   return normalized.split('\n').flatMap(splitSpeechText);
+}
+
+/** Only discard complete, recognizable annotations; mixed narrative stays readable. */
+function omitSpeechNotation(text: string): string {
+  const number = '[+−-]?\\d+(?:\\.\\d+)?';
+  const tuple = `${number}\\s*,\\s*${number}(?:\\s*,\\s*${number})?`;
+  const axes = `x\\s*[:=]\\s*${number}\\s*[,;]\\s*y\\s*[:=]\\s*${number}(?:\\s*[,;]\\s*z\\s*[:=]\\s*${number})?`;
+  const coordinates = new RegExp(
+    `^(?:(?:coordinates?|coords?|grid)\\s*:?\\s*)?(?:${tuple}|${axes})$`,
+    'iu',
+  );
+  const dice = '(?:\\d+)?d\\d+(?:\\s*[+−-]\\s*\\d+)?(?:\\s*=\\s*\\d+)?';
+  const stat = '(?:DC|AC|HP)\\s*[:=]?\\s*\\d+(?:\\s*[/]\\s*\\d+)?';
+  const mechanics = new RegExp(`^(?:${dice}|${stat})(?:\\s*[,;]\\s*(?:${dice}|${stat}))*$`, 'iu');
+
+  // Markdown has already been flattened, so bold/inline-code notation is handled too.
+  return text.replace(/\(([^()\n]*)\)|\[([^\[\]\n]*)\]/gu, (annotation, round, square) => {
+    const content = String(round ?? square).trim();
+    return coordinates.test(content) || mechanics.test(content) ? ' ' : annotation;
+  });
 }
 
 function splitSpeechText(text: string): string[] {

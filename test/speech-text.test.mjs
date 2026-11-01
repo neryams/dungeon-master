@@ -83,3 +83,31 @@ test('speech text splits at sentence boundaries and bounds long unbroken text', 
   assert.equal(unbroken.join(''), 'x'.repeat(1201));
   assert.deepEqual(speechParts('  \n ```\nignored\n```  '), []);
 });
+
+test('speech omits coordinate and mechanical annotations before chunking', () => {
+  assert.deepEqual(
+    speechParts(
+      'The gate (3,4) opens. Mira [−2, +4.5, 0] waits by the tower (coordinates: 8, 9).\n' +
+        'The chest (**x=3, y=-4**) is locked (DC 15). Your armor (AC: 16; HP 8/12) holds.\n' +
+        'The die (`1d20 + 4 = 18`) settles. You advance (grid: 2, 5), then stop.',
+    ),
+    [
+      'The gate opens. Mira waits by the tower.',
+      'The chest is locked. Your armor holds.',
+      'The die settles. You advance, then stop.',
+    ],
+  );
+  assert.deepEqual(speechParts('(3,4)\n\n[DC 15]\n\n(2d6 + 3)'), []);
+});
+
+test('speech preserves narrative parentheses, meaningful numbers, and mixed annotations', () => {
+  const prose =
+    'Mira (her voice barely a whisper) calls out (3 times). ' +
+    'The door (AC 15, scarred by old battles) trembles. ' +
+    'You remember (three days ago, near the tower) the warning. ' +
+    'The sign reads [keep out].';
+  assert.equal(speechParts(prose).join(' '), prose);
+  assert.deepEqual(speechParts('Mira (waiting at the gate (3,4)) waves.'), [
+    'Mira (waiting at the gate) waves.',
+  ]);
+});

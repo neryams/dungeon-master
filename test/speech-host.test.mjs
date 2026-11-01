@@ -43,7 +43,7 @@ test('speech resolves only exact saved public message text and does not write ev
   const revision = await publish(
     campaign,
     host,
-    '## A sign\n\nThe [sign](https://example.invalid) reads **east.**',
+    '## A sign\n\nThe [sign](https://example.invalid) (3,4) reads **east** (in faded letters).',
   );
   await record(campaign.service, 'Only the DM sees this private note.', 'dm');
   const before = await campaign.store.events();
@@ -64,7 +64,7 @@ test('speech resolves only exact saved public message text and does not write ev
     voice: 'Kore',
     part: 1,
   });
-  assert.deepEqual(await next, { text: 'The sign reads east.' });
+  assert.deepEqual(await next, { text: 'The sign reads east (in faded letters).' });
 
   await assert.rejects(
     host.speechText({
