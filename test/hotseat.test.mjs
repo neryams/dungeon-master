@@ -667,6 +667,9 @@ test('desktop imports only its conversation raster assets and renders background
   );
   const art = await importGeneratedArt(store, image, brain);
   assert.deepEqual(await importGeneratedArt(store, image, brain), art);
+  assert.deepEqual(await importGeneratedArt(store, image.replaceAll('\\', '/'), brain), art);
+  const { pathToFileURL } = await import('node:url');
+  assert.deepEqual(await importGeneratedArt(store, pathToFileURL(image).href, brain), art);
   assert.deepEqual(await readFile(join(store.root, art.path)), await readFile(image));
   await assert.rejects(importGeneratedArt(store, join(parent, 'outside.png'), brain), /path/i);
   await symlink(

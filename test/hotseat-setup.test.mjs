@@ -82,6 +82,10 @@ test('beginSetup submits one durable onboarding turn and carries setup-only guid
   assert.match(setupPrompt, /Campaign setup contract/);
   assert.match(setupPrompt, /one or two focused questions per turn/);
   assert.match(setupPrompt, /readable rendered starting map/);
+  assert.match(
+    setupPrompt,
+    /generating and registering its illustrated background via create-map-art/,
+  );
   assert.match(setupPrompt, /do not start actual gameplay/);
 });
 
