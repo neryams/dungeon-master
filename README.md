@@ -88,7 +88,7 @@ npm ci
 npm run desktop
 ```
 
-The app detects the CLI, guides campaign creation or opening, and connects the DM. Choose a character, type an action, and pass the seat to the next player. Public DM narration appears beside the revealed map, exact character sheets, inventory, resources and quests. Campaign state and the table transcript survive restarts. Interrupted actions are never automatically replayed.
+The app detects the CLI, guides campaign creation or opening, and connects the DM. Choose a character, type an action, and pass the seat to the next player. Public DM narration appears beside the revealed map, exact character sheets, inventory, resources and quests. Public character rolls wait for the player to click **Roll dice** or enter physical die faces before modifiers; LAN prompts go to the character’s claimed seat. Completed public rolls remain as cards in the chat. Campaign state and the table transcript survive restarts. Interrupted actions are never automatically replayed.
 
 New campaigns start with a guided DM conversation. Describe your idea or ask for a surprise, and choose whether to bring characters, build them together, or have the DM generate them. The app shows setup progress until the DM saves and verifies the party, starting map and opening scene, then opens the play view. Unfinished setup resumes from saved history.
 

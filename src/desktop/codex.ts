@@ -74,6 +74,7 @@ export interface CodexOptions {
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
   finishingGraceMs?: number;
+  isAwaitingPlayerRoll?: (requestId: string) => Promise<boolean>;
   hasPublishedResponse?: (requestId: string) => Promise<boolean>;
   progress?: (text: string) => void;
   onConversation?: (id: string) => void | Promise<void>;
@@ -134,6 +135,7 @@ export class CodexSession implements AgentDriver {
         finishingGraceMs: this.options.finishingGraceMs,
         requestId,
         hasPublishedResponse: this.options.hasPublishedResponse,
+        isAwaitingPlayerRoll: this.options.isAwaitingPlayerRoll,
         onFinishingGrace: () => {
           this.emitTiming({ kind: 'provider-finishing-grace', requestId });
           this.options.progress?.('The DM saved a response and is finishing up…');
@@ -219,7 +221,7 @@ export class CodexSession implements AgentDriver {
         enabled: true,
         required: true,
         startup_timeout_sec: 60,
-        tool_timeout_sec: 120,
+        tool_timeout_sec: 86400, // Player dice input may wait at the physical table.
       };
       config.plugins = Object.fromEntries(
         Object.entries(inherited.plugins ?? {}).map(([name, value]) => [

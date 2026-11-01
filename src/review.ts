@@ -20,6 +20,7 @@ export function gameplayFingerprint(state: State): string {
     reviewMode: _mode,
     table: _table,
     gathering: _gathering,
+    pendingRolls: _pendingRolls,
     ...gameplay
   } = state;
   return createHash('sha256').update(canonical(gameplay)).digest('hex');

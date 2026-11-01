@@ -358,6 +358,14 @@
         <div id="transcript" role="log" aria-label="Public table conversation">
           <p class="conversation-empty">Describe your party or send an action.</p>
         </div>
+        <section id="roll-prompt" class="roll-prompt" aria-label="Dice requested by the DM" hidden>
+          <h2 id="roll-prompt-title">Dice requested</h2>
+          <p id="roll-prompt-detail"></p>
+          <p id="roll-prompt-help" class="help"></p>
+          <div id="roll-inputs" class="roll-inputs"></div>
+          <p id="roll-error" class="roll-error" role="alert" hidden></p>
+          <button id="roll-submit" class="primary" type="button">Roll dice</button>
+        </section>
         <div id="active-turn" class="active-turn" hidden>
           <span class="active-turn-mark" aria-hidden="true">✦</span>
           <span id="active-turn-phase" role="status" aria-live="polite">The DM is thinking</span>

@@ -115,3 +115,62 @@ dialog::backdrop {
 .message-read {
   margin-top: 8px;
 }
+.roll-prompt {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border, #3c4847);
+  background: #202923;
+}
+.roll-prompt h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.roll-prompt p {
+  margin: 4px 0 10px;
+}
+.roll-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+.roll-inputs label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+.roll-inputs input {
+  width: 100px;
+}
+.roll-error {
+  color: #ffb4a9;
+}
+.roll-card {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #697052;
+  border-radius: 8px;
+  background: #232b25;
+}
+.roll-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.roll-card-title small,
+.roll-card-caption {
+  opacity: 0.75;
+  font-size: 12px;
+}
+.roll-card-total {
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  .roll-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roll-inputs input {
+    width: 100%;
+  }
+}

@@ -106,6 +106,7 @@ export const inputs = {
       ...metadata,
       actionId: Id.optional(),
       stepId: Id.optional(),
+      characterId: Id.optional(),
       expression: z.string().max(40),
       mode: z.enum(['normal', 'advantage', 'disadvantage', 'reported']).default('normal'),
       reportedTotal: z.number().int().safe().optional(),
@@ -166,7 +167,7 @@ export const descriptions: Record<ToolName, string> = {
   read_campaign_record:
     'Read an exact saved scene or session record by record:<id> reference. Uses durable history if journal delivery is pending.',
   roll_dice:
-    'Roll NdM±K or d20 advantage/disadvantage and durably save the result. Visibility defaults to party independently for each roll, even in reviewed play; explicitly set visibility dm only for a deliberately hidden roll. Use mode reported with reportedTotal for physical dice. Reuse operationId and identical input on retry to prevent rerolls.',
+    'Roll NdM±K or d20 advantage/disadvantage and durably save the result. For a public player-character roll, supply characterId; desktop play pauses for that player to roll. A single reviewed action actor is inferred when characterId is omitted. Public DM/monster and private rolls run automatically. Visibility defaults to party. Use mode reported with reportedTotal only for a DM-entered legacy physical total. Reuse operationId and identical input on retry to prevent rerolls.',
   apply_campaign_changes:
     'Atomically apply resolved D&D bookkeeping changes. Supply current expectedRevision and a fresh operationId. DM adjudicates rules; tools enforce state invariants. Repeat exact input on uncertain outcomes.',
   record_scene:
@@ -429,6 +430,7 @@ export class CampaignService {
             mode: i.mode,
             purpose: i.purpose,
             visibility: i.visibility,
+            ...(i.characterId ? { characterId: i.characterId } : {}),
             ...(i.mode === 'reported'
               ? { dice: [], modifier: 0, total: i.reportedTotal! }
               : rollDice(i.expression, i.mode)),

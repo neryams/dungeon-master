@@ -222,7 +222,7 @@ export class DesktopActivity {
   }
 }
 
-function safeLabel(purpose: unknown) {
+export function safeLabel(purpose: unknown) {
   if (typeof purpose !== 'string') return 'Dice roll';
   const value = purpose.trim().toLowerCase();
   const labels = new Map<string, string>();
