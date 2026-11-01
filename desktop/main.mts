@@ -1,8 +1,17 @@
-import { Preferences, WorkerReply, DesktopEvent, dispatchDesktop } from '#desktop/contracts';
-import type { DesktopApi, WorkerApi } from '#desktop/contracts';
+import {
+  Preferences,
+  WorkerReply,
+  DesktopEvent,
+  dispatchDesktop,
+  TranscriptionInput,
+} from '#desktop/contracts';
+import type { DesktopApi, WorkerApi, SpeechSettingsState } from '#desktop/contracts';
 import type { ChildProcess } from 'node:child_process';
-import { app, BrowserWindow, ipcMain, dialog, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, session, shell, safeStorage } from 'electron';
 import { fork } from 'node:child_process';
+import { SpeechService } from '#desktop/speech-service';
+import { GeminiSpeech } from '#desktop/gemini-speech';
+import { SpeechCredentials } from '#desktop/speech-credentials';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join, dirname, delimiter } from 'node:path';
 import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
@@ -53,9 +62,6 @@ else {
         env: {
           ...process.env,
           ELECTRON_RUN_AS_NODE: undefined,
-          DM_BUNDLED_SPEECH: app.isPackaged
-            ? join(process.resourcesPath, 'speech')
-            : process.env.DM_BUNDLED_SPEECH,
           PATH: [
             dirname(nodePath),
             process.env.PATH,
@@ -114,6 +120,79 @@ else {
           worker.send({ id, method, args });
         }) as ReturnType<WorkerApi[K]>;
       }
+      const playerSpeechWindows = new Map<number, { window: BrowserWindow; origin: string }>();
+      let activeLoopbackOrigin: string | undefined;
+      const broadcast = (channel: string, value: SpeechSettingsState | boolean) => {
+        if (window && !window.isDestroyed()) window.webContents.send(channel, value);
+        for (const entry of playerSpeechWindows.values()) {
+          if (!entry.window.isDestroyed()) entry.window.webContents.send(channel, value);
+        }
+      };
+      const credentials = new SpeechCredentials(
+        join(app.getPath('userData'), 'gemini-credentials.bin'),
+        {
+          encryptString: async (key: string) => {
+            if (
+              !(await safeStorage.isAsyncEncryptionAvailable()) ||
+              (process.platform === 'linux' &&
+                ['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend()))
+            )
+              throw new Error(
+                'Secure system storage is unavailable. Unlock or configure your system keychain.',
+              );
+            return safeStorage.encryptStringAsync(key);
+          },
+          decryptString: async (data: Buffer) => {
+            if (
+              !(await safeStorage.isAsyncEncryptionAvailable()) ||
+              (process.platform === 'linux' &&
+                ['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend()))
+            )
+              throw new Error('Secure system storage is unavailable.');
+            return (await safeStorage.decryptStringAsync(data)).result;
+          },
+        },
+      );
+      const speech = new SpeechService(
+        credentials,
+        new GeminiSpeech(),
+        (state) => broadcast('speech:settings', state),
+        (active) => broadcast('speech:recording', active),
+      );
+      function clearPlayerSpeech() {
+        activeLoopbackOrigin = undefined;
+        for (const [id, entry] of playerSpeechWindows) {
+          speech.cancelOwner(id);
+          if (!entry.window.isDestroyed())
+            entry.window.webContents.send('speech:settings', {
+              configured: false,
+              available: false,
+              tested: false,
+              detail: 'The local game is no longer active.',
+            });
+        }
+        playerSpeechWindows.clear();
+      }
+      worker.on('exit', () => {
+        speech.cancelAll();
+        clearPlayerSpeech();
+      });
+      function trustedSpeechFrame(
+        contents: Electron.WebContents | null,
+        frameUrl: string,
+        mainFrame: boolean,
+      ) {
+        if (!contents || !mainFrame) return false;
+        if (contents === window?.webContents) return frameUrl === indexUrl;
+        const entry = playerSpeechWindows.get(contents.id);
+        if (!entry || entry.origin !== activeLoopbackOrigin) return false;
+        try {
+          const url = new URL(frameUrl);
+          return url.origin === entry.origin && url.pathname === '/';
+        } catch {
+          return false;
+        }
+      }
       const prefsPath = join(app.getPath('userData'), 'table-preferences.json');
       let prefs: Preferences = {};
       try {
@@ -152,7 +231,7 @@ else {
           prefs.models = { ...prefs.models, [provider]: model };
         }
       }
-      const actions: Omit<DesktopApi, 'onUpdate'> = {
+      const actions: Omit<DesktopApi, 'onUpdate' | 'onSpeechChange' | 'onRecordingChange'> = {
         preferences: async () => prefs,
         localModels: (settings) => call('localModels', settings),
         configureLocal: async (settings) => {
@@ -243,12 +322,16 @@ else {
           return r.canceled ? null : (r.filePaths[0] ?? null);
         },
         open: async (path) => {
+          speech.cancelAll();
+          clearPlayerSpeech();
           const state = await call('open', path);
           if (state.campaign) prefs.recent = state.root;
           await savePrefs();
           return state;
         },
         create: async (input) => {
+          speech.cancelAll();
+          clearPlayerSpeech();
           const state = await call('create', input);
           if (state.campaign) prefs.recent = state.root;
           await savePrefs();
@@ -270,31 +353,45 @@ else {
         beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
         map: (input) => call('map', input),
-        speech: (input) => call('speech', input),
-        speechStatus: () => call('speechStatus'),
-        cancelSpeech: () => call('cancelSpeech'),
-        speechSetupStatus: () => call('speechSetupStatus'),
-        installSpeech: (input) => call('installSpeech', input),
-        declineSpeech: () => call('declineSpeech'),
-        cancelSpeechInstall: () => call('cancelSpeechInstall'),
+        speech: (input) => speech.speak(input.voice, () => call('speechText', input)),
+        cancelSpeech: async () => {
+          speech.cancelSpeech();
+          await call('cancelSpeech');
+        },
+        speechSettings: () => speech.settings(),
+        saveSpeechKey: ({ key }) => speech.save(key),
+        removeSpeechKey: () => speech.remove(),
+        previewSpeech: ({ voice }) =>
+          speech.speak(voice, async () => ({
+            text: 'The lantern glows beside the ancient gate. Your adventure awaits.',
+          })),
+        transcribe: (input) => speech.transcribe(window.webContents.id, input),
+        cancelTranscription: async () => {
+          speech.cancelTranscription(window.webContents.id);
+        },
+        setRecording: (active) => speech.setRecording(window.webContents.id, active),
         openSpeechLink: async (link) => {
-          if (link === 'license' && app.isPackaged) {
-            const error = await shell.openPath(
-              join(process.resourcesPath, 'speech', 'licenses', 'CC-BY-NC-4.0.txt'),
-            );
-            if (error) throw new Error('Could not open the included narration license.');
-            return;
-          }
           const urls = {
-            license: 'https://creativecommons.org/licenses/by-nc/4.0/',
-            model: 'https://huggingface.co/gradium/phonon-40m-en',
-            token: 'https://huggingface.co/settings/tokens',
+            keys: 'https://aistudio.google.com/apikey',
+            help: 'https://ai.google.dev/gemini-api/docs/api-key',
           };
           await shell.openExternal(urls[link]);
         },
-        stop: () => call('stop'),
-        startLan: () => call('startLan'),
-        stopLan: () => call('stopLan'),
+        stop: async () => {
+          speech.cancelAll();
+          return call('stop');
+        },
+        startLan: async () => {
+          const state = await call('startLan');
+          activeLoopbackOrigin = state.urls
+            .map((link) => new URL(link))
+            .find((url) => url.hostname === '127.0.0.1')?.origin;
+          return state;
+        },
+        stopLan: async () => {
+          clearPlayerSpeech();
+          return call('stopLan');
+        },
         lanStatus: () => call('lanStatus'),
         lanAdmin: (input) => call('lanAdmin', input),
         joinLan: async (link) => {
@@ -309,18 +406,38 @@ else {
             !/^#[a-f0-9]{64}$/.test(url.hash)
           )
             throw new Error('Paste a complete LAN game link.');
+          const localStatus = await call('lanStatus');
+          const localSpeech =
+            url.hostname === '127.0.0.1' &&
+            localStatus?.urls.some((link) => link === url.href) === true;
+          if (localSpeech) activeLoopbackOrigin = url.origin;
           const player = new BrowserWindow({
             title: 'Dungeon Master — LAN player',
             width: 1100,
             height: 850,
             backgroundColor: '#151b18',
             webPreferences: {
+              ...(localSpeech ? { preload: join(root, 'build/desktop/player-preload.cjs') } : {}),
               nodeIntegration: false,
               contextIsolation: true,
               sandbox: true,
               webSecurity: true,
             },
           });
+          if (localSpeech) {
+            const id = player.webContents.id;
+            playerSpeechWindows.set(id, { window: player, origin: url.origin });
+            player.on('closed', () => {
+              speech.cancelOwner(id);
+              playerSpeechWindows.delete(id);
+            });
+            player.webContents.on('render-process-gone', () => {
+              speech.cancelOwner(id);
+            });
+            player.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
+              if (isMainFrame) speech.cancelOwner(id);
+            });
+          }
           player.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
           player.webContents.on('will-navigate', (event) => event.preventDefault());
           player.webContents.on('will-attach-webview', (event) => event.preventDefault());
@@ -336,10 +453,56 @@ else {
           throw new Error('Untrusted window');
         return dispatchDesktop(actions, method, args);
       });
-      session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
-        callback(false),
+      ipcMain.handle('speech:input', async (event, method: unknown, args: unknown) => {
+        if (
+          !trustedSpeechFrame(
+            event.sender,
+            event.senderFrame?.url ?? '',
+            event.senderFrame === event.sender.mainFrame,
+          ) ||
+          event.sender === window?.webContents
+        )
+          throw new Error('Untrusted player window');
+        const id = event.sender.id;
+        if (!Array.isArray(args)) throw new Error('Invalid speech request');
+        switch (method) {
+          case 'speechSettings':
+            if (args.length) throw new Error('Invalid speech request');
+            return speech.settings();
+          case 'transcribe': {
+            const parsed = args.length === 1 ? TranscriptionInput.safeParse(args[0]) : null;
+            if (!parsed?.success) throw new Error('The recording is invalid or too large.');
+            return speech.transcribe(id, parsed.data);
+          }
+          case 'cancelTranscription':
+            if (args.length) throw new Error('Invalid speech request');
+            speech.cancelTranscription(id);
+            return;
+          case 'setRecording':
+            if (args.length !== 1 || typeof args[0] !== 'boolean')
+              throw new Error('Invalid speech request');
+            return speech.setRecording(id, args[0]);
+          default:
+            throw new Error('Invalid speech method');
+        }
+      });
+      session.defaultSession.setPermissionRequestHandler(
+        (contents, permission, callback, details) => {
+          const media = details as Electron.PermissionRequest & { mediaTypes?: string[] };
+          callback(
+            permission === 'media' &&
+              media.mediaTypes?.length === 1 &&
+              media.mediaTypes[0] === 'audio' &&
+              trustedSpeechFrame(contents, details.requestingUrl, details.isMainFrame),
+          );
+        },
       );
-      session.defaultSession.setPermissionCheckHandler(() => false);
+      session.defaultSession.setPermissionCheckHandler(
+        (contents, permission, _origin, details) =>
+          permission === 'media' &&
+          details.mediaType === 'audio' &&
+          trustedSpeechFrame(contents, details.requestingUrl ?? '', details.isMainFrame),
+      );
       window = new BrowserWindow({
         title: 'Dungeon Master — The Table',
         width: 1440,
@@ -360,6 +523,10 @@ else {
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       window.webContents.on('will-navigate', (event) => event.preventDefault());
       window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+      window.webContents.on('render-process-gone', () => speech.cancelAll());
+      window.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
+        if (isMainFrame) speech.cancelAll();
+      });
       window.on('closed', () => app.quit());
       await window.loadFile(index);
       app.on('window-all-closed', () => app.quit());
@@ -367,6 +534,7 @@ else {
         if (quitting) return;
         event.preventDefault();
         quitting = true;
+        speech.cancelAll();
         if (!worker.connected) {
           app.quit();
           return;

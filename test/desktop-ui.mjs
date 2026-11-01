@@ -200,7 +200,6 @@ The boards creak.
       ...process.env,
       DM_DESKTOP_NODE: process.execPath,
       DM_DESKTOP_USER_DATA: join(artifacts, 'profile'),
-      DM_SPEECH_HOME: join(artifacts, 'speech-home'),
       DM_FAKE_CODEX_LOG: join(artifacts, 'codex-requests.jsonl'),
       DM_FAKE_CODEX_HIDE_ASTRA: join(artifacts, 'hide-astra'),
     };
@@ -226,7 +225,7 @@ The boards creak.
     page.on('pageerror', (error) => errors.push(error.message));
     await page.waitForSelector('#create-form');
     await page.locator('#speech-dialog').waitFor({ state: 'visible' });
-    await page.locator('#speech-close').click();
+    await page.locator('#speech-skip').click();
     await page.locator('#provider').selectOption('codex');
     await page.waitForFunction(async () => (await window.table.preferences()).provider === 'codex');
     await page.waitForFunction(

@@ -16,7 +16,6 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
-import { prepareSpeechBundle } from './package-speech.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(root, 'build/desktop-app');
@@ -38,7 +37,6 @@ export const APP_FILES = [
   'skills',
   'examples',
   'rules',
-  'licenses',
 ];
 export const PLUGIN_DOCS = [
   'docs/desktop.md',
@@ -99,15 +97,11 @@ async function stageApp() {
     await mkdir(join(appDir, 'docs'), { recursive: true });
     await copyFile(join(root, path), join(appDir, path));
   }
-  // Speech inference is optional; only the small local sidecar source ships with the app.
-  try {
-    await mkdir(join(appDir, 'scripts'), { recursive: true });
-    await copyFile(
-      join(root, 'scripts/phonon-speech.py'),
-      join(appDir, 'scripts/phonon-speech.py'),
-    );
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+  // TypeScript does not remove outputs for deleted sources; strip legacy Phonon artifacts.
+  for (const extension of ['js', 'js.map', 'd.ts', 'd.ts.map']) {
+    for (const name of ['speech-install', 'speech-runtime']) {
+      await rm(join(appDir, 'dist/desktop', `${name}.${extension}`), { force: true });
+    }
   }
   execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
     cwd: appDir,
@@ -153,8 +147,6 @@ async function stageApp() {
 async function prepare() {
   assertTarget();
   await stageApp();
-  const speech = await prepareSpeechBundle({ sourceRoot: root });
-  if (!speech.included) throw new Error('The desktop release requires a complete Phonon bundle.');
   await rm(runtimeDir, { recursive: true, force: true });
   await mkdir(runtimeDir, { recursive: true });
   await downloadNode(runtimeDir);

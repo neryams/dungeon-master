@@ -71,6 +71,13 @@ button {
   cursor: pointer;
   min-height: 44px;
 }
+.dictation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 0.85rem;
+}
 button:hover,
 button[aria-pressed='true'] {
   background: #4c583e;

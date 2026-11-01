@@ -299,3 +299,27 @@ test('synthesis or playback errors are reported once without replaying on pollin
   assert.equal(calls.synthesize.length, 1);
   assert.equal(controller.getState().error, 'local voice unavailable');
 });
+
+test('recording suspension stops current speech and does not replay messages observed during recording', async () => {
+  const pending = deferred();
+  const { controller, calls } = harness({
+    synthesize(item, voice, part) {
+      calls.synthesize.push({ id: item.id, voice, part });
+      return item.id === 'current' ? pending.promise : Promise.resolve({ audio: item.id });
+    },
+  });
+  controller.reset(snapshot([]));
+  controller.observe(snapshot([message('current')]));
+  await until(() => calls.synthesize.length === 1);
+  controller.setSuspended(true);
+  pending.resolve({ audio: 'stale' });
+  controller.observe(snapshot([message('current'), message('during-recording')]));
+  controller.setSuspended(false);
+  controller.observe(snapshot([message('current'), message('during-recording')]));
+  await delay(5);
+  assert.deepEqual(calls.played, []);
+  assert.deepEqual(
+    calls.synthesize.map((call) => call.id),
+    ['current'],
+  );
+});

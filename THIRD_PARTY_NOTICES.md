@@ -23,18 +23,8 @@ Bundled SRD material has its own attribution and Creative Commons licensing.
 See `rules/` and the attribution and license files included with those sources.
 Those materials are not relicensed under the application's MIT license.
 
-## Optional narration
+## Optional Gemini speech
 
-The macOS installer includes pinned Phonon 40M model weights and the native speech
-runtime. This distribution of the model is for noncommercial purposes under
-CC BY-NC 4.0. Its restrictions apply independently of the application's MIT
-license. Explicit acknowledgement enables narration; users who decline can play
-without it. End users do not need a Hugging Face account or token. Build-time
-download credentials and personal settings are never bundled.
-
-See `licenses/phonon/NOTICE.md`, `licenses/phonon/CC-BY-NC-4.0.txt`, and
-`licenses/phonon/Apache-2.0.txt` for sources, pinned revisions, model restrictions,
-voice licensing and runtime information. These notices are also copied into
-the bundled speech resource directory. Native runtime licenses are retained
-there. The separate source-development Python fallback retains installed package
-license metadata and requires authorized upstream download access.
+Gemini speech is an optional hosted service enabled by the user with their own
+Google AI API key. The installer contains no speech model weights, speech engine,
+or voice assets. Review Google's current API terms and pricing before enabling it.

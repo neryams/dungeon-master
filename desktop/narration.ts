@@ -1,4 +1,5 @@
-export type NarrationVoice = 'Easton' | 'Zoey';
+import type { SpeechVoice } from '#desktop/contracts';
+export type NarrationVoice = SpeechVoice;
 
 export interface NarrationMessage {
   id: string;
@@ -53,6 +54,7 @@ export class NarrationController {
   private readonly queue: QueueItem[] = [];
   private campaignKey?: string;
   private active = false;
+  private suspended = false;
   private generation = 0;
   private cancellation: Promise<void> = Promise.resolve();
   private runner?: number;
@@ -107,7 +109,7 @@ export class NarrationController {
       const key = this.key(message);
       const isNew = !this.seen.has(key);
       this.seen.add(key);
-      if (!isNew || !message.eligible || !this.state.enabled) continue;
+      if (!isNew || !message.eligible || !this.state.enabled || this.suspended) continue;
       if (this.queue.length < MAX_QUEUE) {
         this.queue.push({ message: { ...message }, part: 0 });
       }
@@ -153,9 +155,20 @@ export class NarrationController {
     this.emit();
   }
 
+  /** Pauses narration and cancels current audio while microphone capture is active. */
+  setSuspended(suspended: boolean): void {
+    if (this.suspended === suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      this.queue.length = 0;
+      this.invalidate();
+      this.setState({ activity: 'idle', currentId: undefined, error: undefined });
+    } else this.emit();
+  }
+
   /** Replaces pending speech with a one-off replay, including while automatic narration is muted. */
   replay(message: NarrationMessage): void {
-    if (!this.active || !this.seen.has(this.key(message))) return;
+    if (!this.active || this.suspended || !this.seen.has(this.key(message))) return;
     this.queue.length = 0;
     this.queue.push({ message: { ...message }, part: 0 });
     this.invalidate();
@@ -194,7 +207,13 @@ export class NarrationController {
   }
 
   private pump(): void {
-    if (!this.active || this.queue.length === 0 || this.runner === this.generation) return;
+    if (
+      !this.active ||
+      this.suspended ||
+      this.queue.length === 0 ||
+      this.runner === this.generation
+    )
+      return;
     const token = this.generation;
     this.runner = token;
     void this.runQueue(token).finally(() => {
@@ -242,6 +261,6 @@ export class NarrationController {
   }
 
   private isCurrent(token: number): boolean {
-    return this.active && token === this.generation;
+    return this.active && !this.suspended && token === this.generation;
   }
 }

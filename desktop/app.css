@@ -23,6 +23,22 @@ dialog::backdrop {
 #speech-dialog {
   width: min(620px, 92vw);
 }
+#speech-dialog input[type='password'],
+#speech-dialog select {
+  width: 100%;
+  margin: 6px 0 12px;
+}
+.speech-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.speech-toggle input {
+  width: auto !important;
+  margin: 0;
+  flex: 0 0 auto;
+}
 #speech-dialog .inline-link {
   color: var(--accent, #d2b979);
   text-decoration: underline;
@@ -49,19 +65,15 @@ dialog::backdrop {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-#speech-token {
-  width: 100%;
-  margin-top: 6px;
-}
-.speech-token-help {
-  display: block;
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.4;
-  opacity: 0.8;
-}
 #speech-status {
   min-height: 1.4em;
+}
+.dictation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+  font-size: 12px;
 }
 .model-label-row {
   display: flex;

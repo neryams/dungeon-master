@@ -47,6 +47,8 @@ test(
     });
     const page = await app.firstWindow();
     await page.waitForSelector('#create-form');
+    await page.locator('#speech-dialog').waitFor({ state: 'visible' });
+    await page.locator('#speech-skip').click();
     await page.evaluate(async (root) => {
       const snapshot = await window.table.open(root);
       const { showCampaign } = await import('./app.js');

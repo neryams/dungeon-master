@@ -15,12 +15,10 @@ test('macOS installer has a reproducible, pinned arm64 external Node runtime', (
   assert.deepEqual(builder.mac.target, ['dmg', 'zip']);
   assert.equal(builder.mac.icon, 'build/dungeon-master.icns');
   assert.equal(builder.mac.identity, null);
+  assert.match(builder.mac.extendInfo.NSMicrophoneUsageDescription, /record speech/i);
   assert.ok(packageJson.scripts['desktop:dist'].includes('--arm64'));
   assert.ok(packageJson.scripts['desktop:dist'].includes('build-app-icon.mjs'));
-  assert.match(
-    packageJson.scripts['speech:setup'],
-    /^npm run build && node scripts\/setup-speech\.mjs$/,
-  );
+  assert.equal(packageJson.scripts['speech:setup'], undefined);
 });
 
 test('packaged payload has runtime assets and excludes development journals and caches', () => {
@@ -31,5 +29,11 @@ test('packaged payload has runtime assets and excludes development journals and 
   assert.ok(PLUGIN_DOCS.includes('docs/desktop.md'));
   assert.ok(!PLUGIN_DOCS.some((path) => path.includes('journal')));
   assert.ok(!PLUGIN_DOCS.includes('docs/text-to-speech-investigation.md'));
+  assert.ok(!APP_FILES.some((path) => /speech|phonon/i.test(path)));
   assert.ok(packageJson.scripts['desktop:smoke']);
+  assert.ok(!builder.extraResources.some((resource) => resource.to === 'speech'));
+  assert.deepEqual(packageJson.imports['#desktop/*'], {
+    types: './src/desktop/*.ts',
+    default: './dist/desktop/*.js',
+  });
 });

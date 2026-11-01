@@ -29,7 +29,6 @@ let closing = false;
 async function close() {
   if (closing) return;
   closing = true;
-  host.closeSpeechSetup();
   await host.close();
   process.exit(0);
 }

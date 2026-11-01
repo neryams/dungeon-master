@@ -32,6 +32,12 @@ for (const path of [
 ])
   await cp(path, join(root, path), { recursive: true });
 await cp('build/desktop', join(root, 'build/desktop'), { recursive: true });
+// TypeScript does not remove outputs for deleted sources; strip legacy Phonon artifacts.
+for (const extension of ['js', 'js.map', 'd.ts', 'd.ts.map']) {
+  for (const name of ['speech-install', 'speech-runtime']) {
+    await rm(join(root, 'dist/desktop', `${name}.${extension}`), { force: true });
+  }
+}
 execFileSync('tar', [
   '-czf',
   resolve('build/dungeon-master-plugin.tgz'),

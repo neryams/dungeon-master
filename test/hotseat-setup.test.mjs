@@ -231,6 +231,7 @@ test(
       prompts.filter((prompt) => prompt.includes('Current player submission:')).length,
       2,
     );
+    await host.close();
   },
 );
 

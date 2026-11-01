@@ -80,32 +80,40 @@ test('typed bridge validates methods, argument arity and administration payloads
   assert.equal(LanAdminInput.safeParse({ action: 'skip', characterId: 'hero' }).success, true);
 });
 
-test('narration setup bridge requires consent and restricts external destinations', async () => {
+test('speech bridge protects credentials and internal worker text lookup', async () => {
   const calls = [];
   const api = {
-    installSpeech: async (input) => {
+    saveSpeechKey: async (input) => {
       calls.push(input);
-      return { phase: 'installing' };
+      return { configured: true };
     },
     openSpeechLink: async (link) => {
       calls.push(link);
     },
+    speechText: async () => {
+      calls.push('private worker text');
+    },
   };
   for (const input of [
-    { accepted: false, licenseRevision: 'current' },
-    { accepted: true },
-    { accepted: true, licenseRevision: 'current', token: 'secret-value\ninvalid' },
-    { accepted: true, licenseRevision: 'current', url: 'https://example.invalid' },
+    { key: '' },
+    { key: 'secret-value\ninvalid' },
+    { key: 'value', url: 'https://example.invalid' },
+    {},
   ]) {
-    await assert.rejects(dispatchDesktop(api, 'installSpeech', [input]), (error) => {
+    await assert.rejects(dispatchDesktop(api, 'saveSpeechKey', [input]), (error) => {
       assert.doesNotMatch(error.message, /secret-value/);
       return true;
     });
   }
   await assert.rejects(dispatchDesktop(api, 'openSpeechLink', ['file:///private/path']));
-  await assert.rejects(dispatchWorker(api, 'openSpeechLink', ['license']));
+  await assert.rejects(dispatchWorker(api, 'saveSpeechKey', [{ key: 'secret' }]));
+  await assert.rejects(
+    dispatchDesktop(api, 'speechText', [
+      { campaignId: 'test', turnId: 'turn', revision: 1, voice: 'Kore', part: 0 },
+    ]),
+  );
   assert.deepEqual(calls, []);
-  await dispatchDesktop(api, 'installSpeech', [{ accepted: true, licenseRevision: 'current' }]);
-  await dispatchDesktop(api, 'openSpeechLink', ['license']);
+  await dispatchDesktop(api, 'saveSpeechKey', [{ key: 'synthetic-key' }]);
+  await dispatchDesktop(api, 'openSpeechLink', ['keys']);
   assert.equal(calls.length, 2);
 });

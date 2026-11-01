@@ -30,12 +30,45 @@ export const MapInput = z
     details: z.boolean().optional(),
   })
   .strict();
+export const SpeechVoice = z.enum([
+  'Zephyr',
+  'Puck',
+  'Charon',
+  'Kore',
+  'Fenrir',
+  'Leda',
+  'Orus',
+  'Aoede',
+  'Callirrhoe',
+  'Autonoe',
+  'Enceladus',
+  'Iapetus',
+  'Umbriel',
+  'Algieba',
+  'Despina',
+  'Erinome',
+  'Algenib',
+  'Rasalgethi',
+  'Laomedeia',
+  'Achernar',
+  'Alnilam',
+  'Schedar',
+  'Gacrux',
+  'Pulcherrima',
+  'Achird',
+  'Zubenelgenubi',
+  'Vindemiatrix',
+  'Sadachbia',
+  'Sadaltager',
+  'Sulafat',
+]);
+export type SpeechVoice = z.infer<typeof SpeechVoice>;
 export const SpeechInput = z
   .object({
     campaignId: Id,
     turnId: Id,
     revision: z.number().int().positive().safe(),
-    voice: z.enum(['Easton', 'Zoey']),
+    voice: SpeechVoice,
     part: z.number().int().min(0).max(2000),
   })
   .strict();
@@ -44,32 +77,48 @@ export interface SpeechResult {
   audio: string;
   nextPart?: number;
 }
-export interface SpeechStatus {
+/** Internal worker response. Only Electron main may request narration text. */
+export interface SpeechTextResult {
+  text: string;
+  nextPart?: number;
+}
+export interface SpeechSettingsState {
+  configured: boolean;
   available: boolean;
+  tested: boolean;
   detail: string;
 }
-export interface SpeechInstallState {
-  phase: 'unconfigured' | 'declined' | 'installing' | 'ready' | 'error';
-  detail: string;
-  accepted: boolean;
-  licenseRevision: string;
-  bundled?: boolean;
-}
-export const SpeechInstallInput = z
+export const SpeechKeyInput = z
   .object({
-    accepted: z.literal(true),
-    licenseRevision: z.string().min(1).max(200),
-    token: z
+    key: z
       .string()
       .trim()
-      .min(1)
-      .max(1024)
-      .regex(/^[A-Za-z0-9_-]+$/)
-      .optional(),
+      .min(10)
+      .max(512)
+      .regex(/^[A-Za-z0-9_-]+$/),
   })
   .strict();
-export type SpeechInstallInput = z.infer<typeof SpeechInstallInput>;
-export const SpeechLink = z.enum(['license', 'model', 'token']);
+export const SpeechPreviewInput = z.object({ voice: SpeechVoice }).strict();
+export const TranscriptionInput = z
+  .object({
+    audio: z
+      .string()
+      .min(1)
+      .max(Math.ceil((10 * 1024 * 1024) / 3) * 4)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+    mimeType: z.literal('audio/webm'),
+  })
+  .strict();
+export type TranscriptionInput = z.infer<typeof TranscriptionInput>;
+export interface SpeechInputApi {
+  speechSettings(): Promise<SpeechSettingsState>;
+  transcribe(input: TranscriptionInput): Promise<{ text: string }>;
+  cancelTranscription(): Promise<void>;
+  setRecording(active: boolean): Promise<void>;
+  onSpeechChange(callback: (state: SpeechSettingsState) => void): () => void;
+  onRecordingChange(callback: (active: boolean) => void): () => void;
+}
+export const SpeechLink = z.enum(['keys', 'help']);
 export type SpeechLink = z.infer<typeof SpeechLink>;
 export const IntentInput = z
   .object({
@@ -292,20 +341,20 @@ export interface WorkerApi {
   beginSetup(): Promise<void>;
   snapshot(): Promise<DesktopSnapshot>;
   map(input: MapInput): Promise<MapResult>;
-  speech(input: SpeechInput): Promise<SpeechResult>;
-  speechStatus(): Promise<SpeechStatus>;
+  speechText(input: SpeechInput): Promise<SpeechTextResult>;
   cancelSpeech(): Promise<void>;
-  speechSetupStatus(): Promise<SpeechInstallState>;
-  installSpeech(input: SpeechInstallInput): Promise<SpeechInstallState>;
-  declineSpeech(): Promise<SpeechInstallState>;
-  cancelSpeechInstall(): Promise<SpeechInstallState>;
   stop(): Promise<void>;
   startLan(): Promise<LanStatus>;
   stopLan(): Promise<void>;
   lanStatus(): Promise<LanStatus | null>;
   lanAdmin(input: LanAdminInput): Promise<LanStatus>;
 }
-export interface DesktopApi extends Omit<WorkerApi, 'connect' | 'detect' | 'models'> {
+export interface DesktopApi
+  extends Omit<WorkerApi, 'connect' | 'detect' | 'models' | 'speechText'>, SpeechInputApi {
+  speech(input: SpeechInput): Promise<SpeechResult>;
+  saveSpeechKey(input: z.infer<typeof SpeechKeyInput>): Promise<SpeechSettingsState>;
+  removeSpeechKey(): Promise<SpeechSettingsState>;
+  previewSpeech(input: z.infer<typeof SpeechPreviewInput>): Promise<SpeechResult>;
   onUpdate(callback: (event: DesktopEvent) => void): () => void;
   openSpeechLink(link: SpeechLink): Promise<void>;
   detect(path?: string): Promise<{ path: string; version: string }>;
@@ -441,28 +490,11 @@ export async function dispatchWorker(
       return api.beginSetup();
     case 'map':
       return api.map(...z.tuple([MapInput]).parse(raw));
-    case 'speech':
-      return api.speech(...z.tuple([SpeechInput]).parse(raw));
-    case 'speechStatus':
-      z.tuple([]).parse(raw);
-      return api.speechStatus();
+    case 'speechText':
+      return api.speechText(...z.tuple([SpeechInput]).parse(raw));
     case 'cancelSpeech':
       z.tuple([]).parse(raw);
       return api.cancelSpeech();
-    case 'speechSetupStatus':
-      z.tuple([]).parse(raw);
-      return api.speechSetupStatus();
-    case 'installSpeech':
-      // Never return validator details containing a submitted credential.
-      if (!z.tuple([SpeechInstallInput]).safeParse(raw).success)
-        throw new Error('Confirm the narration terms and provide a valid download credential.');
-      return api.installSpeech(...z.tuple([SpeechInstallInput]).parse(raw));
-    case 'declineSpeech':
-      z.tuple([]).parse(raw);
-      return api.declineSpeech();
-    case 'cancelSpeechInstall':
-      z.tuple([]).parse(raw);
-      return api.cancelSpeechInstall();
     case 'lanAdmin':
       return api.lanAdmin(...z.tuple([LanAdminInput]).parse(raw));
     case 'snapshot':
@@ -485,12 +517,39 @@ export async function dispatchWorker(
   }
 }
 export async function dispatchDesktop(
-  api: Omit<DesktopApi, 'onUpdate'>,
+  api: Omit<DesktopApi, 'onUpdate' | 'onSpeechChange' | 'onRecordingChange'>,
   method: unknown,
   raw: unknown,
 ): Promise<unknown> {
   if (typeof method !== 'string') throw new Error('Invalid desktop method');
   switch (method) {
+    case 'speech':
+      return api.speech(...z.tuple([SpeechInput]).parse(raw));
+    case 'speechSettings':
+      z.tuple([]).parse(raw);
+      return api.speechSettings();
+    case 'saveSpeechKey': {
+      const parsed = z.tuple([SpeechKeyInput]).safeParse(raw);
+      if (!parsed.success) throw new Error('Enter a valid Gemini API key.');
+      return api.saveSpeechKey(...parsed.data);
+    }
+    case 'removeSpeechKey':
+      z.tuple([]).parse(raw);
+      return api.removeSpeechKey();
+    case 'previewSpeech':
+      return api.previewSpeech(...z.tuple([SpeechPreviewInput]).parse(raw));
+    case 'transcribe': {
+      const parsed = z.tuple([TranscriptionInput]).safeParse(raw);
+      if (!parsed.success) throw new Error('The recording is invalid or too large.');
+      return api.transcribe(...parsed.data);
+    }
+    case 'cancelTranscription':
+      z.tuple([]).parse(raw);
+      return api.cancelTranscription();
+    case 'setRecording':
+      return api.setRecording(...z.tuple([z.boolean()]).parse(raw));
+    case 'speechText':
+      throw new Error('Invalid desktop method');
     case 'openSpeechLink':
       return api.openSpeechLink(...z.tuple([SpeechLink]).parse(raw));
     case 'models':
@@ -526,6 +585,9 @@ export async function dispatchDesktop(
       return dispatchWorker(
         {
           ...api,
+          speechText: async () => {
+            throw new Error('Invalid desktop method');
+          },
           connect: async () => {
             throw new Error('Invalid desktop method');
           },
