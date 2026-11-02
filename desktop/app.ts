@@ -268,6 +268,7 @@ function savedNarration(): { enabled: boolean; voice: NarrationVoice } {
 const narrationAudio = new NarrationAudio();
 let speechSettings: SpeechSettingsState | undefined;
 let speechSaving = false;
+let speechTesting = false;
 let initialSpeechPromptShown = false;
 let dictationObservedContext = '';
 let previewGeneration = 0;
@@ -339,6 +340,7 @@ api.onRecordingChange((recording) => {
   }
   narration.setSuspended(recording || !speechSettings?.available);
   renderNarration();
+  renderSpeechTestButton();
 });
 function saveNarration() {
   const { enabled, voice } = narration.getState();
@@ -422,10 +424,14 @@ function updateSpeechSettingsDialog() {
   $('speech-remove').hidden = !speechSettings?.configured;
   $('speech-save').disabled = speechSaving || !$('speech-key').value.trim();
   $('speech-save').textContent = speechSettings?.configured ? 'Replace key' : 'Save key';
-  $('speech-test').disabled = !speechSettings?.available || recordingActive;
+  renderSpeechTestButton();
   $('speech-status').textContent = speechSettings?.detail ?? '';
   $('speech-voice').value = narration.getState().voice;
   $('speech-autoplay').checked = narration.getState().enabled;
+}
+function renderSpeechTestButton() {
+  $('speech-test').disabled = speechTesting || !speechSettings?.available || recordingActive;
+  $('speech-test').textContent = speechTesting ? 'Testing…' : 'Test voice';
 }
 async function showSpeechSetup() {
   $('speech-key').value = '';
@@ -463,13 +469,22 @@ async function removeSpeechKey() {
   renderNarration();
 }
 async function testSpeechVoice() {
+  if (speechTesting || !speechSettings?.available || recordingActive) return;
   const generation = ++previewGeneration;
+  speechTesting = true;
+  renderSpeechTestButton();
   narrationAudio.stop();
   try {
-    const result = await api.previewSpeech({ voice: narration.getState().voice as SpeechVoice });
+    let result;
+    try {
+      result = await api.previewSpeech({ voice: narration.getState().voice as SpeechVoice });
+    } finally {
+      speechTesting = false;
+      renderSpeechTestButton();
+    }
     if (generation === previewGeneration) await narrationAudio.play(result.audio);
   } catch (error) {
-    $('speech-status').textContent = errorMessage(error);
+    if (generation === previewGeneration) $('speech-status').textContent = errorMessage(error);
   }
 }
 function notice(error: unknown) {

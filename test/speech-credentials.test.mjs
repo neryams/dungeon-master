@@ -46,6 +46,33 @@ test('credentials replace atomically, restore after reopen, and remove idempoten
   assert.deepEqual(await credentials.status(), { configured: false, unreadable: false });
 });
 
+test('authorization keys retain their period when encrypted and restored', async (t) => {
+  const { file, crypto, credentials } = await fixture(t);
+  const key = 'AQ.SyntheticCredential_0123456789';
+  await credentials.save(key);
+  assert.deepEqual(await credentials.status(), { configured: true, unreadable: false });
+  assert.equal(await new SpeechCredentials(file, crypto).load(), key);
+  assert.ok(!(await readFile(file, 'utf8')).includes(key));
+});
+
+test('invalid key text never replaces saved credentials or leaks in errors', async (t) => {
+  const { file, credentials } = await fixture(t);
+  await credentials.save('AQ.SyntheticExistingCredential_0123456789');
+  const before = await readFile(file, 'utf8');
+  for (const key of [
+    'AQ.masked***value',
+    'AQ.html&#x52;escaped',
+    'AQ.embedded\nnewline',
+    'x'.repeat(513),
+  ]) {
+    await assert.rejects(credentials.save(key), (error) => {
+      assert.equal(error.message, 'Gemini API key is invalid.');
+      return true;
+    });
+    assert.equal(await readFile(file, 'utf8'), before);
+  }
+});
+
 test('failed encryption preserves the prior credential file', async (t) => {
   const { file, crypto, credentials } = await fixture(t);
   await credentials.save('AIza-preserve-this-secret');

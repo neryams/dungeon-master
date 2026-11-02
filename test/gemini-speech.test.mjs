@@ -39,10 +39,11 @@ test('Gemini TTS uses Interactions API and returns only validated WAV', async ()
       });
     },
   });
-  const result = await service.synthesize('abcdefghijk', 'The gate opens.', 'Kore');
+  const key = 'AQ.SyntheticHeaderKey_0123456789';
+  const result = await service.synthesize(key, 'The gate opens.', 'Kore');
   assert.equal(Buffer.from(result, 'base64').toString('ascii', 0, 4), 'RIFF');
   assert.equal(request.url, 'https://generativelanguage.googleapis.com/v1beta/interactions');
-  assert.equal(request.init.headers.get('x-goog-api-key'), 'abcdefghijk');
+  assert.equal(request.init.headers.get('x-goog-api-key'), key);
   const payload = JSON.parse(request.init.body);
   assert.equal(payload.model, 'gemini-3.8-flash-tts');
   assert.equal(payload.store, false);
@@ -80,7 +81,7 @@ test('Gemini STT uploads in memory, transcribes, then deletes the validated file
   assert.equal(JSON.parse(calls[2].init.body).model, 'gemini-3.5-transcribe');
   assert.equal(JSON.parse(calls[2].init.body).store, false);
   assert.deepEqual(JSON.parse(calls[2].init.body).generation_config.transcription_config, {
-    mode: 'verbatim',
+    mode: { type: 'verbatim' },
   });
   assert.equal(calls[3].url, 'https://generativelanguage.googleapis.com/v1beta/files/f_123');
 });
@@ -236,6 +237,93 @@ test('HTTP categories are sanitized and every key-bearing request rejects redire
       (e) => e.code === code && !e.message.includes('private'),
     );
   }
+});
+
+test('speech reports HTTP status and documented API codes with actionable safe messages', async () => {
+  for (const [status, apiCode, category, guidance] of [
+    [400, 'invalid_request', 'invalid_request', /request parameters/],
+    [400, 'parameter_unknown', 'invalid_request', /compatibility update/],
+    [400, 'failed_precondition', 'precondition', /prerequisite/],
+    [400, 'UNAUTHENTICATED', 'invalid_key', /key was rejected/],
+    [402, 'payment_required', 'billing', /payment or additional credits/],
+    [403, 'permission_denied', 'access_denied', /permissions/],
+    [429, 'rate_limit_exceeded', 'quota', /rate limit/],
+    [503, 'service_unavailable', 'service_unavailable', /Try again later/],
+    [504, 'deadline_exceeded', 'timeout', /timed out/],
+  ]) {
+    let requests = 0;
+    const service = new GeminiSpeech({
+      fetch: async () => {
+        requests++;
+        return response(
+          {
+            error: {
+              code: apiCode,
+              message: 'PRIVATE prompt and key AQ.SyntheticSecret_0123456789',
+              details: [{ project: 'PRIVATE-project' }],
+            },
+          },
+          { status },
+        );
+      },
+    });
+    await assert.rejects(
+      service.synthesize('AQ.SyntheticSecret_0123456789', 'words', 'Kore'),
+      (error) => {
+        assert.equal(error.code, category);
+        assert.equal(error.httpStatus, status);
+        assert.equal(error.apiCode, apiCode);
+        assert.match(error.message, guidance);
+        assert.ok(error.message.includes(`HTTP ${status}; ${apiCode}`));
+        assert.doesNotMatch(JSON.stringify(error) + error.message, /PRIVATE|SyntheticSecret/);
+        return true;
+      },
+    );
+    assert.equal(requests, 1, 'Failures do not automatically retry billed requests');
+  }
+});
+
+test('HTTP diagnostics retain status without exposing unknown or malformed upstream data', async () => {
+  for (const body of [
+    JSON.stringify({
+      error: { code: 'PRIVATE-secret', status: 'PRIVATE-secret', message: 'PRIVATE-secret' },
+    }),
+    '<html>PRIVATE-secret</html>',
+    'PRIVATE-secret'.repeat(2000),
+    '',
+  ]) {
+    const service = new GeminiSpeech({ fetch: async () => new Response(body, { status: 402 }) });
+    await assert.rejects(service.synthesize('abcdefghijk', 'words', 'Kore'), (error) => {
+      assert.equal(error.code, 'billing');
+      assert.equal(error.httpStatus, 402);
+      assert.equal(error.apiCode, undefined);
+      assert.match(error.message, /HTTP 402/);
+      assert.doesNotMatch(error.message, /PRIVATE/);
+      return true;
+    });
+  }
+});
+
+test('legacy failed precondition is reported without revealing the provider message', async () => {
+  const service = new GeminiSpeech({
+    fetch: async () =>
+      response(
+        {
+          error: {
+            code: 400,
+            status: 'FAILED_PRECONDITION',
+            message: 'PRIVATE project billing details',
+          },
+        },
+        { status: 400 },
+      ),
+  });
+  await assert.rejects(service.synthesize('abcdefghijk', 'words', 'Kore'), (error) => {
+    assert.equal(error.code, 'precondition');
+    assert.equal(error.apiCode, 'FAILED_PRECONDITION');
+    assert.doesNotMatch(error.message, /PRIVATE/);
+    return true;
+  });
 });
 
 test('malformed uploaded URI still triggers deletion and only model output text is returned', async () => {

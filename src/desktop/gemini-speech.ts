@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { SpeechApiKey } from './contracts.js';
 
 const API_ORIGIN = 'https://generativelanguage.googleapis.com';
 const API_ROOT = `${API_ORIGIN}/upload/v1beta/files`;
@@ -12,6 +13,10 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 export type GeminiSpeechErrorCode =
   | 'invalid_input'
   | 'invalid_key'
+  | 'invalid_request'
+  | 'billing'
+  | 'precondition'
+  | 'service_unavailable'
   | 'quota'
   | 'access_denied'
   | 'model_unavailable'
@@ -25,8 +30,15 @@ export type GeminiSpeechErrorCode =
 
 /** Safe-to-display failure categories; upstream response bodies are never included. */
 export class GeminiSpeechError extends Error {
-  constructor(readonly code: GeminiSpeechErrorCode) {
-    super(messageFor(code));
+  constructor(
+    readonly code: GeminiSpeechErrorCode,
+    readonly httpStatus?: number,
+    readonly apiCode?: string,
+  ) {
+    super(
+      messageFor(code) +
+        (httpStatus === undefined ? '' : ` (HTTP ${httpStatus}${apiCode ? `; ${apiCode}` : ''})`),
+    );
     this.name = 'GeminiSpeechError';
   }
 }
@@ -37,10 +49,18 @@ function messageFor(code: GeminiSpeechErrorCode): string {
       return 'Speech input is invalid or exceeds the supported size.';
     case 'invalid_key':
       return 'Gemini API key was rejected.';
+    case 'invalid_request':
+      return 'Google rejected the speech request parameters. The app may need an API compatibility update.';
+    case 'billing':
+      return 'Google requires payment or additional credits. Check this project’s billing in Google AI Studio.';
+    case 'precondition':
+      return 'Google reports an unmet project prerequisite. Check billing and API availability in Google AI Studio.';
+    case 'service_unavailable':
+      return 'The Gemini speech service is temporarily unavailable. Try again later.';
     case 'quota':
-      return 'Gemini speech quota has been reached.';
+      return 'Gemini speech quota or rate limit has been reached. Check usage limits in Google AI Studio.';
     case 'access_denied':
-      return 'Gemini speech access was denied.';
+      return 'Gemini speech access was denied. Check the project’s API permissions, eligibility, and billing in Google AI Studio.';
     case 'model_unavailable':
       return 'The requested Gemini speech model is unavailable.';
     case 'cleanup_failed':
@@ -232,7 +252,7 @@ export class GeminiSpeech {
             model: 'gemini-3.5-transcribe',
             store: false,
             input: [{ type: 'audio', uri, mime_type: mimeType }],
-            generation_config: { transcription_config: { mode: 'verbatim' } },
+            generation_config: { transcription_config: { mode: { type: 'verbatim' } } },
           }),
         },
         signal,
@@ -296,8 +316,10 @@ export class GeminiSpeech {
       });
       if (callerSignal?.aborted) fail('cancelled');
       if (!response.ok) {
-        const category = await classifyHttpError(response);
-        fail(category);
+        const error = await classifyHttpError(response);
+        if (callerSignal?.aborted) fail('cancelled');
+        if (controller.signal.aborted) fail('timeout');
+        throw error;
       }
       if (noJson) {
         await response.body?.cancel().catch(() => undefined);
@@ -358,40 +380,77 @@ function isBase64(value: string): boolean {
   return Buffer.from(value, 'base64').toString('base64') === value;
 }
 function validateKey(key: string): void {
-  if (
-    typeof key !== 'string' ||
-    key.length < 10 ||
-    key.length > 512 ||
-    !/^[A-Za-z0-9_-]+$/.test(key)
-  )
-    fail('invalid_input');
+  if (!SpeechApiKey.safeParse(key).success) fail('invalid_input');
 }
-async function classifyHttpError(response: Response): Promise<GeminiSpeechErrorCode> {
-  if (response.status === 401) return 'invalid_key';
-  if (response.status === 403) return 'access_denied';
-  if (response.status === 404) return 'model_unavailable';
-  if (response.status === 429) return 'quota';
-  if (response.status === 400) {
-    try {
-      const text = await readText(response, 16 * 1024);
-      const parsed: unknown = JSON.parse(text);
-      if (isObject(parsed) && isObject(parsed.error)) {
-        const error = parsed.error;
-        const status = typeof error.status === 'string' ? error.status : '';
-        const message = typeof error.message === 'string' ? error.message : '';
-        const details = Array.isArray(error.details) ? JSON.stringify(error.details) : '';
-        if (
-          /API_KEY_INVALID|API key not valid|invalid api key/i.test(
-            `${status} ${message} ${details}`,
-          )
-        )
-          return 'invalid_key';
-      }
-    } catch {
-      /* return the generic safe HTTP category */
+// Only documented constant codes may cross IPC. Provider messages/details can
+// contain prompts, project identifiers, or keys and must never be displayed.
+const SAFE_API_CODES = new Set([
+  'invalid_request',
+  'failed_precondition',
+  'out_of_range',
+  'parameter_unknown',
+  'authentication',
+  'payment_required',
+  'permission_denied',
+  'not_found',
+  'model_not_found',
+  'already_exists',
+  'aborted',
+  'rate_limit_exceeded',
+  'quota_exceeded',
+  'too_many_requests',
+  'cancelled',
+  'api_error',
+  'unimplemented',
+  'service_unavailable',
+  'deadline_exceeded',
+  'API_KEY_INVALID',
+  'INVALID_ARGUMENT',
+  'FAILED_PRECONDITION',
+  'UNAUTHENTICATED',
+  'PERMISSION_DENIED',
+  'NOT_FOUND',
+  'RESOURCE_EXHAUSTED',
+  'INTERNAL',
+  'UNAVAILABLE',
+  'DEADLINE_EXCEEDED',
+]);
+
+async function classifyHttpError(response: Response): Promise<GeminiSpeechError> {
+  let apiCode: string | undefined;
+  let invalidKey = false;
+  try {
+    const parsed: unknown = JSON.parse(await readText(response, 16 * 1024));
+    if (isObject(parsed) && isObject(parsed.error)) {
+      const error = parsed.error;
+      apiCode = [error.code, error.status].find(
+        (value): value is string => typeof value === 'string' && SAFE_API_CODES.has(value),
+      );
+      // Older Files API errors encode authentication details in a status/message.
+      invalidKey = /API_KEY_INVALID|API key not valid|invalid api key/i.test(JSON.stringify(error));
     }
+  } catch {
+    // Keep the HTTP status even when the body is absent, malformed, or oversized.
   }
-  return 'http';
+  let code: GeminiSpeechErrorCode = 'http';
+  if (response.status === 401) code = 'invalid_key';
+  else if (response.status === 402) code = 'billing';
+  else if (response.status === 403) code = 'access_denied';
+  else if (response.status === 404) code = 'model_unavailable';
+  else if (response.status === 429) code = 'quota';
+  else if ([408, 504].includes(response.status)) code = 'timeout';
+  else if (response.status >= 500) code = 'service_unavailable';
+  else if (response.status === 400) {
+    if (
+      invalidKey ||
+      (apiCode && ['authentication', 'UNAUTHENTICATED', 'API_KEY_INVALID'].includes(apiCode))
+    )
+      code = 'invalid_key';
+    else if (apiCode === 'failed_precondition' || apiCode === 'FAILED_PRECONDITION')
+      code = 'precondition';
+    else code = 'invalid_request';
+  }
+  return new GeminiSpeechError(code, response.status, apiCode);
 }
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

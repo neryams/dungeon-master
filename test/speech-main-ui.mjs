@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fixture, apply } from './helpers.mjs';
 
-const SYNTHETIC_KEY = 'AIzaSyntheticLocalSpeechKey_0123456789';
+const SYNTHETIC_KEY = 'AQ.SyntheticLocalSpeechKey_0123456789';
 
 async function launch(userData, extraArgs = []) {
   const executablePath = process.env.DM_TEST_DESKTOP_EXECUTABLE ?? electron;

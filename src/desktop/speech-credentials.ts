@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { SpeechApiKey } from './contracts.js';
 
 export interface SpeechCryptoAdapter {
   encryptString(value: string): Buffer | Uint8Array | Promise<Buffer | Uint8Array>;
@@ -53,13 +54,7 @@ export class SpeechCredentials {
       )
         throw new Error();
       const key = await this.crypto.decryptString(encrypted);
-      if (
-        typeof key !== 'string' ||
-        key.length < 10 ||
-        key.length > 512 ||
-        !/^[A-Za-z0-9_-]+$/.test(key)
-      )
-        throw new Error();
+      if (!SpeechApiKey.safeParse(key).success) throw new Error();
       return key;
     } catch {
       throw new Error('Stored speech credentials are unreadable.');
@@ -67,13 +62,7 @@ export class SpeechCredentials {
   }
 
   async save(key: string): Promise<void> {
-    if (
-      typeof key !== 'string' ||
-      key.length < 10 ||
-      key.length > 512 ||
-      !/^[A-Za-z0-9_-]+$/.test(key)
-    )
-      throw new Error('Gemini API key is invalid.');
+    if (!SpeechApiKey.safeParse(key).success) throw new Error('Gemini API key is invalid.');
     let encrypted: Buffer;
     try {
       encrypted = Buffer.from(await this.crypto.encryptString(key));

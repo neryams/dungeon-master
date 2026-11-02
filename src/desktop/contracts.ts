@@ -88,16 +88,14 @@ export interface SpeechSettingsState {
   tested: boolean;
   detail: string;
 }
-export const SpeechKeyInput = z
-  .object({
-    key: z
-      .string()
-      .trim()
-      .min(10)
-      .max(512)
-      .regex(/^[A-Za-z0-9_-]+$/),
-  })
-  .strict();
+// Both legacy keys and current AQ. authorization keys are supported. Google
+// validates authenticity; these local checks only bound and sanitize the token.
+export const SpeechApiKey = z
+  .string()
+  .min(10)
+  .max(512)
+  .regex(/^[A-Za-z0-9_.-]+$/);
+export const SpeechKeyInput = z.object({ key: z.string().trim().pipe(SpeechApiKey) }).strict();
 export const SpeechPreviewInput = z.object({ voice: SpeechVoice }).strict();
 export const TranscriptionInput = z
   .object({

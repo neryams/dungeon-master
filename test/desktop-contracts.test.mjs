@@ -97,6 +97,10 @@ test('speech bridge protects credentials and internal worker text lookup', async
   for (const input of [
     { key: '' },
     { key: 'secret-value\ninvalid' },
+    { key: 'AQ.masked***value' },
+    { key: 'AQ.html&#x52;escaped' },
+    { key: 'AQ.embedded space' },
+    { key: 'AQ.' + 'x'.repeat(510) },
     { key: 'value', url: 'https://example.invalid' },
     {},
   ]) {
@@ -114,6 +118,8 @@ test('speech bridge protects credentials and internal worker text lookup', async
   );
   assert.deepEqual(calls, []);
   await dispatchDesktop(api, 'saveSpeechKey', [{ key: 'synthetic-key' }]);
+  await dispatchDesktop(api, 'saveSpeechKey', [{ key: ' \tAQ.SyntheticKey_0123456789\n' }]);
+  assert.deepEqual(calls.at(-1), { key: 'AQ.SyntheticKey_0123456789' });
   await dispatchDesktop(api, 'openSpeechLink', ['keys']);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
 });
