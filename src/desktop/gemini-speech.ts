@@ -9,6 +9,8 @@ const MAX_TEXT = 20_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TTS_RESPONSE_BYTES = 14 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 120_000;
+const MAX_RATE_LIMIT_RETRIES = 4;
+const MAX_RATE_LIMIT_ELAPSED_MS = 180_000;
 
 export type GeminiSpeechErrorCode =
   | 'invalid_input'
@@ -41,6 +43,35 @@ export class GeminiSpeechError extends Error {
     );
     this.name = 'GeminiSpeechError';
   }
+}
+
+class RateLimitError extends GeminiSpeechError {
+  constructor(
+    error: GeminiSpeechError,
+    readonly retryAfterMs?: number,
+    readonly retryable = true,
+  ) {
+    super(error.code, error.httpStatus, error.apiCode);
+    if (!retryable)
+      this.message +=
+        ' Daily quota cannot recover with a short retry; wait for its reset or increase the quota.';
+  }
+}
+
+function sleepAbortable(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new GeminiSpeechError('cancelled'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      reject(new GeminiSpeechError('cancelled'));
+    };
+    signal?.addEventListener('abort', abort, { once: true });
+  });
 }
 
 function messageFor(code: GeminiSpeechErrorCode): string {
@@ -83,6 +114,14 @@ function messageFor(code: GeminiSpeechErrorCode): string {
 export interface GeminiSpeechOptions {
   fetch?: typeof fetch;
   timeoutMs?: number;
+  /** Test seams for bounded 429 backoff. */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  random?: () => number;
+  onRetry?: (
+    model: 'gemini-3.8-flash-tts' | 'gemini-3.5-transcribe',
+    attempt: number,
+    delayMs: number,
+  ) => void;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -91,10 +130,16 @@ type JsonObject = Record<string, unknown>;
 export class GeminiSpeech {
   private readonly fetcher: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  private readonly random: () => number;
+  private readonly onRetry?: GeminiSpeechOptions['onRetry'];
 
   constructor(options: GeminiSpeechOptions = {}) {
     this.fetcher = options.fetch ?? fetch;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.sleep = options.sleep ?? sleepAbortable;
+    this.random = options.random ?? Math.random;
+    this.onRetry = options.onRetry;
   }
 
   async synthesize(
@@ -130,6 +175,8 @@ export class GeminiSpeech {
       false,
       false,
       MAX_TTS_RESPONSE_BYTES,
+      undefined,
+      'gemini-3.8-flash-tts',
     );
     const data = findAudio(result.json);
     if (
@@ -184,6 +231,7 @@ export class GeminiSpeech {
         false,
         MAX_RESPONSE_BYTES,
         deadline,
+        undefined,
       );
       const uploadUrl = start.headers.get('x-goog-upload-url');
       if (!uploadUrl || !isTrustedUrl(uploadUrl)) fail('invalid_response');
@@ -205,6 +253,7 @@ export class GeminiSpeech {
         true,
         MAX_RESPONSE_BYTES,
         deadline,
+        undefined,
       );
       const file = isObject(uploaded.json) ? uploaded.json.file : undefined;
       const name = isObject(file) ? file.name : undefined;
@@ -227,6 +276,7 @@ export class GeminiSpeech {
           false,
           MAX_RESPONSE_BYTES,
           deadline,
+          undefined,
         );
         const current = metadata.json;
         if (
@@ -260,6 +310,7 @@ export class GeminiSpeech {
         false,
         MAX_RESPONSE_BYTES,
         deadline,
+        'gemini-3.5-transcribe',
       );
       const extracted = findText(interaction.json);
       if (typeof extracted !== 'string' || extracted.length > MAX_TEXT) fail('invalid_response');
@@ -287,6 +338,49 @@ export class GeminiSpeech {
   }
 
   private async request(
+    url: string,
+    key: string,
+    init: RequestInit,
+    callerSignal?: AbortSignal,
+    noJson = false,
+    rawBytes = false,
+    maxResponseBytes = MAX_RESPONSE_BYTES,
+    deadline?: number,
+    model?: 'gemini-3.8-flash-tts' | 'gemini-3.5-transcribe',
+  ): Promise<{ headers: Headers; json: unknown }> {
+    const deadlineAt = Math.min(deadline ?? Infinity, Date.now() + MAX_RATE_LIMIT_ELAPSED_MS);
+    for (let retry = 0; ; retry++) {
+      try {
+        return await this.requestAttempt(
+          url,
+          key,
+          init,
+          callerSignal,
+          noJson,
+          rawBytes,
+          maxResponseBytes,
+          deadlineAt,
+        );
+      } catch (error) {
+        if (!(error instanceof RateLimitError) || !error.retryable || !model) throw error;
+        const wait =
+          error.retryAfterMs ??
+          Math.min(60_000, 5_000 * 2 ** retry + Math.floor(this.random() * 1_000));
+        if (retry >= MAX_RATE_LIMIT_RETRIES || Date.now() + wait >= deadlineAt) {
+          error.message += ' Automatic retries stopped; try again later or check your quota.';
+          throw error;
+        }
+        try {
+          this.onRetry?.(model, retry + 1, wait);
+        } catch {
+          /* diagnostics must not change speech behavior */
+        }
+        await this.sleep(wait, callerSignal);
+      }
+    }
+  }
+
+  private async requestAttempt(
     url: string,
     key: string,
     init: RequestInit,
@@ -419,10 +513,16 @@ const SAFE_API_CODES = new Set([
 async function classifyHttpError(response: Response): Promise<GeminiSpeechError> {
   let apiCode: string | undefined;
   let invalidKey = false;
+  let retryMs: number | undefined;
+  let retryAfterMs: number | undefined;
+  let dailyQuota = false;
   try {
-    const parsed: unknown = JSON.parse(await readText(response, 16 * 1024));
+    const body = await readText(response, 16 * 1024);
+    const parsed: unknown = JSON.parse(body);
+    retryMs = retryInfoDelay(parsed);
     if (isObject(parsed) && isObject(parsed.error)) {
       const error = parsed.error;
+      dailyQuota = /daily|per[_\s-]?day/i.test(JSON.stringify(error.details ?? []));
       apiCode = [error.code, error.status].find(
         (value): value is string => typeof value === 'string' && SAFE_API_CODES.has(value),
       );
@@ -450,7 +550,36 @@ async function classifyHttpError(response: Response): Promise<GeminiSpeechError>
       code = 'precondition';
     else code = 'invalid_request';
   }
-  return new GeminiSpeechError(code, response.status, apiCode);
+  const result = new GeminiSpeechError(code, response.status, apiCode);
+  if (response.status === 429) {
+    retryAfterMs = parseRetryAfter(response.headers.get('retry-after'));
+    return new RateLimitError(
+      result,
+      Math.max(retryMs ?? 0, retryAfterMs ?? 0) || undefined,
+      !dailyQuota && apiCode !== 'quota_exceeded',
+    );
+  }
+  return result;
+}
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+  return Number.isFinite(ms) && ms >= 0 ? ms : undefined;
+}
+function retryInfoDelay(value: unknown): number | undefined {
+  if (!isObject(value) || !isObject(value.error) || !Array.isArray(value.error.details))
+    return undefined;
+  for (const detail of value.error.details)
+    if (
+      isObject(detail) &&
+      detail['@type'] === 'type.googleapis.com/google.rpc.RetryInfo' &&
+      typeof detail.retryDelay === 'string'
+    ) {
+      const match = /^(\d+(?:\.\d+)?)s$/.exec(detail.retryDelay);
+      if (match) return Number(match[1]) * 1000;
+    }
+  return undefined;
 }
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

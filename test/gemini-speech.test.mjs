@@ -50,6 +50,149 @@ test('Gemini TTS uses Interactions API and returns only validated WAV', async ()
   assert.equal(payload.generation_config.speech_config[0].voice, 'Kore');
 });
 
+test('TTS retries explicit 429s with Retry-After, bounded fallback, cancellation, and safe exhaustion', async () => {
+  let calls = 0;
+  const waits = [];
+  const service = new GeminiSpeech({
+    sleep: async (ms) => waits.push(ms),
+    random: () => 0,
+    fetch: async () =>
+      ++calls === 1
+        ? response(
+            { error: { code: 429, status: 'RESOURCE_EXHAUSTED' } },
+            { status: 429, headers: { 'retry-after': '7' } },
+          )
+        : response({
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'audio', data: wav().toString('base64') }],
+              },
+            ],
+          }),
+  });
+  await service.synthesize('abcdefghijk', 'words', 'Kore');
+  assert.deepEqual(waits, [7000]);
+
+  calls = 0;
+  waits.length = 0;
+  const fallback = new GeminiSpeech({
+    sleep: async (ms) => waits.push(ms),
+    random: () => 0,
+    fetch: async () => {
+      calls++;
+      return calls < 3
+        ? response({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }, { status: 429 })
+        : response({
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'audio', data: wav().toString('base64') }],
+              },
+            ],
+          });
+    },
+  });
+  await fallback.synthesize('abcdefghijk', 'words', 'Kore');
+  assert.deepEqual(waits, [5000, 10000]);
+
+  calls = 0;
+  const exhausted = new GeminiSpeech({
+    sleep: async () => {},
+    fetch: async () => {
+      calls++;
+      return response({ error: { code: 429, message: 'PRIVATE key' } }, { status: 429 });
+    },
+  });
+  await assert.rejects(
+    exhausted.synthesize('abcdefghijk', 'words', 'Kore'),
+    (e) => e.code === 'quota' && !e.message.includes('PRIVATE'),
+  );
+  assert.equal(calls, 5);
+});
+
+test('429 wait cancels promptly and daily quota does not retry', async () => {
+  let calls = 0;
+  const controller = new AbortController();
+  const service = new GeminiSpeech({
+    fetch: async () => {
+      calls++;
+      return response({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }, { status: 429 });
+    },
+  });
+  const pending = service.synthesize('abcdefghijk', 'words', 'Kore', controller.signal);
+  setTimeout(() => controller.abort(), 10);
+  await assert.rejects(pending, (e) => e.code === 'cancelled');
+  assert.equal(calls, 1);
+
+  calls = 0;
+  const daily = new GeminiSpeech({
+    sleep: async () => {},
+    fetch: async () => {
+      calls++;
+      return response(
+        {
+          error: {
+            code: 429,
+            status: 'RESOURCE_EXHAUSTED',
+            details: [{ reason: 'daily quota exceeded' }],
+          },
+        },
+        { status: 429 },
+      );
+    },
+  });
+  await assert.rejects(daily.synthesize('abcdefghijk', 'words', 'Kore'), (e) => e.code === 'quota');
+  assert.equal(calls, 1);
+});
+
+test('RetryInfo wins over a shorter HTTP date and an oversized hint is not retried', async () => {
+  const waits = [];
+  let calls = 0;
+  const hint = new GeminiSpeech({
+    sleep: async (ms) => waits.push(ms),
+    fetch: async () => {
+      calls++;
+      return calls === 1
+        ? response(
+            {
+              error: {
+                code: 429,
+                details: [
+                  { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '8s' },
+                ],
+              },
+            },
+            { status: 429, headers: { 'retry-after': new Date(Date.now() + 5000).toUTCString() } },
+          )
+        : response({
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'audio', data: wav().toString('base64') }],
+              },
+            ],
+          });
+    },
+  });
+  await hint.synthesize('abcdefghijk', 'words', 'Kore');
+  assert.deepEqual(waits, [8000]);
+
+  calls = 0;
+  const tooLong = new GeminiSpeech({
+    sleep: async () => assert.fail('oversized delay must not sleep'),
+    fetch: async () => {
+      calls++;
+      return response({ error: { code: 429 } }, { status: 429, headers: { 'retry-after': '600' } });
+    },
+  });
+  await assert.rejects(
+    tooLong.synthesize('abcdefghijk', 'words', 'Kore'),
+    (e) => e.code === 'quota',
+  );
+  assert.equal(calls, 1);
+});
+
 test('Gemini STT uploads in memory, transcribes, then deletes the validated file', async () => {
   const calls = [];
   const service = new GeminiSpeech({
@@ -91,6 +234,7 @@ test('STT deletes uploaded resource after interaction failure and after caller c
     const calls = [];
     const controller = new AbortController();
     const service = new GeminiSpeech({
+      sleep: async () => {},
       fetch: async (url, init) => {
         calls.push({ url, init });
         if (url.endsWith('/files'))
@@ -222,6 +366,7 @@ test('HTTP categories are sanitized and every key-bearing request rejects redire
     [429, 'quota'],
   ]) {
     const service = new GeminiSpeech({
+      sleep: async () => {},
       fetch: async (_url, init) => {
         assert.equal(init.redirect, 'error');
         return new Response(
@@ -239,6 +384,120 @@ test('HTTP categories are sanitized and every key-bearing request rejects redire
   }
 });
 
+test('daily quota codes and canonical per-day quota IDs never retry', async () => {
+  for (const error of [
+    { code: 'quota_exceeded' },
+    {
+      status: 'RESOURCE_EXHAUSTED',
+      details: [{ violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] }],
+    },
+  ]) {
+    let calls = 0;
+    const service = new GeminiSpeech({
+      sleep: async () => assert.fail('daily quota must not sleep'),
+      fetch: async () => {
+        calls++;
+        return response({ error }, { status: 429 });
+      },
+    });
+    await assert.rejects(
+      service.synthesize('abcdefghijk', 'words', 'Kore'),
+      (e) => e.code === 'quota' && /Daily quota/.test(e.message),
+    );
+    assert.equal(calls, 1);
+  }
+});
+
+test('HTTP-date retry hints work without RetryInfo and diagnostic failures do not stop recovery', async () => {
+  let calls = 0;
+  const waits = [];
+  const diagnostics = [];
+  const service = new GeminiSpeech({
+    sleep: async (ms) => waits.push(ms),
+    onRetry: (...args) => {
+      diagnostics.push(args);
+      throw new Error('diagnostics unavailable');
+    },
+    fetch: async () =>
+      ++calls === 1
+        ? response(
+            { error: { code: 'too_many_requests', message: 'PRIVATE upstream text' } },
+            { status: 429, headers: { 'retry-after': new Date(Date.now() + 10000).toUTCString() } },
+          )
+        : response({
+            steps: [
+              {
+                type: 'model_output',
+                content: [{ type: 'audio', data: wav().toString('base64') }],
+              },
+            ],
+          }),
+  });
+  await service.synthesize('abcdefghijk', 'words', 'Kore');
+  assert.equal(waits.length, 1);
+  assert.ok(waits[0] > 8000 && waits[0] <= 10000);
+  assert.deepEqual(diagnostics, [['gemini-3.8-flash-tts', 1, waits[0]]]);
+});
+
+test('transcription retries only generation and cleans uploads after recovery or cancelled backoff', async () => {
+  for (const cancel of [false, true]) {
+    const calls = [];
+    const controller = new AbortController();
+    let attempts = 0;
+    const service = new GeminiSpeech({
+      sleep: async () => {},
+      onRetry: () => {
+        if (cancel) controller.abort();
+      },
+      fetch: async (url, init) => {
+        calls.push(init.method + ' ' + url);
+        if (init.method === 'DELETE') return response({});
+        if (url.endsWith('/files'))
+          return response(undefined, {
+            headers: { 'x-goog-upload-url': 'https://generativelanguage.googleapis.com/session' },
+          });
+        if (url.endsWith('/session'))
+          return response({
+            file: { name: 'files/retry', uri: 'https://generativelanguage.googleapis.com/file' },
+          });
+        if (++attempts === 1)
+          return response({ error: { code: 'rate_limit_exceeded' } }, { status: 429 });
+        return response({ output_text: 'The lantern glows.' });
+      },
+    });
+    const result = service.transcribe(
+      'abcdefghijk',
+      Buffer.from('synthetic').toString('base64'),
+      'audio/webm',
+      controller.signal,
+    );
+    if (cancel) await assert.rejects(result, (e) => e.code === 'cancelled');
+    else assert.equal(await result, 'The lantern glows.');
+    assert.equal(attempts, cancel ? 1 : 2);
+    assert.equal(calls.filter((call) => call.endsWith('/session')).length, 1);
+    assert.equal(
+      calls.at(-1),
+      'DELETE https://generativelanguage.googleapis.com/v1beta/files/retry',
+    );
+  }
+});
+
+test('upload rate limits do not retry or start transcription', async () => {
+  let calls = 0;
+  const service = new GeminiSpeech({
+    sleep: async () => assert.fail('must not retry upload'),
+    fetch: async () => {
+      calls++;
+      return response({ error: { code: 'rate_limit_exceeded' } }, { status: 429 });
+    },
+  });
+  await assert.rejects(
+    service.transcribe('abcdefghijk', Buffer.from('synthetic').toString('base64'), 'audio/webm'),
+    (e) => e.code === 'quota',
+  );
+  assert.equal(calls, 1);
+});
+
 test('speech reports HTTP status and documented API codes with actionable safe messages', async () => {
   for (const [status, apiCode, category, guidance] of [
     [400, 'invalid_request', 'invalid_request', /request parameters/],
@@ -253,6 +512,7 @@ test('speech reports HTTP status and documented API codes with actionable safe m
   ]) {
     let requests = 0;
     const service = new GeminiSpeech({
+      sleep: async () => {},
       fetch: async () => {
         requests++;
         return response(
@@ -279,7 +539,7 @@ test('speech reports HTTP status and documented API codes with actionable safe m
         return true;
       },
     );
-    assert.equal(requests, 1, 'Failures do not automatically retry billed requests');
+    assert.equal(requests, status === 429 && apiCode === 'rate_limit_exceeded' ? 5 : 1);
   }
 });
 

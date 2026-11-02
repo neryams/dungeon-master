@@ -155,7 +155,11 @@ else {
       );
       const speech = new SpeechService(
         credentials,
-        new GeminiSpeech(),
+        new GeminiSpeech({
+          onRetry: (model, attempt, delayMs) => {
+            console.info(`[speech] ${model}: HTTP 429; retry ${attempt}/4 in ${delayMs} ms`);
+          },
+        }),
         (state) => broadcast('speech:settings', state),
         (active) => broadcast('speech:recording', active),
       );
