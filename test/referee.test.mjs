@@ -562,7 +562,11 @@ test('section citations survive replay, export and exact retries; invalid new ci
   await mkdir(runtime);
   await cp(resolve('dist'), join(runtime, 'dist'), { recursive: true });
   await writeFile(join(runtime, 'package.json'), '{"type":"module"}');
-  await symlink(resolve('node_modules'), join(runtime, 'node_modules'), 'dir');
+  await symlink(
+    resolve('node_modules'),
+    join(runtime, 'node_modules'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
   const { CampaignService: OfflineService } = await import(
     pathToFileURL(join(runtime, 'dist/service.js')).href
   );

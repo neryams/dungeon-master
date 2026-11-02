@@ -19,6 +19,11 @@ module.exports = {
         'Dungeon Master uses the microphone only when you record speech to dictate a message to the DM.',
     },
   },
+  win: {
+    icon: 'build/dungeon-master.ico',
+    target: ['nsis', 'zip'],
+    signAndEditExecutable: false,
+  },
   dmg: {
     title: 'Dungeon Master',
     artifactName: '${productName}-${version}-${arch}.${ext}',
@@ -28,7 +33,7 @@ module.exports = {
     {
       from: 'build/desktop-node',
       to: 'node',
-      filter: ['bin/node', 'LICENSE'],
+      filter: ['bin/node', 'bin/node.exe', 'LICENSE'],
     },
   ],
 };

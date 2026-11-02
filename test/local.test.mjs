@@ -257,7 +257,11 @@ test('local model/context switches cannot resume a different model session or al
     seen.map((s) => s.conversationId),
     [undefined, 'thread-1', undefined, undefined],
   );
-  assert.ok(seen.every((s) => s.env.CODEX_HOME.endsWith('ollama-workspace/codex-home')));
+  assert.ok(
+    seen.every((s) =>
+      s.env.CODEX_HOME.replaceAll('\\', '/').endsWith('ollama-workspace/codex-home'),
+    ),
+  );
   const catalog = JSON.parse(await readFile(seen.at(-1).modelCatalog, 'utf8'));
   assert.deepEqual(catalog.models[0].input_modalities, ['text', 'image']);
   assert.equal(catalog.models[0].slug, 'custom:two');

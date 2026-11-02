@@ -120,7 +120,11 @@ test('workspace traversal and symlinks cannot escape through record tools', asyn
     service.execute('read_campaign_record', { reference: 'record:../../secret' }),
   );
   await writeFile(join(parent, 'secret.md'), 'private');
-  await symlink(join(parent, 'secret.md'), join(store.root, 'journal', 'escape.md'));
+  await symlink(
+    join(parent, 'secret.md'),
+    join(store.root, 'journal', 'escape.md'),
+    process.platform === 'win32' ? 'junction' : undefined,
+  );
   await assert.rejects(service.execute('campaign_status', {}), { code: 'INVALID_PATH' });
 });
 test('malicious archive assets fail before creating a destination', async (t) => {

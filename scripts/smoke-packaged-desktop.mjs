@@ -1,17 +1,18 @@
-import { access, mkdtemp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { _electron } from 'playwright-core';
 
+const isWindows = process.platform === 'win32';
 const smokeArgs = process.argv.slice(2);
-const appBundle = resolve(
-  smokeArgs.find((arg) => !arg.startsWith('--')) ?? 'release/mac-arm64/Dungeon Master.app',
-);
-const resources = join(appBundle, 'Contents/Resources');
+const defaultBundle = isWindows ? 'release/win-unpacked' : 'release/mac-arm64/Dungeon Master.app';
+const appBundle = resolve(smokeArgs.find((arg) => !arg.startsWith('--')) ?? defaultBundle);
+const resources = isWindows ? join(appBundle, 'resources') : join(appBundle, 'Contents/Resources');
 const appDir = join(resources, 'app');
-const node = join(resources, 'node/bin/node');
+const node = join(resources, isWindows ? 'node/bin/node.exe' : 'node/bin/node');
 
 function run(binary, args, options = {}) {
   const result = spawnSync(binary, args, { encoding: 'utf8', ...options });
@@ -25,42 +26,26 @@ async function main() {
   const version = run(node, ['--version']);
   if (version !== 'v22.23.3') throw new Error(`Unexpected bundled runtime: ${version}`);
   const architecture = run(node, ['-p', 'process.arch']);
-  if (architecture !== 'arm64')
+  const expectedArch = isWindows ? 'x64' : 'arm64';
+  if (architecture !== expectedArch)
     throw new Error(`Unexpected bundled runtime architecture: ${architecture}`);
-  try {
-    await access(join(resources, 'speech'));
-    throw new Error('Packaged app unexpectedly contains a speech model resource bundle.');
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
+  if (existsSync(join(resources, 'speech')))
+    throw new Error('Packaged app unexpectedly contains speech model assets.');
   for (const path of [
     'scripts/package-speech.mjs',
     'scripts/setup-speech.mjs',
     'scripts/phonon-speech.py',
+    'gemini-credentials.bin',
   ]) {
-    try {
-      await access(join(appDir, path));
-      throw new Error(`Packaged app unexpectedly contains obsolete speech tooling: ${path}`);
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
+    if (existsSync(join(appDir, path)))
+      throw new Error(`Packaged app unexpectedly contains excluded file: ${path}`);
   }
   for (const name of ['speech-install', 'speech-runtime']) {
     for (const extension of ['js', 'js.map', 'd.ts', 'd.ts.map']) {
       const path = join(appDir, 'dist/desktop', `${name}.${extension}`);
-      try {
-        await access(path);
+      if (existsSync(path))
         throw new Error(`Packaged app unexpectedly contains obsolete speech output: ${path}`);
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
     }
-  }
-  try {
-    await access(join(appDir, 'gemini-credentials.bin'));
-    throw new Error('Packaged app unexpectedly contains a Gemini credential file.');
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
   }
   run(node, ['dist/cli.js', '--help'], { cwd: appDir });
   run(
@@ -77,6 +62,18 @@ async function main() {
   try {
     // A fresh profile with no external tools, cached models or inherited credentials.
     const cleanEnvironment = {
+      ...(isWindows
+        ? {
+            SystemRoot: process.env.SystemRoot ?? 'C:\\Windows',
+            WINDIR: process.env.WINDIR ?? 'C:\\Windows',
+            COMSPEC: process.env.COMSPEC ?? 'C:\\Windows\\System32\\cmd.exe',
+            USERPROFILE: temporary,
+            APPDATA: join(temporary, 'appdata'),
+            LOCALAPPDATA: join(temporary, 'localappdata'),
+            TEMP: temporary,
+            TMP: temporary,
+          }
+        : {}),
       HOME: temporary,
       TMPDIR: temporary,
       PATH: dirname(node),
@@ -88,7 +85,9 @@ async function main() {
     run(node, ['--input-type=module', '-e', createSmoke], { env: cleanEnvironment });
 
     if (smokeArgs.includes('--launch')) {
-      const executable = join(appBundle, 'Contents/MacOS/Dungeon Master');
+      const executable = isWindows
+        ? join(appBundle, 'Dungeon Master.exe')
+        : join(appBundle, 'Contents/MacOS/Dungeon Master');
       const app = await _electron.launch({
         executablePath: executable,
         args: [],
@@ -107,7 +106,7 @@ async function main() {
       }
     }
   } finally {
-    await rm(temporary, { recursive: true, force: true });
+    await rm(temporary, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
   console.log(`Packaged app smoke passed: ${appBundle}`);
 }
