@@ -35,6 +35,8 @@ test(
     });
     const page = await app.firstWindow();
     await page.waitForSelector('#create-form');
+    await page.locator('#speech-dialog').waitFor({ state: 'visible' });
+    await page.locator('#speech-skip').click();
     await page.evaluate((root) => {
       window.__fixtureRoot = root;
     }, store.root);

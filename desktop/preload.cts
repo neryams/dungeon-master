@@ -33,12 +33,27 @@ const api: DesktopApi = {
   snapshot: () => invoke('snapshot'),
   map: (input) => invoke('map', input),
   speech: (input) => invoke('speech', input),
-  speechStatus: () => invoke('speechStatus'),
   cancelSpeech: () => invoke('cancelSpeech'),
-  speechSetupStatus: () => invoke('speechSetupStatus'),
-  installSpeech: (input) => invoke('installSpeech', input),
-  declineSpeech: () => invoke('declineSpeech'),
-  cancelSpeechInstall: () => invoke('cancelSpeechInstall'),
+  speechSettings: () => invoke('speechSettings'),
+  saveSpeechKey: (input) => invoke('saveSpeechKey', input),
+  removeSpeechKey: () => invoke('removeSpeechKey'),
+  previewSpeech: (input) => invoke('previewSpeech', input),
+  transcribe: (input) => invoke('transcribe', input),
+  cancelTranscription: () => invoke('cancelTranscription'),
+  setRecording: (active) => invoke('setRecording', active),
+  onSpeechChange: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('#desktop/contracts').SpeechSettingsState,
+    ) => callback(state);
+    ipcRenderer.on('speech:settings', listener);
+    return () => ipcRenderer.removeListener('speech:settings', listener);
+  },
+  onRecordingChange: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, active: boolean) => callback(active);
+    ipcRenderer.on('speech:recording', listener);
+    return () => ipcRenderer.removeListener('speech:recording', listener);
+  },
   openSpeechLink: (link) => invoke('openSpeechLink', link),
   stop: () => invoke('stop'),
   startLan: () => invoke('startLan'),

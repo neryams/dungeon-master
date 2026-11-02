@@ -59,6 +59,7 @@ export class LanGame {
         [
           'lan.html',
           'lan.js',
+          'dictation.js',
           'lan.css',
           'dom.js',
           'markdown.js',

@@ -9,6 +9,7 @@ import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
 import { rollCard } from './roll-cards.js';
 import { DicePromptSound } from './dice-prompt-sound.js';
+import { DictationController } from './dictation.js';
 const dicePromptSound = new DicePromptSound();
 document.addEventListener('pointerdown', () => dicePromptSound.unlock(), { capture: true });
 document.addEventListener('keydown', () => dicePromptSound.unlock(), { capture: true });
@@ -33,6 +34,8 @@ const tags = {
   'roll-submit': 'button',
   intentions: 'div',
   compose: 'form',
+  dictation: 'button',
+  'dictation-status': 'span',
   acting: 'label',
   text: 'textarea',
   save: 'button',
@@ -57,6 +60,47 @@ const tags = {
   journal: 'div',
 } as const;
 const $ = elements(tags);
+let localDictation: DictationController | undefined;
+let dictationContext = '';
+if (window.speechInput) {
+  const dictation = (localDictation = new DictationController({
+    api: window.speechInput,
+    contextKey: () =>
+      `${location.host}:${state?.campaign.id ?? ''}:${state?.self.characterId ?? ''}:${state?.gathering?.epoch ?? ''}`,
+    append: (transcript) => {
+      $('text').value =
+        `${$('text').value.trimEnd()}${$('text').value.trim() ? ' ' : ''}${transcript}`;
+      dirty = true;
+    },
+    onState: (next) => {
+      $('dictation').textContent =
+        next.status === 'recording'
+          ? 'Stop recording'
+          : next.status === 'transcribing'
+            ? 'Transcribing…'
+            : 'Record dictation';
+      $('dictation').disabled = ['requesting', 'transcribing'].includes(next.status);
+      $('dictation-status').textContent =
+        next.error ??
+        (next.status === 'recording'
+          ? 'Recording (up to 2 minutes)'
+          : next.status === 'transcribing'
+            ? 'Sending audio to Google for transcription…'
+            : '');
+    },
+  }));
+  void window.speechInput.speechSettings().then((settings) => {
+    $('dictation').hidden = !settings.available;
+    if (!settings.available) void dictation.cancel();
+  });
+  window.speechInput.onSpeechChange((settings) => {
+    $('dictation').hidden = !settings.available;
+    if (!settings.available) void dictation.cancel();
+  });
+  window.speechInput.onRecordingChange(() => {});
+  $('dictation').onclick = () =>
+    void (dictation.getState().status === 'recording' ? dictation.stop() : dictation.start());
+}
 const key = `dm-lan:${location.host}`;
 let invitation = location.hash.slice(1);
 history.replaceState(null, '', '/');
@@ -182,6 +226,9 @@ $('join').addEventListener('submit', async (e) => {
 $('roll-submit').addEventListener('click', () => void submitRoll());
 const nameOf = (id: string) => state.party.members.find((p) => p.id === id)?.name ?? id;
 function render() {
+  const nextDictationContext = `${location.host}:${state.campaign.id}:${state.self.characterId ?? ''}:${state.gathering?.epoch ?? ''}`;
+  if (dictationContext && dictationContext !== nextDictationContext) void localDictation?.cancel();
+  dictationContext = nextDictationContext;
   $('join').hidden = true;
   $('game').hidden = false;
   $('title').textContent = state.campaign.name;

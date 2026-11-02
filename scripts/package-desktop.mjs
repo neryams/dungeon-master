@@ -16,12 +16,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
-import { prepareSpeechBundle } from './package-speech.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(root, 'build/desktop-app');
 const runtimeDir = join(root, 'build/desktop-node');
-const speechDir = join(root, 'build/desktop-speech');
 export const NODE_VERSION = '22.23.3';
 export const NODE_SHA256 = '72d5d8832b41c9d9646197af614ffd751406ea4d215060eb91b98864e1919a3e';
 export const NODE_WIN_X64_SHA256 =
@@ -56,7 +54,6 @@ export const APP_FILES = [
   'skills',
   'examples',
   'rules',
-  'licenses',
 ];
 export const PLUGIN_DOCS = [
   'docs/desktop.md',
@@ -122,15 +119,11 @@ async function stageApp() {
     await mkdir(join(appDir, 'docs'), { recursive: true });
     await copyFile(join(root, path), join(appDir, path));
   }
-  // Speech inference is optional; only the small local sidecar source ships with the app.
-  try {
-    await mkdir(join(appDir, 'scripts'), { recursive: true });
-    await copyFile(
-      join(root, 'scripts/phonon-speech.py'),
-      join(appDir, 'scripts/phonon-speech.py'),
-    );
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+  // TypeScript does not remove outputs for deleted sources; strip legacy Phonon artifacts.
+  for (const extension of ['js', 'js.map', 'd.ts', 'd.ts.map']) {
+    for (const name of ['speech-install', 'speech-runtime']) {
+      await rm(join(appDir, 'dist/desktop', `${name}.${extension}`), { force: true });
+    }
   }
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   execFileSync(npmCmd, ['ci', '--omit=dev', '--no-audit', '--no-fund'], {
@@ -178,16 +171,6 @@ async function stageApp() {
 async function prepare() {
   const target = resolveTarget();
   await stageApp();
-  if (process.platform === 'darwin') {
-    const speech = await prepareSpeechBundle({ sourceRoot: root });
-    if (!speech.included) throw new Error('The desktop release requires a complete Phonon bundle.');
-  } else {
-    await rm(speechDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
-    await mkdir(speechDir, { recursive: true });
-    console.log(
-      'Skipping macOS-only Phonon speech bundle on Windows; local speech remains optional.',
-    );
-  }
   await rm(runtimeDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   await mkdir(runtimeDir, { recursive: true });
   await downloadNode(runtimeDir, target);

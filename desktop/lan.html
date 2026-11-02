@@ -44,6 +44,10 @@
         <form id="compose">
           <label id="acting" for="text">Your intention</label
           ><textarea id="text" maxlength="10000" rows="4"></textarea>
+          <div class="dictation-row">
+            <button type="button" id="dictation" hidden>Record dictation</button
+            ><span id="dictation-status" role="status"></span>
+          </div>
           <div class="buttons">
             <button type="button" id="save">Save draft</button
             ><button id="confirm">Confirm intention</button

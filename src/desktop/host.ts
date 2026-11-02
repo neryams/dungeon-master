@@ -29,10 +29,7 @@ import { LanGame } from './lan.js';
 import { providerModels } from './models.js';
 import type { ModelCatalog } from './contracts.js';
 import { ModelId } from './contracts.js';
-import { SpeechInput, type SpeechResult } from './contracts.js';
-import { SpeechRuntime } from './speech-runtime.js';
-import { SpeechInstaller } from './speech-install.js';
-import { SpeechInstallInput } from './contracts.js';
+import { SpeechInput, type SpeechTextResult } from './contracts.js';
 import { speechEligibleRevisions, speechParts } from './speech-text.js';
 import { NARRATION_GUIDANCE } from './narration-guidance.js';
 import { playerRollView, submitPlayerRoll, SubmitRollInput } from './player-roll.js';
@@ -47,9 +44,7 @@ import { SubmitInput as Submit, CreateInput as Create, MapInput } from './contra
 import type { DesktopSnapshot, DesktopEvent, MapResult, Stage } from './contracts.js';
 
 export class DesktopHost {
-  private speechRuntime?: SpeechRuntime;
   private speechGeneration = 0;
-  private speechInstaller?: SpeechInstaller;
   private store?: CampaignStore;
   private lan?: LanGame;
   private lanStarting?: Promise<LanGame>;
@@ -92,8 +87,6 @@ export class DesktopHost {
       driver?: (options: CodexOptions) => AgentDriver;
       probe?: typeof detectAntigravity;
       modelProbe?: typeof providerModels;
-      speechRuntime?: SpeechRuntime;
-      speechInstaller?: SpeechInstaller;
     },
   ) {}
 
@@ -892,45 +885,10 @@ export class DesktopHost {
         : {}),
     };
   }
-  private narrator() {
-    return (this.speechRuntime ??= this.options.speechRuntime ?? new SpeechRuntime());
-  }
-  private narrationSetup() {
-    return (this.speechInstaller ??=
-      this.options.speechInstaller ?? new SpeechInstaller({ sourceRoot: this.options.source }));
-  }
-  speechSetupStatus() {
-    return this.narrationSetup().status();
-  }
-  async installSpeech(raw: SpeechInstallInput) {
-    const parsed = SpeechInstallInput.safeParse(raw);
-    if (!parsed.success)
-      throw new Error('Confirm the narration terms and provide a valid download credential.');
-    await this.cancelSpeech();
-    return this.narrationSetup().install(parsed.data);
-  }
-  async declineSpeech() {
-    await this.cancelSpeech();
-    return this.narrationSetup().decline();
-  }
-  async cancelSpeechInstall() {
-    await this.cancelSpeech();
-    return this.narrationSetup().cancel();
-  }
-  closeSpeechSetup() {
-    this.speechInstaller?.close();
-  }
-  async speechStatus() {
-    const setup = await this.speechSetupStatus();
-    if (!setup.accepted || setup.phase !== 'ready')
-      return { available: false, detail: setup.detail };
-    return this.narrator().status();
-  }
   async cancelSpeech() {
     ++this.speechGeneration;
-    this.speechRuntime?.cancel();
   }
-  async speech(raw: SpeechInput): Promise<SpeechResult> {
+  async speechText(raw: SpeechInput): Promise<SpeechTextResult> {
     const input = SpeechInput.parse(raw);
     const store = this.requireStore();
     const generation = this.speechGeneration;
@@ -940,22 +898,19 @@ export class DesktopHost {
     if (store !== this.store || generation !== this.speechGeneration || this.changing)
       throw new Error('Reading cancelled.');
     if (state.reviewMode === 'setup') throw new Error('Narration is available during play.');
-    const setup = await this.speechSetupStatus();
-    if (!setup.accepted || setup.phase !== 'ready')
-      throw new Error('Set up optional narration before reading messages aloud.');
-    if (store !== this.store || generation !== this.speechGeneration)
-      throw new Error('Reading cancelled.');
     const message = state.table
       ?.find((turn) => turn.id === input.turnId)
       ?.messages.find((entry) => entry.revision === input.revision);
     if (!message) throw new Error('That public DM message is unavailable.');
+    if (!speechEligibleRevisions(await store.events()).includes(input.revision))
+      throw new Error('Setup messages cannot be narrated.');
     const parts = speechParts(message.text);
-    if (!parts.length && input.part === 0) return { audio: '' };
+    if (!parts.length && input.part === 0) return { text: '' };
     if (input.part >= parts.length) throw new Error('That message part is unavailable.');
-    const audio = await this.narrator().synthesize(parts[input.part], input.voice);
+    const text = parts[input.part];
     if (store !== this.store || generation !== this.speechGeneration)
       throw new Error('Reading cancelled.');
-    return { audio, ...(input.part + 1 < parts.length ? { nextPart: input.part + 1 } : {}) };
+    return { text, ...(input.part + 1 < parts.length ? { nextPart: input.part + 1 } : {}) };
   }
   async map(raw: MapInput): Promise<MapResult> {
     const input = MapInput.parse(raw);
@@ -1051,8 +1006,6 @@ export class DesktopHost {
   }
   async close() {
     await this.cancelSpeech();
-    this.speechRuntime?.close();
-    this.speechRuntime = undefined;
     await this.stopLan();
     await this.stop();
     await this.activityBus?.close();

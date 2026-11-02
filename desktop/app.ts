@@ -9,7 +9,8 @@ import type {
   LocalSettings,
   ModelCatalog,
   Provider,
-  SpeechInstallState,
+  SpeechSettingsState,
+  SpeechVoice,
 } from '#desktop/contracts';
 import { elements, node, errorMessage } from './dom.js';
 import { markdownMessage } from './markdown.js';
@@ -24,6 +25,8 @@ import { NarrationAudio } from './narration-audio.js';
 import { DiceFeedback } from './dice-feedback.js';
 import { rollCard } from './roll-cards.js';
 import { DicePromptSound } from './dice-prompt-sound.js';
+import { DictationController } from './dictation.js';
+import { SPEECH_VOICES } from './speech-voices.js';
 const tags = {
   'campaign-heading': 'div',
   revision: 'span',
@@ -34,20 +37,19 @@ const tags = {
   stop: 'button',
   'speech-settings': 'button',
   'speech-dialog': 'dialog',
-  'speech-intro': 'p',
-  'speech-license-info': 'p',
-  'speech-download-info': 'p',
-  'speech-license-link': 'button',
-  'speech-model-link': 'button',
-  'speech-access-link': 'button',
-  'speech-token-link': 'button',
-  'speech-consent': 'input',
-  'speech-token': 'input',
-  'speech-token-label': 'label',
+  'speech-help-link': 'button',
+  'speech-keys-link': 'button',
+  'speech-key': 'input',
+  'speech-key-state': 'p',
+  'speech-autoplay': 'input',
+  'speech-voice': 'select',
   'speech-status': 'p',
-  'speech-install': 'button',
-  'speech-cancel': 'button',
-  'speech-close': 'button',
+  'speech-save': 'button',
+  'speech-test': 'button',
+  'speech-remove': 'button',
+  'speech-skip': 'button',
+  dictation: 'button',
+  'dictation-status': 'span',
   'model-dialog': 'dialog',
   'model-current': 'p',
   'switch-model': 'select',
@@ -140,7 +142,6 @@ const tags = {
   'roll-error': 'p',
   'roll-submit': 'button',
   'narration-controls': 'div',
-  'narration-voice': 'select',
   'narration-mute': 'button',
   'narration-skip': 'button',
   'narration-status': 'span',
@@ -246,29 +247,38 @@ function receiveUpdate(update: DesktopEvent) {
   scheduleRefresh();
 }
 const unsubscribeUpdates = api.onUpdate(receiveUpdate);
-const narrationStorageKey = 'dungeon-master.narration.v1';
+const narrationStorageKey = 'dungeon-master.narration.v2';
 function savedNarration(): { enabled: boolean; voice: NarrationVoice } {
   try {
-    const saved = JSON.parse(localStorage.getItem(narrationStorageKey) ?? 'null');
-    if (saved && typeof saved.enabled === 'boolean' && ['Easton', 'Zoey'].includes(saved.voice))
-      return { enabled: saved.enabled, voice: saved.voice };
+    const saved = JSON.parse(
+      localStorage.getItem(narrationStorageKey) ??
+        localStorage.getItem('dungeon-master.narration.v1') ??
+        'null',
+    );
+    if (saved && typeof saved.enabled === 'boolean')
+      return {
+        enabled: saved.enabled,
+        voice: SPEECH_VOICES.includes(saved.voice) ? saved.voice : 'Kore',
+      };
   } catch {
     /* Missing or inaccessible storage uses the documented defaults. */
   }
-  return { enabled: true, voice: 'Easton' };
+  return { enabled: false, voice: 'Kore' };
 }
 const narrationAudio = new NarrationAudio();
-let narrationAvailable: boolean | undefined;
-let speechInstallState: SpeechInstallState | undefined;
-let firstSpeechPromptChecked = false;
-let speechSetupPoll: number | undefined;
-let speechInstallBusy = false;
+let speechSettings: SpeechSettingsState | undefined;
+let speechSaving = false;
+let speechTesting = false;
+let initialSpeechPromptShown = false;
+let dictationObservedContext = '';
+let previewGeneration = 0;
+let recordingActive = false;
 let resolvingSince: number | undefined;
 const narration = new NarrationController(
   {
     synthesize: (message, voice, part) => {
-      if (speechInstallState?.phase !== 'ready')
-        return Promise.reject(new Error('Narration setup is not complete.'));
+      if (!speechSettings?.available)
+        return Promise.reject(new Error('Add a Google AI Studio API key in Speech settings.'));
       return api.speech({
         campaignId: message.campaignId,
         turnId: message.turnId,
@@ -284,6 +294,54 @@ const narration = new NarrationController(
   },
   savedNarration(),
 );
+for (const voice of SPEECH_VOICES)
+  $('speech-voice').add(new Option(`${voice}${voice === 'Kore' ? ' (default)' : ''}`, voice));
+const dictation = new DictationController({
+  api,
+  contextKey: () => `${state?.root ?? ''}:${state?.campaign?.id ?? ''}:${selected ?? ''}`,
+  append: (text) => {
+    const draft = $('action');
+    draft.value = `${draft.value.trimEnd()}${draft.value.trim() ? ' ' : ''}${text}`;
+    draft.focus();
+  },
+  onState: (next) => {
+    $('dictation').textContent =
+      next.status === 'recording'
+        ? 'Stop recording'
+        : next.status === 'transcribing'
+          ? 'Transcribing…'
+          : 'Record dictation';
+    $('dictation').disabled = ['requesting', 'transcribing'].includes(next.status);
+    $('dictation-status').textContent =
+      next.error ??
+      (next.status === 'recording'
+        ? 'Recording (up to 2 minutes)'
+        : next.status === 'transcribing'
+          ? 'Sending audio to Google for transcription…'
+          : '');
+  },
+});
+api.onSpeechChange((next) => {
+  speechSettings = next;
+  if (!next.available) {
+    previewGeneration += 1;
+    narrationAudio.stop();
+    narration.setSuspended(true);
+    void dictation.cancel();
+  } else narration.setSuspended(recordingActive);
+  renderNarration();
+  updateSpeechSettingsDialog();
+});
+api.onRecordingChange((recording) => {
+  recordingActive = recording;
+  if (recording) {
+    ++previewGeneration;
+    narrationAudio.stop();
+  }
+  narration.setSuspended(recording || !speechSettings?.available);
+  renderNarration();
+  renderSpeechTestButton();
+});
 function saveNarration() {
   const { enabled, voice } = narration.getState();
   try {
@@ -303,16 +361,21 @@ function narrationSnapshot(snapshot: CampaignSnapshot): NarrationSnapshot {
         campaignId: snapshot.campaign.id,
         turnId: turn.id,
         revision: message.revision,
-        eligible: speechInstallState?.phase === 'ready' && eligible.has(message.revision),
+        eligible: speechSettings?.available === true && eligible.has(message.revision),
       })),
     ),
   };
 }
 function renderNarration() {
+  const context = `${state?.campaign?.id ?? ''}:${selected ?? ''}`;
+  if (dictationObservedContext && context !== dictationObservedContext) void dictation.cancel();
+  dictationObservedContext = context;
+  $('dictation').disabled =
+    !speechSettings?.available ||
+    ['requesting', 'transcribing'].includes(dictation.getState().status);
   const current = narration.getState();
   const active = !!state?.campaign && state.reviewMode !== 'setup' && !$('play').hidden;
   $('narration-controls').hidden = !active;
-  $('narration-voice').value = current.voice;
   $('narration-mute').textContent = current.enabled ? 'Mute narration' : 'Enable narration';
   $('narration-mute').setAttribute('aria-pressed', String(!current.enabled));
   $('narration-skip').disabled = !['preparing', 'reading'].includes(current.activity);
@@ -325,8 +388,8 @@ function renderNarration() {
           ? `Reading · ${current.voice}${current.enabled ? '' : ' · Automatic narration muted'}`
           : !current.enabled
             ? 'Automatic narration muted'
-            : narrationAvailable === false
-              ? 'Narration is not installed on this computer.'
+            : !speechSettings?.available
+              ? 'Add a Google AI Studio API key in Speech settings.'
               : `New DM messages will be read by ${current.voice}.`;
   for (const button of document.querySelectorAll<HTMLButtonElement>('.message-read')) {
     const reading =
@@ -338,162 +401,91 @@ function renderNarration() {
       reading ? 'Stop reading this message' : `Read this message aloud with ${current.voice}`,
     );
     button.setAttribute('aria-pressed', String(reading));
-    button.disabled = speechInstallState?.phase !== 'ready';
+    button.disabled = !speechSettings?.available || recordingActive;
   }
 }
 async function checkNarration() {
   try {
-    speechInstallState = await api.speechSetupStatus();
-    narrationAvailable = speechInstallState.phase === 'ready';
+    speechSettings = await api.speechSettings();
   } catch {
-    narrationAvailable = false;
+    speechSettings = { configured: false, available: false, tested: false, detail: '' };
   }
-  updateSpeechSetupDialog();
+  updateSpeechSettingsDialog();
   renderNarration();
-}
-function updateSpeechSetupDialog() {
-  const current = speechInstallState;
-  if (!current) return;
-  const bundled = current.bundled === true;
-  $('speech-consent').disabled = current.phase === 'installing';
-  $('speech-token').disabled = bundled || current.phase === 'installing';
-  $('speech-license-info').hidden = current.phase === 'ready';
-  $('speech-download-info').hidden = bundled || current.phase === 'ready';
-  $('speech-token-label').hidden = bundled || current.phase === 'ready';
-  $('speech-install').disabled =
-    speechInstallBusy ||
-    current.phase === 'installing' ||
-    current.phase === 'ready' ||
-    !$('speech-consent').checked;
-  $('speech-install').textContent = bundled
-    ? current.phase === 'error'
-      ? 'Try narration again'
-      : 'Agree & enable narration'
-    : current.phase === 'error'
-      ? 'Agree & retry installation'
-      : 'Agree & install narration';
-  $('speech-cancel').hidden = current.phase !== 'installing';
-  $('speech-close').disabled = false;
-  $('speech-close').textContent =
-    current.phase === 'ready'
-      ? 'Done'
-      : current.phase === 'installing'
-        ? 'Continue playing'
-        : 'Skip for now';
-  $('speech-consent').closest('label')!.hidden = current.phase === 'ready';
-  $('speech-intro').textContent =
-    current.phase === 'ready'
-      ? bundled
-        ? 'Narration is enabled. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
-        : 'Narration is installed and ready. New DM messages can be read aloud with a local Phonon voice. Automatic narration can be muted in the conversation controls.'
-      : bundled
-        ? 'Dungeon Master includes optional Phonon narration. Accept its noncommercial license to enable it. Speech runs locally on this computer. You can skip this and play normally, or change this later from Narration setup.'
-        : 'Dungeon Master can read new DM messages aloud with a local Phonon voice. The speech model downloads to this computer and runs locally. Text is sent to the local speech engine only. You can skip this and play normally, or set it up later from Narration setup.';
-  $('speech-status').textContent =
-    bundled && current.phase === 'ready'
-      ? 'Narration is ready.'
-      : bundled && current.phase === 'error'
-        ? safeSpeechDetail(current.detail)
-        : bundled && current.phase === 'declined'
-          ? 'Narration is off. You can still play normally and enable it later.'
-          : current.phase === 'installing'
-            ? safeSpeechDetail(current.detail) ||
-              'Installing narration… This can take a few minutes. You can keep playing while it installs.'
-            : current.phase === 'error'
-              ? safeSpeechDetail(current.detail) ||
-                'Narration could not be installed. Check model access and try again.'
-              : current.phase === 'declined'
-                ? 'Narration is off. You can still play normally and set it up later.'
-                : current.phase === 'ready'
-                  ? safeSpeechDetail(current.detail) || 'Narration is ready.'
-                  : safeSpeechDetail(current.detail) ||
-                    'Optional: install local narration when you are ready.';
-  if (!firstSpeechPromptChecked) {
-    firstSpeechPromptChecked = true;
-    if (current.phase === 'unconfigured') {
-      if (current.accepted) $('speech-consent').checked = true;
-      $('speech-dialog').showModal();
-      $('speech-install').disabled = !current.accepted;
-    }
-  }
-  if (current.phase === 'installing') monitorSpeechSetup();
-  renderNarration();
-}
-function safeSpeechDetail(detail: string) {
-  return detail.replace(/hf_[A-Za-z0-9_-]{10,}/g, '[hidden token]');
-}
-function monitorSpeechSetup() {
-  if (speechSetupPoll !== undefined) return;
-  speechSetupPoll = window.setInterval(() => {
-    void api
-      .speechSetupStatus()
-      .then((next) => {
-        speechInstallState = next;
-        narrationAvailable = next.phase === 'ready';
-        updateSpeechSetupDialog();
-        if (next.phase !== 'installing') {
-          window.clearInterval(speechSetupPoll);
-          speechSetupPoll = undefined;
-        }
-      })
-      .catch((error) => {
-        $('speech-status').textContent = safeSpeechDetail(errorMessage(error));
-        if (speechSetupPoll !== undefined) window.clearInterval(speechSetupPoll);
-        speechSetupPoll = undefined;
-      });
-  }, 1000);
-}
-function showSpeechSetup() {
-  if (!speechInstallState) void checkNarration().then(() => $('speech-dialog').showModal());
-  else {
-    if (speechInstallState.phase === 'installing') monitorSpeechSetup();
-    $('speech-dialog').showModal();
+  if (!initialSpeechPromptShown) {
+    initialSpeechPromptShown = true;
+    if (!speechSettings?.configured) $('speech-dialog').showModal();
   }
 }
-async function skipSpeechSetup() {
-  if (speechInstallState?.phase === 'unconfigured' && !speechInstallState.accepted)
-    speechInstallState = await api.declineSpeech();
-  $('speech-token').value = '';
-  if (speechInstallState?.phase === 'declined') $('speech-consent').checked = false;
-  if (state?.campaign) narration.reset(narrationSnapshot(state));
-  updateSpeechSetupDialog();
+function updateSpeechSettingsDialog() {
+  $('speech-key-state').textContent = speechSettings?.configured
+    ? 'An API key is saved. It is stored securely and never shown here.'
+    : 'No API key is saved.';
+  $('speech-remove').hidden = !speechSettings?.configured;
+  $('speech-save').disabled = speechSaving || !$('speech-key').value.trim();
+  $('speech-save').textContent = speechSettings?.configured ? 'Replace key' : 'Save key';
+  renderSpeechTestButton();
+  $('speech-status').textContent = speechSettings?.detail ?? '';
+  $('speech-voice').value = narration.getState().voice;
+  $('speech-autoplay').checked = narration.getState().enabled;
+}
+function renderSpeechTestButton() {
+  $('speech-test').disabled = speechTesting || !speechSettings?.available || recordingActive;
+  $('speech-test').textContent = speechTesting ? 'Testing…' : 'Test voice';
+}
+async function showSpeechSetup() {
+  $('speech-key').value = '';
+  await checkNarration();
+  $('speech-dialog').showModal();
+}
+function skipSpeechSetup() {
+  $('speech-key').value = '';
   $('speech-dialog').close();
 }
-async function installSpeech() {
-  if (!speechInstallState || !$('speech-consent').checked || speechInstallBusy) return;
-  const token = speechInstallState.bundled
-    ? undefined
-    : $('speech-token').value.trim() || undefined;
-  $('speech-token').value = '';
-  speechInstallBusy = true;
-  updateSpeechSetupDialog();
+async function saveSpeechKey() {
+  const key = $('speech-key').value.trim();
+  if (!key || speechSaving) return;
+  speechSaving = true;
+  $('speech-key').value = '';
+  let failure: string | undefined;
   try {
-    speechInstallState = await api.installSpeech({
-      accepted: true,
-      licenseRevision: speechInstallState.licenseRevision,
-      ...(token ? { token } : {}),
-    });
-    narrationAvailable = speechInstallState.phase === 'ready';
-    updateSpeechSetupDialog();
-    if (speechInstallState.phase === 'installing') monitorSpeechSetup();
+    speechSettings = await api.saveSpeechKey({ key });
   } catch (error) {
-    $('speech-status').textContent = safeSpeechDetail(errorMessage(error));
+    failure = errorMessage(error);
   } finally {
-    speechInstallBusy = false;
-    updateSpeechSetupDialog();
+    speechSaving = false;
+    $('speech-key').value = '';
+    updateSpeechSettingsDialog();
+    if (failure) $('speech-status').textContent = failure;
+    renderNarration();
   }
 }
-async function cancelSpeechSetup() {
-  speechInstallState = await api.cancelSpeechInstall();
-  if (speechSetupPoll !== undefined) window.clearInterval(speechSetupPoll);
-  speechSetupPoll = undefined;
-  $('speech-token').value = '';
-  $('speech-consent').checked = false;
-  narrationAvailable = speechInstallState.phase === 'ready';
-  updateSpeechSetupDialog();
+async function removeSpeechKey() {
+  speechSettings = await api.removeSpeechKey();
+  narrationAudio.stop();
+  narration.skip();
+  await dictation.cancel();
+  updateSpeechSettingsDialog();
+  renderNarration();
 }
-async function openSpeechInfo(link: 'license' | 'model' | 'token') {
-  await api.openSpeechLink(link);
+async function testSpeechVoice() {
+  if (speechTesting || !speechSettings?.available || recordingActive) return;
+  const generation = ++previewGeneration;
+  speechTesting = true;
+  renderSpeechTestButton();
+  narrationAudio.stop();
+  try {
+    let result;
+    try {
+      result = await api.previewSpeech({ voice: narration.getState().voice as SpeechVoice });
+    } finally {
+      speechTesting = false;
+      renderSpeechTestButton();
+    }
+    if (generation === previewGeneration) await narrationAudio.play(result.audio);
+  } catch (error) {
+    if (generation === previewGeneration) $('speech-status').textContent = errorMessage(error);
+  }
 }
 function notice(error: unknown) {
   $('notice-text').textContent = errorMessage(error).replace(
@@ -1188,18 +1180,28 @@ on('dismiss', () => {
   $('notice').hidden = true;
 });
 on('speech-settings', showSpeechSetup);
-on('speech-close', skipSpeechSetup);
-on('speech-install', installSpeech);
-on('speech-cancel', cancelSpeechSetup);
-on('speech-license-link', () => openSpeechInfo('license'));
-on('speech-model-link', () => openSpeechInfo('model'));
-on('speech-access-link', () => openSpeechInfo('model'));
-on('speech-token-link', () => openSpeechInfo('token'));
-$('speech-consent').addEventListener('change', updateSpeechSetupDialog);
-$('speech-dialog').addEventListener('cancel', (event) => {
-  event.preventDefault();
-  void skipSpeechSetup().catch(notice);
+on('speech-skip', skipSpeechSetup);
+on('speech-save', saveSpeechKey);
+on('speech-remove', removeSpeechKey);
+on('speech-test', testSpeechVoice);
+on('speech-help-link', () => api.openSpeechLink('help'));
+on('speech-keys-link', () => api.openSpeechLink('keys'));
+$('speech-key').addEventListener('input', updateSpeechSettingsDialog);
+$('speech-voice').addEventListener('change', () => {
+  narration.setVoice($('speech-voice').value as NarrationVoice);
+  saveNarration();
 });
+$('speech-autoplay').addEventListener('change', () => {
+  narration.setEnabled($('speech-autoplay').checked);
+  saveNarration();
+});
+$('speech-dialog').addEventListener('cancel', () => {
+  $('speech-key').value = '';
+});
+$('dictation').addEventListener(
+  'click',
+  () => void (dictation.getState().status === 'recording' ? dictation.stop() : dictation.start()),
+);
 $('provider').onchange = () => {
   void (async () => {
     $('provider').disabled = true;
@@ -1568,12 +1570,6 @@ on('narration-mute', () => {
   saveNarration();
 });
 on('narration-skip', () => narration.skip());
-$('narration-voice').addEventListener('change', () => {
-  const voice = $('narration-voice').value;
-  if (voice !== 'Easton' && voice !== 'Zoey') return;
-  narration.setVoice(voice);
-  saveNarration();
-});
 window.addEventListener('beforeunload', () => {
   unsubscribeUpdates();
   if (mapRetryTimer !== undefined) window.clearTimeout(mapRetryTimer);

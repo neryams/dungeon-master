@@ -8,7 +8,7 @@
     "types": ["node"],
     "declaration": true
   },
-  "include": ["desktop/main.mts", "desktop/preload.cts"],
+  "include": ["desktop/main.mts", "desktop/preload.cts", "desktop/player-preload.cts"],
   "references": [
     {
       "path": "./tsconfig.json"

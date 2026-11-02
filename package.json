@@ -28,8 +28,7 @@
     "desktop:dist": "npm run build && node scripts/build-app-icon.mjs && node scripts/package-desktop.mjs --dist --arm64 --x64",
     "desktop:smoke": "node scripts/smoke-packaged-desktop.mjs",
     "test:desktop-package": "npm run build && node --test test/desktop-package.test.mjs",
-    "speech:setup": "npm run build && node scripts/setup-speech.mjs",
-    "test:desktop": "npm run build && node --test test/desktop-ui.mjs test/narration-ui.mjs test/speech-install-ui.mjs test/dice-feedback-ui.mjs test/player-roll-ui.mjs test/desktop-events-ui.mjs",
+    "test:desktop": "npm run build && node --test test/desktop-ui.mjs test/narration-ui.mjs test/speech-install-ui.mjs test/speech-main-ui.mjs test/dice-feedback-ui.mjs test/player-roll-ui.mjs test/desktop-events-ui.mjs",
     "test:antigravity": "npm run build && node --test test/integration/antigravity.mjs",
     "test:lan": "npm run build && node --test test/lan-ui.mjs",
     "test:codex": "npm run build && node --test test/integration/codex.mjs",
@@ -63,6 +62,10 @@
     "#desktop/contracts": {
       "types": "./src/desktop/contracts.ts",
       "default": "./dist/desktop/contracts.js"
+    },
+    "#desktop/*": {
+      "types": "./src/desktop/*.ts",
+      "default": "./dist/desktop/*.js"
     }
   }
 }

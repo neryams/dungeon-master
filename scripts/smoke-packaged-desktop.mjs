@@ -13,7 +13,6 @@ const appBundle = resolve(smokeArgs.find((arg) => !arg.startsWith('--')) ?? defa
 const resources = isWindows ? join(appBundle, 'resources') : join(appBundle, 'Contents/Resources');
 const appDir = join(resources, 'app');
 const node = join(resources, isWindows ? 'node/bin/node.exe' : 'node/bin/node');
-const hasBundledSpeech = existsSync(join(resources, 'speech/speech-assets.json'));
 
 function run(binary, args, options = {}) {
   const result = spawnSync(binary, args, { encoding: 'utf8', ...options });
@@ -30,6 +29,24 @@ async function main() {
   const expectedArch = isWindows ? 'x64' : 'arm64';
   if (architecture !== expectedArch)
     throw new Error(`Unexpected bundled runtime architecture: ${architecture}`);
+  if (existsSync(join(resources, 'speech')))
+    throw new Error('Packaged app unexpectedly contains speech model assets.');
+  for (const path of [
+    'scripts/package-speech.mjs',
+    'scripts/setup-speech.mjs',
+    'scripts/phonon-speech.py',
+    'gemini-credentials.bin',
+  ]) {
+    if (existsSync(join(appDir, path)))
+      throw new Error(`Packaged app unexpectedly contains excluded file: ${path}`);
+  }
+  for (const name of ['speech-install', 'speech-runtime']) {
+    for (const extension of ['js', 'js.map', 'd.ts', 'd.ts.map']) {
+      const path = join(appDir, 'dist/desktop', `${name}.${extension}`);
+      if (existsSync(path))
+        throw new Error(`Packaged app unexpectedly contains obsolete speech output: ${path}`);
+    }
+  }
   run(node, ['dist/cli.js', '--help'], { cwd: appDir });
   run(
     node,
@@ -61,69 +78,11 @@ async function main() {
       TMPDIR: temporary,
       PATH: dirname(node),
       LANG: 'en_US.UTF-8',
-      HF_HOME: join(temporary, 'empty-hugging-face'),
-      HF_HUB_OFFLINE: '1',
-      ...(hasBundledSpeech ? { DM_BUNDLED_SPEECH: join(resources, 'speech') } : {}),
-      DM_SPEECH_HOME: join(temporary, 'isolated-speech'),
       DM_DESKTOP_USER_DATA: join(temporary, 'isolated-profile'),
     };
     const hostUrl = pathToFileURL(join(appDir, 'dist/desktop/host.js')).href;
     const createSmoke = `import { DesktopHost } from ${JSON.stringify(hostUrl)}; const host = new DesktopHost({ source: ${JSON.stringify(appDir)} }); try { const created = await host.create({ parent: ${JSON.stringify(join(temporary, 'campaigns'))}, slug: 'smoke-campaign', name: 'Smoke Campaign', edition: '2024' }); if (created.campaign?.id !== 'smoke-campaign' || created.reviewMode !== 'setup' || created.revision !== 1) throw new Error('Packaged campaign creation returned an unexpected snapshot'); console.log(JSON.stringify({ campaign: created.campaign, revision: created.revision, reviewMode: created.reviewMode })); } finally { await host.close(); }`;
     run(node, ['--input-type=module', '-e', createSmoke], { env: cleanEnvironment });
-
-    const runtimeUrl = pathToFileURL(join(appDir, 'dist/desktop/speech-runtime.js')).href;
-    const installerUrl = pathToFileURL(join(appDir, 'dist/desktop/speech-install.js')).href;
-    if (hasBundledSpeech) {
-      const narrationSmoke = `
-        import { SpeechRuntime } from ${JSON.stringify(runtimeUrl)};
-        import { SpeechInstaller, PHONON_LICENSE_REVISION } from ${JSON.stringify(installerUrl)};
-        const installer = new SpeechInstaller({sourceRoot: ${JSON.stringify(appDir)}});
-        const runtime = new SpeechRuntime({sourceRoot: ${JSON.stringify(appDir)}});
-        try {
-          const before = await installer.status();
-          if (!before.bundled || before.accepted) throw new Error('Expected fresh bundled consent');
-          await installer.install({accepted:true, licenseRevision:PHONON_LICENSE_REVISION});
-          let state;
-          for (let attempt=0; attempt<100; attempt++) {
-            state = await installer.status();
-            if(state.phase !== 'installing') break;
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
-          if(state.phase !== 'ready') throw new Error('Bundled speech did not become ready');
-          for (const voice of ['Easton', 'Zoey']) {
-            const wav=Buffer.from(await runtime.synthesize('The lantern shines beside the ancient gate.', voice), 'base64');
-            if(wav.length <= 44 || wav.toString('ascii',0,4)!=='RIFF' || wav.toString('ascii',8,12)!=='WAVE') throw new Error('Invalid speech audio');
-            console.log(voice + ' bundled offline narration: ' + wav.length + ' bytes');
-          }
-          await installer.decline();
-        } finally { runtime.close(); installer.close(); }
-      `;
-      console.log(
-        run(node, ['--input-type=module', '-e', narrationSmoke], {
-          env: cleanEnvironment,
-          timeout: 180000,
-        }),
-      );
-    } else {
-      const optionalSpeechSmoke = `
-        import { SpeechInstaller } from ${JSON.stringify(installerUrl)};
-        const installer = new SpeechInstaller({sourceRoot: ${JSON.stringify(appDir)}});
-        try {
-          const before = await installer.status();
-          if (before.phase !== 'unconfigured' || before.accepted) throw new Error('Expected unconfigured optional speech state');
-          const declined = await installer.decline();
-          if (declined.phase !== 'declined') throw new Error('Expected declined speech state');
-        } finally { installer.close(); }
-      `;
-      run(node, ['--input-type=module', '-e', optionalSpeechSmoke], { env: cleanEnvironment });
-    }
-    // The UI must start with its own untouched consent state.
-    await rm(cleanEnvironment.DM_SPEECH_HOME, {
-      recursive: true,
-      force: true,
-      maxRetries: 10,
-      retryDelay: 50,
-    });
 
     if (smokeArgs.includes('--launch')) {
       const executable = isWindows
@@ -138,28 +97,6 @@ async function main() {
       try {
         const page = await app.firstWindow();
         await page.waitForSelector('#create-form', { timeout: 20000 });
-        await page.locator('#speech-dialog').waitFor({ state: 'visible', timeout: 20000 });
-        if (hasBundledSpeech && !(await page.locator('#speech-token-label').isHidden()))
-          throw new Error('Packaged narration must not request Hugging Face credentials.');
-        await page.locator('#speech-close').click();
-        await page.waitForFunction(
-          async () => (await window.table.speechSetupStatus()).phase === 'declined',
-          undefined,
-          { timeout: 20000 },
-        );
-        await page.locator('#speech-dialog').waitFor({ state: 'hidden', timeout: 20000 });
-        if (hasBundledSpeech) {
-          await page.locator('#speech-settings').click();
-          await page.locator('#speech-consent').check();
-          await page.locator('#speech-install').click();
-          await page.waitForFunction(
-            async () => (await window.table.speechSetupStatus()).phase === 'ready',
-            undefined,
-            { timeout: 20000 },
-          );
-          await page.locator('#speech-close').click();
-          await page.locator('#speech-dialog').waitFor({ state: 'hidden', timeout: 20000 });
-        }
         const snapshot = await page.evaluate(() => window.table.snapshot());
         if (snapshot.campaign !== null || snapshot.stage !== 'disconnected')
           throw new Error('Packaged Electron worker returned an unexpected initial snapshot.');

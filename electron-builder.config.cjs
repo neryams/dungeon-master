@@ -14,6 +14,10 @@ module.exports = {
     target: ['dmg', 'zip'],
     identity: null,
     hardenedRuntime: false,
+    extendInfo: {
+      NSMicrophoneUsageDescription:
+        'Dungeon Master uses the microphone only when you record speech to dictate a message to the DM.',
+    },
   },
   win: {
     icon: 'build/dungeon-master.ico',
@@ -26,11 +30,6 @@ module.exports = {
   },
   artifactName: '${productName}-${version}-${arch}.${ext}',
   extraResources: [
-    {
-      from: 'build/desktop-speech',
-      to: 'speech',
-      filter: ['**/*'],
-    },
     {
       from: 'build/desktop-node',
       to: 'node',

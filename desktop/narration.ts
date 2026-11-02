@@ -1,4 +1,5 @@
-export type NarrationVoice = 'Easton' | 'Zoey';
+import type { SpeechVoice } from '#desktop/contracts';
+export type NarrationVoice = SpeechVoice;
 
 export interface NarrationMessage {
   id: string;
@@ -44,6 +45,14 @@ interface QueueItem {
   part: number;
 }
 
+type SynthesisResult = Awaited<ReturnType<NarrationDependencies['synthesize']>>;
+type PreparedPart = {
+  item: QueueItem;
+  part: number;
+  // Capture errors immediately: a prefetched request can fail before playback ends.
+  outcome: Promise<{ result: SynthesisResult; error?: never } | { error: unknown; result?: never }>;
+};
+
 const MAX_QUEUE = 30;
 
 /** Coordinates automatic and manual narration without depending on a host runtime. */
@@ -53,6 +62,7 @@ export class NarrationController {
   private readonly queue: QueueItem[] = [];
   private campaignKey?: string;
   private active = false;
+  private suspended = false;
   private generation = 0;
   private cancellation: Promise<void> = Promise.resolve();
   private runner?: number;
@@ -107,7 +117,7 @@ export class NarrationController {
       const key = this.key(message);
       const isNew = !this.seen.has(key);
       this.seen.add(key);
-      if (!isNew || !message.eligible || !this.state.enabled) continue;
+      if (!isNew || !message.eligible || !this.state.enabled || this.suspended) continue;
       if (this.queue.length < MAX_QUEUE) {
         this.queue.push({ message: { ...message }, part: 0 });
       }
@@ -153,9 +163,20 @@ export class NarrationController {
     this.emit();
   }
 
+  /** Pauses narration and cancels current audio while microphone capture is active. */
+  setSuspended(suspended: boolean): void {
+    if (this.suspended === suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      this.queue.length = 0;
+      this.invalidate();
+      this.setState({ activity: 'idle', currentId: undefined, error: undefined });
+    } else this.emit();
+  }
+
   /** Replaces pending speech with a one-off replay, including while automatic narration is muted. */
   replay(message: NarrationMessage): void {
-    if (!this.active || !this.seen.has(this.key(message))) return;
+    if (!this.active || this.suspended || !this.seen.has(this.key(message))) return;
     this.queue.length = 0;
     this.queue.push({ message: { ...message }, part: 0 });
     this.invalidate();
@@ -174,6 +195,10 @@ export class NarrationController {
     } catch {
       // A failed stop must not keep stale playback eligible to resume.
     }
+    this.cancelPending();
+  }
+
+  private cancelPending(): Promise<void> {
     const previous = this.cancellation;
     this.cancellation = previous
       .catch(() => undefined)
@@ -182,6 +207,7 @@ export class NarrationController {
         () => undefined,
         () => undefined,
       );
+    return this.cancellation;
   }
 
   private setState(change: Partial<NarrationState>): void {
@@ -194,7 +220,13 @@ export class NarrationController {
   }
 
   private pump(): void {
-    if (!this.active || this.queue.length === 0 || this.runner === this.generation) return;
+    if (
+      !this.active ||
+      this.suspended ||
+      this.queue.length === 0 ||
+      this.runner === this.generation
+    )
+      return;
     const token = this.generation;
     this.runner = token;
     void this.runQueue(token).finally(() => {
@@ -204,20 +236,47 @@ export class NarrationController {
   }
 
   private async runQueue(token: number): Promise<void> {
+    let prepared: PreparedPart | undefined;
+    const prepare = (item: QueueItem, part: number): PreparedPart => ({
+      item,
+      part,
+      outcome: Promise.resolve()
+        .then(() => {
+          if (!this.isCurrent(token)) throw new Error('Speech cancelled.');
+          return this.dependencies.synthesize(item.message, this.state.voice, part);
+        })
+        .then(
+          (result) => ({ result }),
+          (error) => ({ error }),
+        ),
+    });
     while (this.isCurrent(token) && this.queue.length > 0) {
       const item = this.queue[0];
-      const voice = this.state.voice;
       this.setState({ activity: 'preparing', currentId: item.message.id, error: undefined });
 
       try {
         await this.cancellation;
         if (!this.isCurrent(token)) return;
 
-        const result = await this.dependencies.synthesize(item.message, voice, item.part);
+        const work =
+          prepared?.item === item && prepared.part === item.part
+            ? prepared
+            : prepare(item, item.part);
+        prepared = undefined;
+        const outcome = await work.outcome;
         if (!this.isCurrent(token)) return;
+        if ('error' in outcome) throw outcome.error;
+        const result = outcome.result;
 
         this.setState({ activity: 'reading', currentId: item.message.id });
-        await this.dependencies.play(result.audio);
+        const playing = this.dependencies.play(result.audio);
+        // Keep just one future WAV/request in memory. Synthesis stays sequential,
+        // while playback overlaps it; a rate-limited part cannot be overtaken.
+        if (this.isCurrent(token)) {
+          if (result.nextPart !== undefined) prepared = prepare(item, result.nextPart);
+          else if (this.queue[1]) prepared = prepare(this.queue[1], this.queue[1].part);
+        }
+        await playing;
         if (!this.isCurrent(token)) return;
 
         if (result.nextPart !== undefined) {
@@ -228,6 +287,13 @@ export class NarrationController {
         this.setState({ activity: 'idle', currentId: undefined, error: undefined });
       } catch (error) {
         if (!this.isCurrent(token)) return;
+        if (prepared) {
+          prepared = undefined;
+          // Playback failed while future synthesis was running. Finish cancellation
+          // before advancing so it cannot cancel the next request by mistake.
+          await this.cancelPending();
+          if (!this.isCurrent(token)) return;
+        }
         this.queue.shift();
         this.setState({
           activity: 'error',
@@ -236,12 +302,12 @@ export class NarrationController {
         });
       }
     }
-    if (this.active && this.queue.length === 0 && this.state.activity !== 'error') {
+    if (this.isCurrent(token) && this.queue.length === 0 && this.state.activity !== 'error') {
       this.setState({ activity: 'idle', currentId: undefined });
     }
   }
 
   private isCurrent(token: number): boolean {
-    return this.active && token === this.generation;
+    return this.active && !this.suspended && token === this.generation;
   }
 }
