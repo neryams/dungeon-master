@@ -87,15 +87,15 @@ export const refereeDescriptions: Record<keyof typeof refereeInputs, string> = {
   configure_review:
     'Record an administrative transition to setup, reviewed play, or legacy mode. Close pending actions first.',
   prepare_action:
-    'Save a pending action and return a private, revision-bound review packet. Pass the returned packet to a bounded host referee; select a supported model prioritizing speed, cost-effectiveness and rules-checking capability.',
+    'Save a pending action and return a private, revision-bound review packet for single-stage pre-roll referee delegation; pass the returned packet and output schema inline to a bounded host referee using a fast, cost-effective rules-checking model.',
   get_action:
-    'Read a saved action, its rolls and review stage; DM view includes fresh context and stale status. Party view returns only an authored public explanation.',
+    'Read a saved action, its rolls and review stage; DM view includes stale status and includes currentPacket only when stale. Party view returns only an authored public explanation.',
   record_action_ruling:
     'Save the referee verdict, citations, costs, procedure and outcome branches before rolling. Does not itself run a model.',
   amend_action_rolls:
     'Record a referee-approved additional roll step before rolling it. Does not replace the existing outcome terms.',
   approve_action_effects:
-    'Save referee approval of exact mechanical changes after checking the actual saved rolls. Does not itself run a model.',
+    'Save approval of exact mechanical changes after checking actual saved rolls against the recorded procedure; when rolls follow the pre-roll procedure without new rules ambiguity, the DM can record approval directly without a second subagent run. Does not itself run a model.',
   commit_action:
     'Atomically commit the exact approved changes at the reviewed gameplay state; no replacement effects accepted.',
   cancel_action: 'Close an action with an explicit reason, retaining rulings and rolls.',
@@ -121,20 +121,35 @@ function packet(
     circumstances: string;
   },
 ) {
+  const itemOwners = new Set([...input.actors, ...input.targets, ...input.entityIds]);
   const ids = new Set([
-    ...input.actors,
-    ...input.targets,
-    ...input.entityIds,
+    ...itemOwners,
     ...(state.encounter?.participants.map((p) => p.id) ?? []),
   ]);
   if (state.scene?.map) ids.add(state.scene.map);
   if (state.scene?.location) ids.add(state.scene.location);
-  for (const e of Object.values(state.entities))
+  const hasSceneContext = Boolean(state.scene?.map || state.scene?.location);
+  const allEntities = Object.values(state.entities);
+  const ownersWithEquippedOrExplicitItems = new Set(
+    allEntities
+      .filter(
+        (e) =>
+          e.item?.owner &&
+          itemOwners.has(e.item.owner) &&
+          (e.item.equipped || input.entityIds.includes(e.id)),
+      )
+      .map((e) => e.item!.owner!),
+  );
+  for (const e of allEntities) {
     if (
-      (e.item?.owner && ids.has(e.item.owner)) ||
-      (e.map && Object.keys(e.map.tokens).some((id) => ids.has(id)))
+      e.item?.owner &&
+      itemOwners.has(e.item.owner) &&
+      (e.item.equipped || !ownersWithEquippedOrExplicitItems.has(e.item.owner))
     )
       ids.add(e.id);
+    if (!hasSceneContext && e.map && Object.keys(e.map.tokens).some((id) => ids.has(id)))
+      ids.add(e.id);
+  }
   for (const id of ids)
     if (!state.entities[id]) throw new CampaignError('NOT_FOUND', `Unknown review entity: ${id}`);
   return ReviewPacket.parse({
@@ -145,7 +160,12 @@ function packet(
     targets: input.targets,
     intent: input.intent,
     circumstances: input.circumstances,
-    entities: [...ids].map((id) => state.entities[id]),
+    entities: [...ids].map((id) => {
+      const e = state.entities[id];
+      if (!itemOwners.has(id) && (e.kind === 'character' || e.kind === 'npc'))
+        return { ...e, description: '', dmNotes: undefined, relationships: [] };
+      return e;
+    }),
     encounter: state.encounter,
     scene: state.scene,
     time: state.time,
@@ -167,14 +187,19 @@ export async function executeReferee(
         throw new CampaignError('NOT_FOUND', 'Public action explanation not found');
       return { revision: state.revision, publicExplanation: action.publicExplanation };
     }
+    const status = actionStatus(state, action);
     return {
       revision: state.revision,
-      status: actionStatus(state, action),
+      status,
       action,
-      currentPacket: packet(state, store.config, {
-        ...action.packet,
-        entityIds: action.packet.entities.map((e) => e.id),
-      }),
+      ...(status === 'stale'
+        ? {
+            currentPacket: packet(state, store.config, {
+              ...action.packet,
+              entityIds: action.packet.entities.map((e) => e.id),
+            }),
+          }
+        : {}),
     };
   }
   const i = refereeInputs[name].parse(raw);
@@ -329,9 +354,20 @@ export async function executeReferee(
     }
     throw new Error('Unknown referee operation');
   });
+  const review = result.event.payload.review;
+  const event =
+    review?.type === 'ruling' || review?.type === 'approve'
+      ? {
+          ...result.event,
+          payload: {
+            ...result.event.payload,
+            review: { type: review.type, actionId: review.actionId },
+          },
+        }
+      : result.event;
   return {
     revision: result.state.revision,
-    event: result.event,
+    event,
     duplicate: result.duplicate,
     warnings: result.warnings,
   };
