@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -138,4 +138,49 @@ test('local mode without model metadata inherits locally and ignores hosted opti
   assert.equal(selected.explicit, false);
   assert.equal(selected.executionPath, 'local');
   assert.match(selected.instruction, /configured local provider/);
+});
+
+test('DM and referee skills enforce single-pass pre-roll review, batched lookups, and fast combat pacing', async () => {
+  const [runSkill, refereeSkill, protocol] = await Promise.all([
+    readFile(join(process.cwd(), 'skills/run-campaign/SKILL.md'), 'utf8'),
+    readFile(join(process.cwd(), 'skills/rules-referee/SKILL.md'), 'utf8'),
+    readFile(join(process.cwd(), 'skills/rules-referee/references/protocol.md'), 'utf8'),
+  ]);
+
+  assert.match(
+    refereeSkill,
+    /without calling `get_action` or `read_file` on `SKILL\.md` or `references\/protocol\.md`/,
+  );
+  assert.match(
+    refereeSkill,
+    /batch multiple `search_rules` \/ `read_rules` calls in parallel within one turn/,
+  );
+  assert.match(
+    refereeSkill,
+    /keep `reasoning`, `costs`, `procedure`, `success`, and `failure` concise \(1–2 sentences each\)/,
+  );
+  assert.match(
+    protocol,
+    /without calling `get_action` or `read_file` on `SKILL\.md` or `protocol\.md`/,
+  );
+  assert.match(
+    protocol,
+    /batch multiple `search_rules` \/ `read_rules` calls in parallel within one turn/,
+  );
+  assert.match(protocol, /concise nonempty text \(1–2 sentences each\)/);
+
+  assert.match(
+    runSkill,
+    /directly call `approve_action_effects` \(passing `approval` as a JSON object, never a JSON string, reusing the pre-roll citations and referee identity/,
+  );
+  assert.match(runSkill, /without spawning a second post-roll referee subagent/);
+  assert.match(
+    runSkill,
+    /For routine monster or NPC combat turns[\s\S]*adjudicate directly with `administer_campaign`/,
+  );
+  assert.match(runSkill, /Call `roll_dice` in parallel within a single turn/);
+  assert.match(
+    runSkill,
+    /publish the PC's resolved beat with `publish_table_message\(delivery="progress"\)` first/,
+  );
 });
