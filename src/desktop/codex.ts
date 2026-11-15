@@ -22,6 +22,9 @@ const REASONING_EFFORTS = new Set([
 // Restore only the active request, never repeat the large skill/history preamble.
 function continuationFor(prompt: string | undefined): string {
   if (!prompt) return '';
+  const resumeMarker = '\n\nResumed turn contract: ';
+  const resumeIndex = prompt.lastIndexOf(resumeMarker);
+  if (resumeIndex >= 0) return prompt.slice(resumeIndex + 2);
   const marker = '\n\nCurrent player submission: ';
   const index = prompt.lastIndexOf(marker);
   return index >= 0 ? prompt.slice(index + 2) : prompt.slice(-12000);
@@ -75,6 +78,7 @@ export interface CodexOptions {
   timeoutMs?: number;
   finishingGraceMs?: number;
   isAwaitingPlayerRoll?: (requestId: string) => Promise<boolean>;
+  playerRollWaitMs?: (requestId: string) => Promise<number> | number;
   hasPublishedResponse?: (requestId: string) => Promise<boolean>;
   progress?: (text: string) => void;
   onConversation?: (id: string) => void | Promise<void>;
@@ -136,6 +140,7 @@ export class CodexSession implements AgentDriver {
         requestId,
         hasPublishedResponse: this.options.hasPublishedResponse,
         isAwaitingPlayerRoll: this.options.isAwaitingPlayerRoll,
+        playerRollWaitMs: this.options.playerRollWaitMs,
         onFinishingGrace: () => {
           this.emitTiming({ kind: 'provider-finishing-grace', requestId });
           this.options.progress?.('The DM saved a response and is finishing up…');

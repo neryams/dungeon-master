@@ -74,7 +74,7 @@ class OwnedService extends CampaignService {
               ? await requestPlayerRoll(store, raw)
               : await requestAdministrativePlayerRoll(store, raw);
           if (request) {
-            await announce('changed', undefined, undefined, op);
+            await announce('changed', undefined, owner.activeRequestId, op);
             for (;;) {
               await checkOwner();
               const { events, state } = await store.read();
@@ -114,7 +114,7 @@ class OwnedService extends CampaignService {
         this.memory?.after(name, raw, result);
       } catch (error) {
         await activity.finishTool(op, error).catch(() => {});
-        await announce('changed', undefined, undefined, op);
+        await announce('changed', undefined, owner.activeRequestId, op);
         throw error;
       }
       status = 'ok';
@@ -142,7 +142,7 @@ class OwnedService extends CampaignService {
           'performance-backend.jsonl',
         );
       await activity.finishTool(op).catch(() => {});
-      await announce('changed', undefined, undefined, op);
+      await announce('changed', undefined, owner.activeRequestId, op);
       if (name === 'render_location_map' && (raw as { mode?: string }).mode === 'reference') {
         const rendered = result as { image?: { data: string }; path?: string };
         if (rendered.image && rendered.path) {

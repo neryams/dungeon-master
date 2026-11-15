@@ -549,6 +549,12 @@ export const TableOperation = z.discriminatedUnion('type', [
       status: z.enum(['completed', 'interrupted']),
     })
     .strict(),
+  z
+    .object({
+      type: z.literal('resume'),
+      requestId: Id,
+    })
+    .strict(),
 ]);
 export interface TableTurn {
   id: string;

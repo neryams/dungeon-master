@@ -163,7 +163,9 @@ const tags = {
   'dice-dismiss': 'button',
   'status-dot': 'span',
   'status-text': 'span',
+  'status-resume': 'button',
   recovery: 'div',
+  'resume-turn': 'button',
   reconnect: 'button',
   fresh: 'button',
   'action-form': 'form',
@@ -606,8 +608,22 @@ function renderQuests() {
   if (!container.children.length)
     container.append(node('p', 'Objectives and active quests will appear here.', 'help'));
 }
+function resumableTurn() {
+  return [...(state?.table ?? [])]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.status === 'interrupted' && !turn.messages.some((m) => m.delivery !== 'progress'),
+    );
+}
 function renderTranscript() {
-  const key = JSON.stringify([state.reviewMode, state.table, state.rollHistory]);
+  const key = JSON.stringify([
+    state.reviewMode,
+    state.table,
+    state.rollHistory,
+    state.stage,
+    submitting,
+  ]);
   if (key === transcriptKey) return;
   transcriptKey = key;
   const log = $('transcript');
@@ -680,10 +696,23 @@ function renderTranscript() {
       items.push({
         revision: turn.revision,
         order: 2,
-        render: () =>
-          log.append(
-            node('p', 'Turn interrupted · Check saved outcomes before continuing.', 'interrupted'),
-          ),
+        render: () => {
+          const row = node(
+            'p',
+            'Turn interrupted · Check saved outcomes before continuing.',
+            'interrupted',
+          );
+          if (!turn.messages.some((m) => m.delivery !== 'progress')) {
+            const btn = node('button', 'Resume turn', 'secondary resume-turn-button');
+            btn.type = 'button';
+            btn.dataset.requestId = turn.id;
+            btn.disabled =
+              submitting || state.stage === 'connecting' || state.stage === 'resolving';
+            btn.addEventListener('click', () => void resumeTurn(turn.id));
+            row.append(' ', btn);
+          }
+          log.append(row);
+        },
       });
   }
   for (const roll of state.rollHistory ?? [])
@@ -922,7 +951,12 @@ function renderState() {
   $('status-text').title = state.detail;
   $('status-dot').className =
     `small-dot${busy ? ' busy' : state.stage === 'attention' ? ' warning' : ''}`;
+  const resumable = resumableTurn();
   $('recovery').hidden = state.stage !== 'attention';
+  $('resume-turn').hidden = !resumable;
+  $('resume-turn').disabled = busy || submitting;
+  $('status-resume').hidden = !resumable || state.stage === 'attention' || busy;
+  $('status-resume').disabled = busy || submitting;
   $('review-mode').textContent =
     state.reviewMode === 'reviewed'
       ? 'Reviewed play'
@@ -1427,7 +1461,30 @@ on('campaigns', async () => {
   }
   await loadModels();
 });
+async function resumeTurn(requestId?: string) {
+  const targetId = requestId ?? resumableTurn()?.id;
+  if (!targetId || submitting || state?.stage === 'connecting' || state?.stage === 'resolving')
+    return;
+  submitting = true;
+  renderState();
+  try {
+    await modelSaving;
+    if ($('provider').value === 'ollama') await api.configureLocal(localSettings());
+    const pending = api.resume(targetId);
+    void refresh();
+    await pending;
+    await refresh();
+    $('transcript').scrollTop = $('transcript').scrollHeight;
+  } catch (e) {
+    notice(e);
+  } finally {
+    submitting = false;
+    await refresh();
+  }
+}
 on('connection', () => (state?.stage === 'ready' ? showModelDialog() : connect()));
+on('resume-turn', () => resumeTurn());
+on('status-resume', () => resumeTurn());
 on('reconnect', () => connect());
 on('fresh', () => connect(true));
 on('stop', async () => {

@@ -363,11 +363,15 @@
         </div>
         <div id="session-status" role="status">
           <span id="status-dot" class="small-dot"></span
-          ><span id="status-text">Connect DM to send an action.</span>
+          ><span id="status-text">Connect DM to send an action.</span
+          ><button id="status-resume" class="quiet status-resume" type="button" hidden>
+            Resume turn
+          </button>
         </div>
         <div id="recovery" hidden>
           <p>Turn interrupted. Check saved outcomes before continuing.</p>
-          <button id="reconnect" class="secondary">Reconnect DM</button
+          <button id="resume-turn" class="primary" type="button" hidden>Resume turn</button
+          ><button id="reconnect" class="secondary">Reconnect DM</button
           ><button id="fresh" class="quiet">Reset DM context</button>
           <button id="change-model" class="quiet">Change model…</button>
         </div>

@@ -118,6 +118,17 @@ export function reduceTable(state: State, payload: Payload): void {
     return;
   }
   const turn = turns.find((t) => t.id === op.requestId);
+  if (op.type === 'resume') {
+    if (turns.some((t) => t.status === 'pending')) fail('Finish the current table request first');
+    if (!turn || turn.status !== 'interrupted') fail('Table request is not interrupted');
+    if (state.gathering) {
+      state.gathering.epoch++;
+      for (const a of Object.values(state.gathering.actions)) a.confirmed = false;
+      delete state.gathering.request;
+    }
+    turn.status = 'pending';
+    return;
+  }
   if (
     !turn ||
     (turn.status !== 'pending' &&

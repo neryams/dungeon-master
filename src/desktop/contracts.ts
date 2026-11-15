@@ -136,6 +136,7 @@ export const LanAdminInput = z.discriminatedUnion('action', [
   z.object({ action: z.literal('rotate') }).strict(),
   z.object({ action: z.literal('resolve') }).strict(),
   z.object({ action: z.literal('continue') }).strict(),
+  z.object({ action: z.literal('resume'), requestId: Id.optional() }).strict(),
 ]);
 export const Provider = z.enum(['antigravity', 'codex', 'ollama']);
 export type Provider = z.infer<typeof Provider>;
@@ -333,6 +334,7 @@ export interface WorkerApi {
     model?: string,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
+  resume(requestId?: string): Promise<{ id: string; duplicate: boolean }>;
   submitRoll(
     input: z.input<typeof SubmitRollInput>,
   ): Promise<{ id: string; duplicate: boolean; roll?: unknown }>;
@@ -481,6 +483,12 @@ export async function dispatchWorker(
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
+    case 'resume': {
+      const [requestId] = z
+        .union([z.tuple([]), z.tuple([Id.nullish().transform((value) => value ?? undefined)])])
+        .parse(raw);
+      return api.resume(requestId);
+    }
     case 'submitRoll':
       return api.submitRoll(...z.tuple([SubmitRollInput]).parse(raw));
     case 'beginSetup':

@@ -28,6 +28,7 @@ const api: DesktopApi = {
   create: (input) => invoke('create', input),
   connect: (fresh) => invoke('connect', fresh),
   submit: (input) => invoke('submit', input),
+  resume: (requestId) => invoke('resume', requestId),
   submitRoll: (input) => invoke('submitRoll', input),
   beginSetup: () => invoke('beginSetup'),
   snapshot: () => invoke('snapshot'),

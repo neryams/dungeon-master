@@ -194,3 +194,73 @@ test('a stalled player dice lookup cannot disable the provider deadline', async 
   await flushMicrotasks();
   assert.equal(timedOut, true);
 });
+
+test('mid-turn player roll wait time pauses the deadline instead of consuming DM compute budget', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  let waiting = false;
+  let timedOut = 0;
+  const deadline = new TurnDeadline({
+    timeoutMs: 100,
+    pollIntervalMs: 10,
+    requestId: 'mid-turn-dice',
+    isAwaitingPlayerRoll: async () => waiting,
+    onTimeout: () => timedOut++,
+  });
+  deadline.start();
+  // 30ms of DM compute before first roll
+  t.mock.timers.tick(30);
+  await flushMicrotasks();
+  assert.equal(timedOut, 0);
+
+  // Player spends 60ms rolling dice mid-turn (completes before 100ms mark)
+  waiting = true;
+  t.mock.timers.tick(10);
+  await flushMicrotasks();
+  t.mock.timers.tick(50);
+  await flushMicrotasks();
+  waiting = false;
+  t.mock.timers.tick(10);
+  await flushMicrotasks();
+
+  // At t=100ms total wall clock, only ~40ms of DM compute has been used; must not time out.
+  t.mock.timers.tick(20);
+  await flushMicrotasks();
+  assert.equal(timedOut, 0);
+
+  // Remaining ~40ms of DM compute expires the 100ms budget.
+  t.mock.timers.tick(45);
+  await flushMicrotasks();
+  assert.equal(timedOut, 1);
+  deadline.cancel();
+});
+
+test('authoritative playerRollWaitMs credits completed sequential rolls back to the deadline budget', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let reportedWaitMs = 60;
+  let timedOut = 0;
+  const deadline = new TurnDeadline({
+    timeoutMs: 100,
+    requestId: 'sequential-rolls',
+    isAwaitingPlayerRoll: async () => false,
+    playerRollWaitMs: async (id) => {
+      assert.equal(id, 'sequential-rolls');
+      return reportedWaitMs;
+    },
+    onTimeout: () => timedOut++,
+  });
+  deadline.start();
+  // At initial 100ms check, 60ms of completed player roll wait is credited back.
+  t.mock.timers.tick(100);
+  await flushMicrotasks();
+  assert.equal(timedOut, 0);
+
+  // 59ms later (total 159ms wall-clock, 99ms DM compute), still within budget.
+  t.mock.timers.tick(59);
+  await flushMicrotasks();
+  assert.equal(timedOut, 0);
+
+  // 1ms later (100ms DM compute + 60ms player roll wait), deadline fires.
+  t.mock.timers.tick(1);
+  await flushMicrotasks();
+  assert.equal(timedOut, 1);
+});

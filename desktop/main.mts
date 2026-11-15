@@ -353,6 +353,21 @@ else {
           return call('connect', executable(provider), fresh, provider, prefs.local, model);
         },
         submit: (input) => call('submit', input),
+        resume: async (requestId) => {
+          const view = await call('snapshot');
+          if (view.campaign && view.stage !== 'ready') {
+            const provider = prefs.provider ?? 'antigravity';
+            const model = provider === 'ollama' ? undefined : prefs.models?.[provider];
+            if (provider !== 'ollama') await checkModel(model, provider);
+            if (
+              (prefs.provider ?? 'antigravity') !== provider ||
+              (provider !== 'ollama' && prefs.models?.[provider] !== model)
+            )
+              throw new Error('The provider or model changed. Connect again with your selection.');
+            await call('connect', executable(provider), false, provider, prefs.local, model);
+          }
+          return call('resume', requestId);
+        },
         submitRoll: (input) => call('submitRoll', input),
         beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),
