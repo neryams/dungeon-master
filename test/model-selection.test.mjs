@@ -131,3 +131,25 @@ test('failed connection after a model change never resumes or replays the previo
   await host.connect(undefined, false, 'codex', undefined, 'second-model');
   assert.notEqual(seen[2].conversationId, 'thread-1');
 });
+
+test('refereeModel selection persists in session locator and changing it starts a fresh context', async (t) => {
+  const seen = [];
+  const { host } = await hosted(t, { driver: (options) => fakeDriver(seen, options) });
+  await host.connect(undefined, false, 'codex', undefined, 'gpt-6.1-sol:high', 'gpt-6-luna:medium');
+  await host.connect(undefined, false, 'codex', undefined, 'gpt-6.1-sol:high', 'gpt-6-luna:medium');
+  assert.deepEqual(
+    seen.map((options) => [options.model, options.conversationId]),
+    [
+      ['gpt-6.1-sol:high', undefined],
+      ['gpt-6.1-sol:high', 'thread-1'],
+    ],
+  );
+  assert.equal((await host.snapshot()).refereeModel, 'gpt-6-luna:medium');
+  const locatorPath = join((await host.snapshot()).root, '.dm/hotseat/codex-session.json');
+  assert.equal(JSON.parse(await readFile(locatorPath, 'utf8')).refereeModel, 'gpt-6-luna:medium');
+
+  await host.connect(undefined, false, 'codex', undefined, 'gpt-6.1-sol:high', 'gpt-6-luna:high');
+  assert.equal(seen[2].conversationId, undefined);
+  assert.equal((await host.snapshot()).refereeModel, 'gpt-6-luna:high');
+  assert.equal(JSON.parse(await readFile(locatorPath, 'utf8')).refereeModel, 'gpt-6-luna:high');
+});

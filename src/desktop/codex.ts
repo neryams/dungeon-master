@@ -7,18 +7,9 @@ import { homedir } from 'node:os';
 import type { LocalSettings } from './contracts.js';
 import type { AgentDriver, AgentResult, ProviderTiming } from './antigravity.js';
 import { AgentTimeoutError, TurnDeadline } from './turn-deadline.js';
+import { parseCodexModelId, REASONING_EFFORTS } from './models.js';
 
 const execute = promisify(execFile);
-const REASONING_EFFORTS = new Set([
-  'none',
-  'minimal',
-  'low',
-  'medium',
-  'high',
-  'xhigh',
-  'max',
-  'ultra',
-]);
 // Restore only the active request, never repeat the large skill/history preamble.
 function continuationFor(prompt: string | undefined): string {
   if (!prompt) return '';
@@ -235,9 +226,11 @@ export class CodexSession implements AgentDriver {
         ]),
       );
       const local = this.options.local;
-      const selectedModel = local?.model ?? this.options.model;
-      let selectedReasoningEffort: string | undefined;
-      if (!local && this.options.model) {
+      const parsedHostedModel =
+        !local && this.options.model ? parseCodexModelId(this.options.model) : undefined;
+      const selectedModel = local?.model ?? parsedHostedModel?.model;
+      let selectedReasoningEffort: string | undefined = parsedHostedModel?.reasoningEffort;
+      if (!local && parsedHostedModel) {
         const seenCursors = new Set<string>();
         let cursor: string | undefined;
         let selectedModelAvailable = false;
@@ -249,11 +242,26 @@ export class CodexSession implements AgentDriver {
           });
           if (!Array.isArray(page?.data) || page.data.length > 100)
             throw new Error('Codex returned an invalid model catalog.');
-          const selected = page.data.find((entry: any) => entry?.model === this.options.model);
+          const selected = page.data.find((entry: any) => entry?.model === parsedHostedModel.model);
           if (selected) {
-            selectedModelAvailable = true;
-            if (REASONING_EFFORTS.has(selected.defaultReasoningEffort))
+            if (parsedHostedModel.reasoningEffort) {
+              if (
+                Array.isArray(selected.supportedReasoningEfforts) &&
+                selected.supportedReasoningEfforts.length > 0 &&
+                !selected.supportedReasoningEfforts.some(
+                  (effortItem: any) =>
+                    (typeof effortItem === 'string' ? effortItem : effortItem?.reasoningEffort) ===
+                    parsedHostedModel.reasoningEffort,
+                )
+              ) {
+                selectedModelAvailable = false;
+                break;
+              }
+              selectedReasoningEffort = parsedHostedModel.reasoningEffort;
+            } else if (REASONING_EFFORTS.has(selected.defaultReasoningEffort)) {
               selectedReasoningEffort = selected.defaultReasoningEffort;
+            }
+            selectedModelAvailable = true;
             break;
           }
           const nextCursor = page.nextCursor;
@@ -328,7 +336,9 @@ export class CodexSession implements AgentDriver {
     const response = await this.request('turn/start', {
       threadId: this.threadId,
       input: [{ type: 'text', text: prompt }],
-      ...(!this.options.local && this.options.model ? { model: this.options.model } : {}),
+      ...(!this.options.local && this.options.model
+        ? { model: parseCodexModelId(this.options.model).model }
+        : {}),
     });
     if (this.pending && !this.turnId) this.turnId = response.turn?.id;
   }

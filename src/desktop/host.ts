@@ -60,6 +60,7 @@ export class DesktopHost {
   private executable?: string;
   private local?: LocalSettings;
   private model?: string;
+  private refereeModel?: string;
   private refereeModelInstruction =
     'Choose a host-supported faster child model for bounded rules checks when native delegation metadata confirms one; otherwise inherit the current host model.';
   private conversationId?: string;
@@ -422,9 +423,10 @@ export class DesktopHost {
     }
     throw new Error('Campaign is changing in another client. Try again once it is idle.');
   }
-  private async loadSession(provider: Provider, model?: string) {
+  private async loadSession(provider: Provider, model?: string, refereeModel?: string) {
     this.provider = provider;
     this.model = model;
+    this.refereeModel = refereeModel;
     this.sessionFile = await safePath(
       this.requireStore().root,
       provider === 'antigravity'
@@ -440,11 +442,15 @@ export class DesktopHost {
         : provider === 'ollama'
           ? cache.local?.model
           : undefined;
+      const cachedRefereeModel = Object.hasOwn(cache, 'refereeModel')
+        ? cache.refereeModel
+        : undefined;
       if (
         cache.campaignRoot === this.requireStore().root &&
         (cache.provider ?? 'antigravity') === provider &&
         (provider !== 'ollama' || JSON.stringify(cache.local) === JSON.stringify(this.local)) &&
         cachedModel === model &&
+        cachedRefereeModel === refereeModel &&
         typeof cache.conversationId === 'string' &&
         /^[a-zA-Z0-9_-]{1,100}$/.test(cache.conversationId)
       )
@@ -469,6 +475,7 @@ export class DesktopHost {
     provider: Provider = 'antigravity',
     local?: LocalSettings,
     model?: string,
+    refereeModel?: string,
   ) {
     Provider.parse(provider);
     const label =
@@ -478,6 +485,8 @@ export class DesktopHost {
       throw new Error('The campaign session lock was lost. Reopen the campaign.');
     if (this.working || this.connecting || this.changing) throw new Error('The DM is busy.');
     const selectedModel = model === undefined ? undefined : ModelId.parse(model);
+    const selectedRefereeModel =
+      refereeModel === undefined ? undefined : ModelId.parse(refereeModel);
     this.executable = executable;
     this.provider = provider;
     const generation = ++this.generation;
@@ -495,12 +504,17 @@ export class DesktopHost {
       if (this.local && selectedModel !== undefined)
         this.local = LocalSettings.parse({ ...this.local, model: selectedModel });
       this.model = this.local?.model ?? selectedModel;
+      this.refereeModel = this.local ? undefined : selectedRefereeModel;
       this.refereeModelInstruction =
         provider === 'antigravity'
           ? 'Check installed Antigravity workflow metadata at connection time; use a faster referee child tier only when it is documented as supported.'
           : provider === 'ollama'
             ? selectRefereeModel({ provider, localModel: this.local?.model }).instruction
-            : selectRefereeModel({ provider, supportedModelOptions: [] }).instruction;
+            : selectRefereeModel({
+                provider,
+                preferredModel: this.refereeModel,
+                supportedModelOptions: [],
+              }).instruction;
       const localInfo = this.local ? await validateLocalModel(this.local) : undefined;
       const found = await this.detect(executable, provider);
       checkActive();
@@ -509,11 +523,16 @@ export class DesktopHost {
         checkActive();
         this.refereeModelInstruction = selectRefereeModel({
           provider,
+          preferredModel: this.refereeModel,
           supportedModelOptions,
         }).instruction;
       } else if (provider === 'codex') {
-        this.refereeModelInstruction =
-          'Inspect the native Codex delegation model options once for this connection. If they explicitly advertise a fast or efficient child model that can check rules and typed effects, pass that exact advertised model value to the referee; do not infer performance from an ID or display name. Otherwise use the inherited model. Reuse this choice for comparable actions, and escalate only for a specific complex or unresolved ruling.';
+        this.refereeModelInstruction = this.refereeModel
+          ? selectRefereeModel({
+              provider,
+              preferredModel: this.refereeModel,
+            }).instruction
+          : 'Inspect the native Codex delegation model options once for this connection. If they explicitly advertise a fast or efficient child model that can check rules and typed effects, pass that exact advertised model value to the referee; do not infer performance from an ID or display name. Otherwise use the inherited model. Reuse this choice for comparable actions, and escalate only for a specific complex or unresolved ruling.';
       }
       const workspace = await prepareWorkspace(
         store,
@@ -525,7 +544,7 @@ export class DesktopHost {
       checkActive();
       if (provider === 'antigravity')
         await grantCampaignPermission(workspace.serverName, this.options.permissionPath);
-      await this.loadSession(provider, this.model);
+      await this.loadSession(provider, this.model, this.refereeModel);
       checkActive();
       if (fresh) {
         this.conversationId = undefined;
@@ -668,6 +687,7 @@ export class DesktopHost {
           campaignRoot: this.requireStore().root,
           provider: this.provider,
           ...(this.model !== undefined ? { model: this.model } : {}),
+          ...(this.refereeModel !== undefined ? { refereeModel: this.refereeModel } : {}),
           ...(this.local ? { local: this.local } : {}),
           conversationId: this.conversationId,
         }),
@@ -765,15 +785,19 @@ export class DesktopHost {
       const req = event.payload.rollRequest;
       if (!req || req.tableRequestId !== requestId) continue;
       const rawStart = Date.parse(event.timestamp);
-      const startMs = Math.max(Number.isFinite(rawStart) ? rawStart : attemptStartMs, attemptStartMs);
+      const startMs = Math.max(
+        Number.isFinite(rawStart) ? rawStart : attemptStartMs,
+        attemptStartMs,
+      );
       const completedMs = completionByRoll.get(req.id);
       const endMs =
-        completedMs !== undefined
-          ? completedMs
-          : state.pendingRolls?.[req.id]
-            ? now
-            : undefined;
-      if (endMs !== undefined && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        completedMs !== undefined ? completedMs : state.pendingRolls?.[req.id] ? now : undefined;
+      if (
+        endMs !== undefined &&
+        Number.isFinite(startMs) &&
+        Number.isFinite(endMs) &&
+        endMs > startMs
+      ) {
         intervals.push([startMs, endMs]);
       }
     }
@@ -805,18 +829,24 @@ export class DesktopHost {
     const initialTurns = (await store.read()).state.table ?? [];
     const candidate = targetId
       ? initialTurns.find((t) => t.id === targetId)
-      : [...initialTurns]
+      : ([...initialTurns]
           .reverse()
           .find((t) => t.status === 'interrupted' && !hasPublishedResponse(t)) ??
-        [...initialTurns].reverse().find((t) => t.status === 'interrupted');
+        [...initialTurns].reverse().find((t) => t.status === 'interrupted'));
     if (!candidate)
       throw new Error(
         targetId ? 'Table request was not found.' : 'No interrupted table turn to resume.',
       );
-    if (candidate.status !== 'interrupted')
-      throw new Error('Table request is not interrupted.');
+    if (candidate.status !== 'interrupted') throw new Error('Table request is not interrupted.');
     if (!this.agent || this.stage !== 'ready') {
-      await this.connect(this.executable, false, this.provider, this.local, this.model);
+      await this.connect(
+        this.executable,
+        false,
+        this.provider,
+        this.local,
+        this.model,
+        this.refereeModel,
+      );
     }
     if (this.working || this.connecting || this.changing || this.stage !== 'ready' || !this.agent)
       throw new Error('Connect the DM and wait for the current action to finish.');
@@ -1030,6 +1060,7 @@ export class DesktopHost {
       reviewMode: state.reviewMode ?? 'legacy',
       provider: this.provider,
       ...(this.model !== undefined ? { model: this.model } : {}),
+      ...(this.refereeModel !== undefined ? { refereeModel: this.refereeModel } : {}),
       ...(activity
         ? {
             activity: {

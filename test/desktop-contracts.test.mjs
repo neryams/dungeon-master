@@ -19,6 +19,7 @@ test('typed bridge validates methods, argument arity and administration payloads
       return { models: [{ id: 'gpt-6-sol', name: 'GPT-6 Sol' }] };
     },
     selectModel: async (...args) => calls.push(['selectModel', ...args]),
+    selectRefereeModel: async (...args) => calls.push(['selectRefereeModel', ...args]),
     switchModel: async (...args) => calls.push(['switchModel', ...args]),
     detect: async (...args) => {
       calls.push(['detect', ...args]);
@@ -47,8 +48,16 @@ test('typed bridge validates methods, argument arity and administration payloads
   await dispatchWorker(api, 'models', [null, 'codex', null]);
   await dispatchDesktop(api, 'models', []);
   await dispatchDesktop(api, 'selectModel', ['gpt-6-sol']);
-  await dispatchDesktop(api, 'switchModel', ['gpt-6-astra']);
-  await dispatchWorker(api, 'connect', [null, false, 'codex', null, 'gpt-6-astra']);
+  await dispatchDesktop(api, 'selectRefereeModel', ['gpt-6-luna:medium']);
+  await dispatchDesktop(api, 'switchModel', ['gpt-6-astra', 'gpt-6-luna:medium']);
+  await dispatchWorker(api, 'connect', [
+    null,
+    false,
+    'codex',
+    null,
+    'gpt-6-astra',
+    'gpt-6-luna:medium',
+  ]);
   assert.deepEqual(calls, [
     ['connect'],
     ['connect', true],
@@ -57,8 +66,9 @@ test('typed bridge validates methods, argument arity and administration payloads
     ['models', undefined, 'codex', undefined],
     ['models'],
     ['selectModel', 'gpt-6-sol'],
-    ['switchModel', 'gpt-6-astra'],
-    ['connect', undefined, false, 'codex', undefined, 'gpt-6-astra'],
+    ['selectRefereeModel', 'gpt-6-luna:medium'],
+    ['switchModel', 'gpt-6-astra', 'gpt-6-luna:medium'],
+    ['connect', undefined, false, 'codex', undefined, 'gpt-6-astra', 'gpt-6-luna:medium'],
   ]);
   await dispatchDesktop(api, 'beginSetup', []);
   assert.deepEqual(calls.at(-1), ['beginSetup']);
@@ -78,7 +88,9 @@ test('typed bridge validates methods, argument arity and administration payloads
     ['connect', ['path', false, 'codex', null, 'not a model id']],
     ['models', ['path', 'unknown-provider']],
     ['selectModel', ['not a model id']],
+    ['selectRefereeModel', ['not a model id']],
     ['switchModel', [{}]],
+    ['switchModel', ['gpt-6-sol', 'not a model id']],
     ['__proto__', []],
     ['tableChange', [{}]],
     ['lanAdmin', [{ action: 'assign', clientId: 'player' }]],
@@ -86,7 +98,7 @@ test('typed bridge validates methods, argument arity and administration payloads
   ]) {
     await assert.rejects(dispatchDesktop(api, method, args));
   }
-  assert.equal(calls.length, 13, 'Malformed requests must never invoke handlers');
+  assert.equal(calls.length, 14, 'Malformed requests must never invoke handlers');
   assert.equal(WorkerEnvelope.safeParse({ id: 1, method: 'snapshot', args: [] }).success, true);
   assert.equal(WorkerEnvelope.safeParse({ id: '1', method: 'snapshot', args: [] }).success, false);
   assert.equal(LanAdminInput.safeParse({ action: 'skip', characterId: 'hero' }).success, true);

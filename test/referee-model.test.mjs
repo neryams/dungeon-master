@@ -140,6 +140,48 @@ test('local mode without model metadata inherits locally and ignores hosted opti
   assert.match(selected.instruction, /configured local provider/);
 });
 
+test('preferredModel overrides Antigravity and Codex referee instructions', () => {
+  const agyPro = selectRefereeModel({
+    provider: 'antigravity',
+    preferredModel: 'pro',
+    supportedModelOptions: ['inherit', 'flash', 'flash_lite', 'pro'],
+  });
+  assert.equal(agyPro.model, 'pro');
+  assert.equal(agyPro.explicit, true);
+  assert.equal(agyPro.executionPath, 'workflow');
+  assert.match(agyPro.instruction, /model="pro"/);
+
+  const agyInherit = selectRefereeModel({
+    provider: 'antigravity',
+    preferredModel: 'inherit',
+    supportedModelOptions: ['inherit', 'flash', 'flash_lite', 'pro'],
+  });
+  assert.equal(agyInherit.model, 'inherit');
+  assert.equal(agyInherit.explicit, true);
+  assert.equal(agyInherit.executionPath, 'inherit');
+  assert.match(agyInherit.instruction, /Use the inherited primary model/);
+
+  const codexLuna = selectRefereeModel({
+    provider: 'codex',
+    preferredModel: 'gpt-6-luna:medium',
+  });
+  assert.equal(codexLuna.model, 'gpt-6-luna:medium');
+  assert.equal(codexLuna.explicit, true);
+  assert.equal(codexLuna.executionPath, 'native-delegation');
+  assert.match(
+    codexLuna.instruction,
+    /fork_turns="none", model="gpt-6-luna", and reasoning_effort="medium"/,
+  );
+
+  const codexInherit = selectRefereeModel({
+    provider: 'codex',
+    preferredModel: 'inherit',
+  });
+  assert.equal(codexInherit.model, 'inherit');
+  assert.equal(codexInherit.explicit, true);
+  assert.equal(codexInherit.executionPath, 'inherit');
+});
+
 test('DM and referee skills enforce single-pass pre-roll review, batched lookups, and fast combat pacing', async () => {
   const [runSkill, refereeSkill, protocol] = await Promise.all([
     readFile(join(process.cwd(), 'skills/run-campaign/SKILL.md'), 'utf8'),

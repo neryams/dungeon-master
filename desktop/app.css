@@ -17,8 +17,12 @@ dialog::backdrop {
 #lan-links {
   width: 100%;
 }
-#switch-model {
+#switch-model,
+#switch-referee-model {
   width: 100%;
+}
+#switch-referee-row {
+  margin-top: 10px;
 }
 #speech-dialog {
   width: min(620px, 92vw);

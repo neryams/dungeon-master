@@ -27,8 +27,8 @@ createInterface({input:process.stdin}).on('line', line => {
  if(m.method==='account/read') send({id:m.id,result:{account:process.env.DM_FIXTURE_AUTH==='none'?null:{type:process.env.DM_FIXTURE_AUTH??'chatgpt'}}});
  if(m.method==='config/read') send({id:m.id,result:{config:{mcp_servers:{unrelated:{command:'ignored',tool_timeout_sec:null}},plugins:{'old@market':{enabled:true}}}}});
  if(m.method==='model/list') send({id:m.id,result:{data:[
-   {model:'gpt-6-mini',defaultReasoningEffort:'high'},
-   {model:'gpt-6-astra',defaultReasoningEffort:'medium'}
+   {model:'gpt-6-mini',defaultReasoningEffort:'high',supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'medium'},{reasoningEffort:'high'}]},
+   {model:'gpt-6-astra',defaultReasoningEffort:'medium',supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'medium'},{reasoningEffort:'high'}]}
  ],nextCursor:null}});
  if(m.method==='thread/start'||m.method==='thread/resume') send({id:m.id,result:{thread:{id:'thread-1'}}});
  if(m.method==='thread/compact/start') {
@@ -179,6 +179,24 @@ test('Codex passes the selected model to thread start and turn start', async (t)
   assert.equal(start.config.model, 'gpt-6-mini');
   assert.equal(start.config.model_reasoning_effort, 'high');
   assert.equal(turn.model, 'gpt-6-mini');
+});
+
+test('Codex parses <model>:<effort> IDs, overrides model_reasoning_effort, and rejects unsupported efforts', async (t) => {
+  const { driver, parent } = await driverFixture(t, { model: 'gpt-6-astra:high' });
+  await driver.run('hello');
+  const requests = (await readFile(join(parent, 'requests.jsonl'), 'utf8'))
+    .trim()
+    .split('\n')
+    .map(JSON.parse);
+  const start = requests.find((request) => request.method === 'thread/start').params;
+  const turn = requests.find((request) => request.method === 'turn/start').params;
+  assert.equal(start.model, 'gpt-6-astra');
+  assert.equal(start.config.model, 'gpt-6-astra');
+  assert.equal(start.config.model_reasoning_effort, 'high');
+  assert.equal(turn.model, 'gpt-6-astra');
+
+  const { driver: badDriver } = await driverFixture(t, { model: 'gpt-6-astra:ultra' });
+  await assert.rejects(badDriver.run('hello'), /Reset DM context/);
 });
 
 test('Codex rejects a model missing from the live account catalog before starting a thread', async (t) => {
