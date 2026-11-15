@@ -74,3 +74,51 @@ readline.createInterface({ input: process.stdin }).on('line', () => {
   assert(progress.every((entry) => !/PRIVATE_|invoke_subagent|approve_action_effects/.test(entry)));
   assert.doesNotMatch(JSON.stringify([result, timings, progress]), /PRIVATE_/);
 });
+
+test('AntigravitySession tolerates trajectory-poisoned ERROR results only when the turn finished with an agent response after tool work', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'dm-agy-trajectory-error-'));
+  const cli = join(root, 'fake-agy-trajectory.mjs');
+  await writeFile(
+    cli,
+    `import readline from 'node:readline';
+const line = event => process.stdout.write(JSON.stringify(event) + '\\n');
+readline.createInterface({ input: process.stdin }).on('line', raw => {
+  const prompt = JSON.parse(raw).message.content;
+  line({event:'init',conversation_id:'conv-trajectory-1'});
+  line({event:'step_update',step_update:{step_type:'tool',step_index:1,state:'DONE',tool_name:'call_mcp_tool',tool_info:{name:'call_mcp_tool',output:JSON.stringify({campaign:{schemaVersion:1,id:'campaign-1'},revision:1,journal:{}})}}});
+  if (prompt === 'recovered-mid-turn-error') {
+    line({event:'step_update',step_update:{step_type:'error_message',step_index:2}});
+    line({event:'step_update',step_update:{step_type:'tool',step_index:3,state:'DONE',tool_name:'publish_table_message',tool_info:{name:'publish_table_message',output:'{}'}}});
+    line({event:'step_update',step_update:{step_type:'agent_response',step_index:4,text_delta:'Published response.'}});
+    line({event:'result',result:{status:'ERROR',error:'Your previous response contained an improperly formatted function call: Malformed function call',response:'Published response.',finished_reason:'error'}});
+    return;
+  }
+  if (prompt === 'unrecovered-end-error') {
+    line({event:'step_update',step_update:{step_type:'agent_response',step_index:2,text_delta:'Thinking...'}});
+    line({event:'step_update',step_update:{step_type:'error_message',step_index:3}});
+    line({event:'result',result:{status:'ERROR',error:'Agent execution terminated due to error.',response:'Thinking...',finished_reason:'error'}});
+    return;
+  }
+});`,
+  );
+  const session = new AntigravitySession({
+    executable: process.execPath,
+    prefixArgs: [cli],
+    cwd: root,
+    timeoutMs: 2000,
+  });
+  t.after(async () => {
+    await session.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  });
+
+  const recovered = await session.run('recovered-mid-turn-error', 'req-1');
+  assert.equal(recovered.conversationId, 'conv-trajectory-1');
+  assert.deepEqual(recovered.campaignIds, ['campaign-1']);
+  assert(recovered.tools.includes('publish_table_message'));
+
+  await assert.rejects(
+    session.run('unrecovered-end-error', 'req-2'),
+    /Antigravity did not complete the turn/,
+  );
+});

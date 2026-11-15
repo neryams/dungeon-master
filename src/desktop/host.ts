@@ -595,19 +595,37 @@ export class DesktopHost {
         isAwaitingPlayerRoll: (requestId: string) => this.isAwaitingPlayerRoll(requestId),
       };
       checkActive();
-      this.agent =
-        this.options.driver?.(config) ??
-        (provider !== 'antigravity' ? new CodexSession(config) : new AntigravitySession(config));
-      const check = await this.agent.run(
-        `Connection check only. Use the ${workspace.serverName} campaign_status tool now. Verify campaign id ${JSON.stringify(store.config.id)}. Do not change any campaign state, resume any pending action, publish messages, or use other servers. Return only READY if the tool succeeds. This is a hotseat application; later player responses MUST use publish_table_message with the supplied requestId. Raw assistant text is private and not shown to players.`,
-      );
-      checkActive();
-      if (this.local) await verifyLocalContext(this.local);
-      checkActive();
-      if (!check.campaignIds.includes(store.config.id))
-        throw new Error(
-          `The campaign tool check did not confirm this campaign. Check ${label} sign-in and permission rules, then reconnect.`,
-        );
+      const checkPrompt = `Connection check only. Use the ${workspace.serverName} campaign_status tool now. Verify campaign id ${JSON.stringify(store.config.id)}. Do not change any campaign state, resume any pending action, publish messages, or use other servers. Return only READY if the tool succeeds. This is a hotseat application; later player responses MUST use publish_table_message with the supplied requestId. Raw assistant text is private and not shown to players.`;
+      const runConnectionCheck = async () => {
+        const agent =
+          this.options.driver?.(config) ??
+          (provider !== 'antigravity' ? new CodexSession(config) : new AntigravitySession(config));
+        this.agent = agent;
+        const check = await agent.run(checkPrompt);
+        checkActive();
+        if (this.local) await verifyLocalContext(this.local);
+        checkActive();
+        if (!check.campaignIds.includes(store.config.id))
+          throw new Error(
+            `The campaign tool check did not confirm this campaign. Check ${label} sign-in and permission rules, then reconnect.`,
+          );
+      };
+      try {
+        await runConnectionCheck();
+      } catch (e) {
+        if (provider !== 'antigravity' || fresh || !config.conversationId) throw e;
+        checkActive();
+        const failedAgent = this.agent as AgentDriver | undefined;
+        await failedAgent?.close();
+        this.agent = undefined;
+        this.conversationId = undefined;
+        config.conversationId = undefined;
+        await unlink(this.sessionFile!).catch((error) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+        checkActive();
+        await runConnectionCheck();
+      }
       await this.saveSession();
       checkActive();
       this.stage = 'ready';
@@ -771,33 +789,35 @@ export class DesktopHost {
       // Do not replay an uncertain agent turn. The transcript and mechanical events remain durable.
       await this.agent?.close();
       this.agent = undefined;
-      let publishedTimeout = false;
+      let publishedFinal = false;
       try {
         const turn = (await this.requireStore().read()).state.table?.find((t) => t.id === input.id);
-        publishedTimeout =
-          e instanceof AgentTimeoutError && Boolean(turn && hasPublishedResponse(turn));
+        publishedFinal = Boolean(turn && hasPublishedResponse(turn));
         await this.change(
           {
             type: 'finish',
             requestId: input.id,
-            status: publishedTimeout ? 'completed' : 'interrupted',
+            status: publishedFinal ? 'completed' : 'interrupted',
           },
-          `${publishedTimeout ? 'table-finish' : 'table-interrupt'}-${input.id}`,
+          `${publishedFinal ? 'table-finish' : 'table-interrupt'}-${input.id}`,
         );
       } catch {
-        publishedTimeout = false;
+        publishedFinal = false;
         /* Recovered from authoritative pending state on the next open. */
       }
+      const publishedTimeout = publishedFinal && e instanceof AgentTimeoutError;
       void log({
-        kind: publishedTimeout ? 'request-published-timeout' : 'request-interrupted',
+        kind: publishedFinal ? 'request-published-timeout' : 'request-interrupted',
         status: 'interrupted',
       });
       this.stage = 'attention';
       this.detail = publishedTimeout
         ? 'Response saved; follow-up work timed out. Reconnect to continue. Review saved notes before resuming bookkeeping.'
-        : e instanceof Error
-          ? e.message
-          : 'The DM was interrupted. Check saved state before continuing.';
+        : publishedFinal
+          ? 'Response saved; follow-up work was interrupted. Reconnect to continue. Review saved notes before resuming bookkeeping.'
+          : e instanceof Error
+            ? e.message
+            : 'The DM was interrupted. Check saved state before continuing.';
       this.changed();
     } finally {
       await this.setPerformanceRequest(undefined);

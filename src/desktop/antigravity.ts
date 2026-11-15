@@ -193,6 +193,7 @@ export class AntigravitySession implements AgentDriver {
     toolStarts: Map<string, number>;
     completedToolCalls: Set<string>;
     sawEvent: boolean;
+    endedWithAgentResponse: boolean;
   };
   private buffer = '';
   private conversationId?: string;
@@ -250,6 +251,7 @@ export class AntigravitySession implements AgentDriver {
         toolStarts: new Map(),
         completedToolCalls: new Set(),
         sawEvent: false,
+        endedWithAgentResponse: false,
       };
       deadline.start();
       this.emitTiming({ kind: 'provider-dispatch', requestId, model: this.options.model });
@@ -347,6 +349,21 @@ export class AntigravitySession implements AgentDriver {
         this.fail(new Error('Could not save DM conversation context'));
         void this.close();
       });
+    }
+    if (
+      event.event === 'step_update' &&
+      event.step_update?.step_type === 'agent_response' &&
+      typeof event.step_update?.text_delta === 'string' &&
+      event.step_update.text_delta.trim().length > 0
+    ) {
+      if (this.pending) this.pending.endedWithAgentResponse = true;
+    } else if (
+      event.event === 'step_update' &&
+      (event.step_update?.step_type === 'error_message' ||
+        event.step_update?.step_type === 'tool' ||
+        event.step_update?.tool_info != null)
+    ) {
+      if (this.pending) this.pending.endedWithAgentResponse = false;
     }
     if (
       event.event === 'step_update' &&
@@ -468,7 +485,20 @@ export class AntigravitySession implements AgentDriver {
       }
     }
     if (event.event !== 'result' || !this.pending) return;
-    if (event.result?.status !== 'SUCCESS') {
+    // agy 1.4's steps.BuildJSONOutput scans the entire conversation trajectory for
+    // ERROR_MESSAGE steps without stopping at the current turn or last response step.
+    // Accept a turn when it completed tool work and ended with an agent_response step.
+    const recoveredFromTrajectoryError =
+      event.result?.status === 'ERROR' &&
+      this.pending.endedWithAgentResponse &&
+      typeof event.result?.error === 'string' &&
+      event.result.error.length > 0 &&
+      typeof event.result?.response === 'string' &&
+      event.result.response.trim().length > 0 &&
+      event.result?.finished_reason !== 'timeout' &&
+      event.result?.finished_reason !== 'interrupted' &&
+      (this.pending.tools.size > 0 || this.pending.campaignIds.size > 0);
+    if (event.result?.status !== 'SUCCESS' && !recoveredFromTrajectoryError) {
       this.fail(
         new Error(
           'Antigravity did not complete the turn. Check CLI authentication, limits and campaign permissions; saved changes remain intact.',

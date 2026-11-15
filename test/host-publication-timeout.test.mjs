@@ -63,13 +63,15 @@ for (const scenario of [
       await delay(10);
     } while (Date.now() < deadline);
     assert.equal(view.stage, 'attention');
-    assert.equal(
-      view.table[0].status,
-      scenario === 'response-timeout' ? 'completed' : 'interrupted',
-    );
+    assert.equal(view.table[0].status, final ? 'completed' : 'interrupted');
     assert.equal(view.table[0].messages.length, 1);
-    if (scenario === 'response-timeout') {
-      assert.match(view.detail, /Response saved; follow-up work timed out/);
+    if (final) {
+      assert.match(
+        view.detail,
+        scenario === 'response-timeout'
+          ? /Response saved; follow-up work timed out/
+          : /Response saved; follow-up work was interrupted/,
+      );
       assert.equal((await store.read()).state.gathering.request.prompt, 'Wait or speak?');
     }
     assert.equal((await host.submit({ id: 'turn', text: 'Approach' })).duplicate, true);
@@ -77,3 +79,38 @@ for (const scenario of [
     await host.close();
   });
 }
+
+test('Antigravity connect falls back to a fresh conversation when resuming a saved session fails', async (t) => {
+  const { store, parent } = await fixture(t);
+  const seen = [];
+  const host = new DesktopHost({
+    source: resolve('.'),
+    permissionPath: join(parent, 'settings.json'),
+    probe: async () => ({ path: process.execPath, version: 'fixture' }),
+    driver: (options) => ({
+      run: async () => {
+        seen.push(options.conversationId);
+        if (options.conversationId === 'poisoned-conv')
+          throw new Error('Antigravity did not complete the turn.');
+        await options.onConversation('fresh-conv');
+        return { tools: ['campaign_status'], campaignIds: ['test'] };
+      },
+      close: async () => {},
+    }),
+  });
+  t.after(() => host.close());
+  await host.open(store.root);
+  const { writeFile, readFile } = await import('node:fs/promises');
+  await writeFile(
+    join(store.root, '.dm/hotseat/session.json'),
+    JSON.stringify({
+      campaignRoot: store.root,
+      provider: 'antigravity',
+      conversationId: 'poisoned-conv',
+    }),
+  );
+  await host.connect();
+  assert.deepEqual(seen, ['poisoned-conv', undefined]);
+  const saved = JSON.parse(await readFile(join(store.root, '.dm/hotseat/session.json'), 'utf8'));
+  assert.equal(saved.conversationId, 'fresh-conv');
+});
