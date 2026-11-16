@@ -136,6 +136,7 @@ export const LanAdminInput = z.discriminatedUnion('action', [
   z.object({ action: z.literal('rotate') }).strict(),
   z.object({ action: z.literal('resolve') }).strict(),
   z.object({ action: z.literal('continue') }).strict(),
+  z.object({ action: z.literal('resume'), requestId: Id.optional() }).strict(),
 ]);
 export const Provider = z.enum(['antigravity', 'codex', 'ollama']);
 export type Provider = z.infer<typeof Provider>;
@@ -192,6 +193,10 @@ export const Preferences = z
     local: LocalSettings.optional(),
     provider: Provider.optional(),
     models: z
+      .object({ antigravity: ModelId.optional(), codex: ModelId.optional() })
+      .strict()
+      .optional(),
+    refereeModels: z
       .object({ antigravity: ModelId.optional(), codex: ModelId.optional() })
       .strict()
       .optional(),
@@ -288,6 +293,7 @@ export type CampaignSnapshot = PlayerView & {
   lanHosted: boolean;
   provider?: Provider;
   model?: string;
+  refereeModel?: string;
   speechEligibleRevisions?: number[];
   activity?: CampaignActivity;
   activitySequence?: number;
@@ -331,8 +337,10 @@ export interface WorkerApi {
     provider?: Provider,
     local?: LocalSettings,
     model?: string,
+    refereeModel?: string,
   ): Promise<{ connected: boolean; path: string; version: string }>;
   submit(input: SubmitInput): Promise<{ id: string; duplicate: boolean }>;
+  resume(requestId?: string): Promise<{ id: string; duplicate: boolean }>;
   submitRoll(
     input: z.input<typeof SubmitRollInput>,
   ): Promise<{ id: string; duplicate: boolean; roll?: unknown }>;
@@ -358,7 +366,8 @@ export interface DesktopApi
   detect(path?: string): Promise<{ path: string; version: string }>;
   models(): Promise<ModelCatalog>;
   selectModel(model?: string): Promise<void>;
-  switchModel(model?: string): Promise<void>;
+  selectRefereeModel(model?: string): Promise<void>;
+  switchModel(model?: string, refereeModel?: string): Promise<void>;
   preferences(): Promise<Preferences>;
   configureLocal(settings: LocalSettings): Promise<void>;
   selectProvider(provider: Provider): Promise<void>;
@@ -471,16 +480,32 @@ export async function dispatchWorker(
             LocalSettings.nullish().transform((value) => value ?? undefined),
             OptionalWireModel,
           ]),
+          z.tuple([
+            OptionalWireString,
+            OptionalWireBoolean,
+            Provider,
+            LocalSettings.nullish().transform((value) => value ?? undefined),
+            OptionalWireModel,
+            OptionalWireModel,
+          ]),
         ])
         .parse(raw);
-      return args.length === 5
-        ? api.connect(args[0], args[1], args[2], args[3], args[4])
-        : args.length === 4
-          ? api.connect(args[0], args[1], args[2], args[3])
-          : api.connect(args[0], args[1], args[2]);
+      return args.length === 6
+        ? api.connect(args[0], args[1], args[2], args[3], args[4], args[5])
+        : args.length === 5
+          ? api.connect(args[0], args[1], args[2], args[3], args[4])
+          : args.length === 4
+            ? api.connect(args[0], args[1], args[2], args[3])
+            : api.connect(args[0], args[1], args[2]);
     }
     case 'submit':
       return api.submit(...z.tuple([SubmitInput]).parse(raw));
+    case 'resume': {
+      const [requestId] = z
+        .union([z.tuple([]), z.tuple([Id.nullish().transform((value) => value ?? undefined)])])
+        .parse(raw);
+      return api.resume(requestId);
+    }
     case 'submitRoll':
       return api.submitRoll(...z.tuple([SubmitRollInput]).parse(raw));
     case 'beginSetup':
@@ -555,8 +580,20 @@ export async function dispatchDesktop(
       return api.models();
     case 'selectModel':
       return api.selectModel(...z.union([z.tuple([]), z.tuple([OptionalWireModel])]).parse(raw));
-    case 'switchModel':
-      return api.switchModel(...z.union([z.tuple([]), z.tuple([OptionalWireModel])]).parse(raw));
+    case 'selectRefereeModel':
+      return api.selectRefereeModel(
+        ...z.union([z.tuple([]), z.tuple([OptionalWireModel])]).parse(raw),
+      );
+    case 'switchModel': {
+      const args = z
+        .union([
+          z.tuple([]),
+          z.tuple([OptionalWireModel]),
+          z.tuple([OptionalWireModel, OptionalWireModel]),
+        ])
+        .parse(raw);
+      return args.length === 2 ? api.switchModel(args[0], args[1]) : api.switchModel(args[0]);
+    }
     case 'detect':
       return api.detect(...z.union([z.tuple([]), z.tuple([OptionalWireString])]).parse(raw));
     case 'configureLocal':

@@ -17,8 +17,12 @@ dialog::backdrop {
 #lan-links {
   width: 100%;
 }
-#switch-model {
+#switch-model,
+#switch-referee-model {
   width: 100%;
+}
+#switch-referee-row {
+  margin-top: 10px;
 }
 #speech-dialog {
   width: min(620px, 92vw);
@@ -176,6 +180,15 @@ dialog::backdrop {
 .roll-card-total {
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
+}
+.resume-turn-button,
+.status-resume {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.status-resume {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 @media (max-width: 520px) {
   .roll-inputs {

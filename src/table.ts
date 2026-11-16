@@ -118,7 +118,28 @@ export function reduceTable(state: State, payload: Payload): void {
     return;
   }
   const turn = turns.find((t) => t.id === op.requestId);
-  if (!turn || turn.status !== 'pending') fail('Table request is not pending');
+  if (op.type === 'resume') {
+    if (turns.some((t) => t.status === 'pending')) fail('Finish the current table request first');
+    if (!turn || turn.status !== 'interrupted') fail('Table request is not interrupted');
+    if (state.gathering) {
+      state.gathering.epoch++;
+      for (const a of Object.values(state.gathering.actions)) a.confirmed = false;
+      delete state.gathering.request;
+    }
+    turn.status = 'pending';
+    return;
+  }
+  if (
+    !turn ||
+    (turn.status !== 'pending' &&
+      !(
+        op.type === 'finish' &&
+        op.status === 'completed' &&
+        turn.status === 'interrupted' &&
+        hasPublishedResponse(turn)
+      ))
+  )
+    fail('Table request is not pending');
   if (op.type === 'publish') {
     if (turn.messages.length >= 30) fail('Too many messages in one table turn');
     const delivery = op.delivery ?? 'response';
@@ -132,8 +153,9 @@ export function reduceTable(state: State, payload: Payload): void {
   } else {
     if (op.status === 'completed' && !hasPublishedResponse(turn))
       fail('Publish a public response before completing a turn');
+    const wasPending = turn.status === 'pending';
     turn.status = op.status;
-    if (state.gathering || turn.responseRequest) {
+    if (wasPending && (state.gathering || turn.responseRequest)) {
       const g = (state.gathering ??= { epoch: 0, seats: [], actions: {} });
       g.epoch++;
       for (const a of Object.values(g.actions)) a.confirmed = false;

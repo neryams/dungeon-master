@@ -6,6 +6,7 @@ import {
   TranscriptionInput,
 } from '#desktop/contracts';
 import type { DesktopApi, WorkerApi, SpeechSettingsState } from '#desktop/contracts';
+import { ANTIGRAVITY_REFEREE_CATALOG_MODELS } from '#desktop/models';
 import type { ChildProcess } from 'node:child_process';
 import { app, BrowserWindow, ipcMain, dialog, session, shell, safeStorage } from 'electron';
 import { fork } from 'node:child_process';
@@ -224,6 +225,25 @@ else {
         if (!catalog.models.some((entry) => entry.id === model))
           throw new Error('That model is unavailable. Refresh the model list and choose another.');
       }
+      async function checkRefereeModel(
+        refereeModel: string | undefined,
+        provider = prefs.provider ?? 'antigravity',
+      ) {
+        if (refereeModel === undefined || provider === 'ollama') return;
+        if (provider === 'antigravity') {
+          if (!ANTIGRAVITY_REFEREE_CATALOG_MODELS.some((entry) => entry.id === refereeModel))
+            throw new Error(
+              'That adjudicator model is unavailable. Refresh the model list and choose another.',
+            );
+          return;
+        }
+        if (refereeModel === 'inherit') return;
+        const catalog = await call('models', executable(provider), provider, prefs.local);
+        if (!catalog.models.some((entry) => entry.id === refereeModel))
+          throw new Error(
+            'That adjudicator model is unavailable. Refresh the model list and choose another.',
+          );
+      }
       function rememberModel(
         model: string | undefined,
         provider = prefs.provider ?? 'antigravity',
@@ -234,6 +254,13 @@ else {
         } else {
           prefs.models = { ...prefs.models, [provider]: model };
         }
+      }
+      function rememberRefereeModel(
+        refereeModel: string | undefined,
+        provider = prefs.provider ?? 'antigravity',
+      ) {
+        if (provider === 'ollama') return;
+        prefs.refereeModels = { ...prefs.refereeModels, [provider]: refereeModel };
       }
       const actions: Omit<DesktopApi, 'onUpdate' | 'onSpeechChange' | 'onRecordingChange'> = {
         preferences: async () => prefs,
@@ -263,15 +290,44 @@ else {
           rememberModel(model, provider);
           await savePrefs();
         },
-        switchModel: async (model) => {
+        selectRefereeModel: async (refereeModel) => {
           const provider = prefs.provider ?? 'antigravity';
+          const view = await call('snapshot');
+          if (view.campaign && !['disconnected', 'attention'].includes(view.stage))
+            throw new Error('Use DM model to change models in an active campaign.');
+          await checkRefereeModel(refereeModel, provider);
+          const latest = await call('snapshot');
+          if (latest.campaign && !['disconnected', 'attention'].includes(latest.stage))
+            throw new Error('Wait for the DM before changing models.');
+          if ((prefs.provider ?? 'antigravity') !== provider)
+            throw new Error('The provider changed. Choose its model again.');
+          rememberRefereeModel(refereeModel, provider);
+          await savePrefs();
+        },
+        switchModel: async (model, refereeModel) => {
+          const provider = prefs.provider ?? 'antigravity';
+          const nextRefereeModel =
+            provider === 'ollama'
+              ? undefined
+              : refereeModel !== undefined
+                ? refereeModel
+                : prefs.refereeModels?.[provider];
           await checkModel(model, provider);
+          await checkRefereeModel(nextRefereeModel, provider);
           if ((prefs.provider ?? 'antigravity') !== provider)
             throw new Error('The provider changed. Choose its model again.');
           const local =
             provider === 'ollama' && prefs.local && model ? { ...prefs.local, model } : prefs.local;
           try {
-            await call('connect', executable(provider), true, provider, local, model);
+            await call(
+              'connect',
+              executable(provider),
+              true,
+              provider,
+              local,
+              model,
+              nextRefereeModel,
+            );
           } catch (error) {
             const view = await call('snapshot');
             const attemptedModel = provider === 'ollama' ? local?.model : model;
@@ -279,14 +335,19 @@ else {
               view.campaign &&
               view.stage === 'attention' &&
               view.provider === provider &&
-              view.model === attemptedModel
+              view.model === attemptedModel &&
+              view.refereeModel === nextRefereeModel
             ) {
               rememberModel(model, provider);
+              if (refereeModel !== undefined || provider !== 'ollama')
+                rememberRefereeModel(nextRefereeModel, provider);
               await savePrefs();
             }
             throw error;
           }
           rememberModel(model, provider);
+          if (refereeModel !== undefined || provider !== 'ollama')
+            rememberRefereeModel(nextRefereeModel, provider);
           await savePrefs();
         },
         detect: async (path) => {
@@ -344,15 +405,59 @@ else {
         connect: async (fresh = false) => {
           const provider = prefs.provider ?? 'antigravity';
           const model = provider === 'ollama' ? undefined : prefs.models?.[provider];
-          if (provider !== 'ollama') await checkModel(model, provider);
+          const refereeModel = provider === 'ollama' ? undefined : prefs.refereeModels?.[provider];
+          if (provider !== 'ollama') {
+            await checkModel(model, provider);
+            await checkRefereeModel(refereeModel, provider);
+          }
           if (
             (prefs.provider ?? 'antigravity') !== provider ||
-            (provider !== 'ollama' && prefs.models?.[provider] !== model)
+            (provider !== 'ollama' &&
+              (prefs.models?.[provider] !== model ||
+                prefs.refereeModels?.[provider] !== refereeModel))
           )
             throw new Error('The provider or model changed. Connect again with your selection.');
-          return call('connect', executable(provider), fresh, provider, prefs.local, model);
+          return call(
+            'connect',
+            executable(provider),
+            fresh,
+            provider,
+            prefs.local,
+            model,
+            refereeModel,
+          );
         },
         submit: (input) => call('submit', input),
+        resume: async (requestId) => {
+          const view = await call('snapshot');
+          if (view.campaign && view.stage !== 'ready') {
+            const provider = prefs.provider ?? 'antigravity';
+            const model = provider === 'ollama' ? undefined : prefs.models?.[provider];
+            const refereeModel =
+              provider === 'ollama' ? undefined : prefs.refereeModels?.[provider];
+            if (provider !== 'ollama') {
+              await checkModel(model, provider);
+              await checkRefereeModel(refereeModel, provider);
+            }
+            if (
+              (prefs.provider ?? 'antigravity') !== provider ||
+              (provider !== 'ollama' &&
+                (prefs.models?.[provider] !== model ||
+                  prefs.refereeModels?.[provider] !== refereeModel))
+            )
+              throw new Error('The provider or model changed. Connect again with your selection.');
+            await call(
+              'connect',
+              executable(provider),
+              false,
+              provider,
+              prefs.local,
+              model,
+              refereeModel,
+            );
+          }
+          return call('resume', requestId);
+        },
         submitRoll: (input) => call('submitRoll', input),
         beginSetup: () => call('beginSetup'),
         snapshot: () => call('snapshot'),

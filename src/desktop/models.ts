@@ -1,7 +1,7 @@
 import { spawn, execFile } from 'node:child_process';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { ModelCatalog } from './contracts.js';
+import type { ModelCatalog, Provider } from './contracts.js';
 
 const execute = promisify(execFile);
 const MAX_STDOUT = 2 * 1024 * 1024;
@@ -13,6 +13,84 @@ const MAX_CURSOR_LENGTH = 4096;
 const TERMINATION_GRACE_MS = 250;
 const MODEL_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/;
 const SAFE_TEXT = /^[^\u0000-\u001f\u007f]*$/;
+
+export const REASONING_EFFORTS = new Set([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+]);
+
+const REASONING_EFFORT_LABELS: Record<string, string> = {
+  none: 'None',
+  minimal: 'Minimal',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra High',
+  max: 'Max',
+  ultra: 'Ultra',
+};
+
+export const ANTIGRAVITY_REFEREE_CATALOG_MODELS = [
+  { id: 'flash', name: 'Flash', isDefault: true },
+  { id: 'flash_lite', name: 'Flash Lite' },
+  { id: 'inherit', name: 'Inherit primary model' },
+  { id: 'pro', name: 'Pro' },
+] as const;
+
+export function parseCodexModelId(modelId: string): {
+  model: string;
+  reasoningEffort?: string;
+} {
+  const colonIndex = modelId.lastIndexOf(':');
+  if (colonIndex > 0) {
+    const base = modelId.slice(0, colonIndex);
+    const effort = modelId.slice(colonIndex + 1);
+    if (MODEL_ID.test(base) && REASONING_EFFORTS.has(effort)) {
+      return { model: base, reasoningEffort: effort };
+    }
+  }
+  return { model: modelId };
+}
+
+export function resolveDefaultPrimaryModel(
+  provider: Provider,
+  catalog?: ModelCatalog,
+): string | undefined {
+  if (!catalog) return undefined;
+  if (provider === 'antigravity') {
+    return catalog.models.some((m) => m.id === 'gemini-4-argon-medium')
+      ? 'gemini-4-argon-medium'
+      : undefined;
+  }
+  if (provider === 'codex') {
+    for (const candidate of ['gpt-6.1-sol:high', 'gpt-6-sol:high', 'gpt-5.6-sol:high']) {
+      if (catalog.models.some((m) => m.id === candidate)) return candidate;
+    }
+    return catalog.models.find((m) => /^gpt-[0-9.]+-sol:high$/i.test(m.id))?.id;
+  }
+  return undefined;
+}
+
+export function resolveDefaultRefereeModel(
+  provider: Provider,
+  catalog?: ModelCatalog,
+): string | undefined {
+  if (provider === 'antigravity') return 'flash';
+  if (provider === 'codex') {
+    if (!catalog) return undefined;
+    for (const candidate of ['gpt-6-luna:medium', 'gpt-5.6-luna:medium']) {
+      if (catalog.models.some((m) => m.id === candidate)) return candidate;
+    }
+    return catalog.models.find((m) => /^gpt-[0-9.]+-luna:medium$/i.test(m.id))?.id;
+  }
+  return undefined;
+}
 
 export interface ModelDiscoveryOptions {
   env?: NodeJS.ProcessEnv;
@@ -236,11 +314,63 @@ async function discoverCodex(executable: string, options: ModelDiscoveryOptions)
               item.description.length > MAX_DESCRIPTION_LENGTH ||
               !SAFE_TEXT.test(item.description))) ||
           (item.isDefault !== undefined && typeof item.isDefault !== 'boolean') ||
-          (item.hidden !== undefined && typeof item.hidden !== 'boolean')
+          (item.hidden !== undefined && typeof item.hidden !== 'boolean') ||
+          (item.supportedReasoningEfforts !== undefined &&
+            item.supportedReasoningEfforts !== null &&
+            !Array.isArray(item.supportedReasoningEfforts))
         )
           throw new Error('Codex returned a malformed model catalog.');
         if (!MODEL_ID.test(item.model)) continue;
         if (item.hidden) continue;
+        const efforts: string[] = [];
+        if (Array.isArray(item.supportedReasoningEfforts)) {
+          for (const rawEffort of item.supportedReasoningEfforts) {
+            const effort =
+              typeof rawEffort === 'string'
+                ? rawEffort
+                : rawEffort &&
+                    typeof rawEffort === 'object' &&
+                    typeof rawEffort.reasoningEffort === 'string'
+                  ? rawEffort.reasoningEffort
+                  : undefined;
+            if (!effort) throw new Error('Codex returned a malformed model catalog.');
+            if (REASONING_EFFORTS.has(effort) && !efforts.includes(effort)) efforts.push(effort);
+          }
+        }
+        if (efforts.length > 0) {
+          const defaultEffort =
+            typeof item.defaultReasoningEffort === 'string' &&
+            efforts.includes(item.defaultReasoningEffort)
+              ? item.defaultReasoningEffort
+              : efforts[0];
+          for (const effort of efforts) {
+            const id = `${item.model}:${effort}`;
+            if (!MODEL_ID.test(id)) continue;
+            const isDefault = item.isDefault === true && effort === defaultEffort;
+            if (seen.has(id)) {
+              if (isDefault) {
+                const existing = seenModels.get(id);
+                if (existing) existing.isDefault = true;
+              }
+              continue;
+            }
+            seen.add(id);
+            if (models.length >= MAX_MODELS)
+              throw new Error('Codex returned too many available models.');
+            const label = REASONING_EFFORT_LABELS[effort] ?? effort;
+            const model = {
+              id,
+              name: `${item.displayName.trim()} (${label})`,
+              ...(typeof item.description === 'string' && item.description
+                ? { description: item.description }
+                : {}),
+              ...(isDefault ? { isDefault: true } : {}),
+            };
+            seenModels.set(id, model);
+            models.push(model);
+          }
+          continue;
+        }
         if (seen.has(item.model)) {
           if (item.isDefault) {
             const existing = seenModels.get(item.model);

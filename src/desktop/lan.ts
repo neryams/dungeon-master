@@ -310,6 +310,7 @@ export class LanGame {
     return this.serial(async () => {
       if (i.action === 'rotate') this.invitation = secret();
       else if (i.action === 'resolve') await this.dispatch(undefined, true);
+      else if (i.action === 'resume') await this.host.resume(i.requestId);
       else if (i.action === 'continue') {
         const s = await this.host.snapshot();
         if (!s.campaign || !s.encounter || this.required(s).length || s.gathering?.request)

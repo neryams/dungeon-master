@@ -2,6 +2,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import type { Provider } from './contracts.js';
+import { parseCodexModelId } from './models.js';
 
 /**
  * Native Antigravity workflow model tiers documented by the installed CLI.
@@ -24,6 +25,8 @@ export interface SupportedRefereeModelOption {
 
 export interface RefereeModelSelectionInput {
   provider: Provider;
+  /** Explicit referee/adjudicator model or tier selected by the user. */
+  preferredModel?: string;
   /** Exact child-model options documented by the native workflow skill. */
   supportedModelOptions?: readonly (string | SupportedRefereeModelOption)[];
   /** Local provider model already selected for the DM session, if applicable. */
@@ -48,6 +51,9 @@ const FAST_ANTIGRAVITY_OPTIONS = new Set<string>(
     (option) => option.id,
   ),
 );
+const ANTIGRAVITY_WORKFLOW_TIER_IDS = new Set<string>(
+  ANTIGRAVITY_REFEREE_MODEL_OPTIONS.map((option) => option.id),
+);
 
 /**
  * Select only an exact child-model option supported by the host. In particular,
@@ -71,19 +77,57 @@ export function selectRefereeModel(input: RefereeModelSelectionInput): RefereeMo
   const supportedIds = new Set(
     options.map((option) => (typeof option === 'string' ? option : option.id)),
   );
-  const fastOption = ANTIGRAVITY_REFEREE_MODEL_OPTIONS.find(
-    (option) => FAST_ANTIGRAVITY_OPTIONS.has(option.id) && supportedIds.has(option.id),
-  );
-  if (input.provider === 'antigravity' && fastOption) {
-    return {
-      model: fastOption.id,
-      explicit: true,
-      executionPath: 'workflow',
-      instruction: `Use the documented ${fastOption.id} tier for the bounded referee when run_workflow is in your active native tools. Register the rules-referee role using the native definition schema and its read-only referee instructions; restrict tools and disable file writes where supported. Then use run_workflow agent(type_name=<registered referee>, workspace="inherit", model="${fastOption.id}") with the exact packet and result schema. Consult the installed native workflow skill for invocation syntax and reuse context when supported. Do not pass any model field to invoke_subagent: that path has not demonstrated an override. If the workflow tool or tier is unavailable, use native delegation with its inherited model and record that limitation. Use a stronger supported tier only for a specific unresolved ruling.`,
-    };
+  const preferred = input.preferredModel?.trim();
+
+  if (input.provider === 'antigravity') {
+    if (preferred === 'inherit') {
+      return {
+        model: 'inherit',
+        explicit: true,
+        executionPath: 'inherit',
+        instruction:
+          'Use the inherited primary model for the bounded referee (use invoke_subagent without a model field, or run_workflow with model="inherit"; give the referee its read-only instructions and restrict tools where supported). Do not infer child tiers from agy models catalogue IDs, names, or assumed pricing.',
+      };
+    }
+    const chosenTier =
+      preferred && ANTIGRAVITY_WORKFLOW_TIER_IDS.has(preferred) && supportedIds.has(preferred)
+        ? preferred
+        : !preferred
+          ? ANTIGRAVITY_REFEREE_MODEL_OPTIONS.find(
+              (option) => FAST_ANTIGRAVITY_OPTIONS.has(option.id) && supportedIds.has(option.id),
+            )?.id
+          : undefined;
+    if (chosenTier) {
+      return {
+        model: chosenTier,
+        explicit: true,
+        executionPath: 'workflow',
+        instruction: `Use the documented ${chosenTier} tier for the bounded referee when run_workflow is in your active native tools. Register the rules-referee role using the native definition schema and its read-only referee instructions; restrict tools and disable file writes where supported. Then use run_workflow agent(type_name=<registered referee>, workspace="inherit", model="${chosenTier}") with the exact packet and result schema. Consult the installed native workflow skill for invocation syntax and reuse context when supported. Do not pass any model field to invoke_subagent: that path has not demonstrated an override. If the workflow tool or tier is unavailable, use native delegation with its inherited model and record that limitation. Use a stronger supported tier only for a specific unresolved ruling.`,
+      };
+    }
   }
 
   if (input.provider === 'codex') {
+    if (preferred === 'inherit') {
+      return {
+        model: 'inherit',
+        explicit: true,
+        executionPath: 'inherit',
+        instruction:
+          'Use the inherited primary model for the bounded referee (omit model and reasoning_effort overrides when calling spawn_agent).',
+      };
+    }
+    if (preferred) {
+      const parsed = parseCodexModelId(preferred);
+      return {
+        model: preferred,
+        explicit: true,
+        executionPath: 'native-delegation',
+        instruction: parsed.reasoningEffort
+          ? `Invoke the referee with the configured ${parsed.model} model and reasoning_effort="${parsed.reasoningEffort}" (when calling spawn_agent, pass fork_turns="none", model="${parsed.model}", and reasoning_effort="${parsed.reasoningEffort}" along with the complete prepared action packet inline). Escalate only for a specific unresolved or complex ruling.`
+          : `Invoke the referee with the configured ${parsed.model} model (when calling spawn_agent, pass fork_turns="none" and model="${parsed.model}" along with the complete prepared action packet inline). Escalate only for a specific unresolved or complex ruling.`,
+      };
+    }
     const suitable = options
       .filter((option): option is SupportedRefereeModelOption => typeof option !== 'string')
       .filter(

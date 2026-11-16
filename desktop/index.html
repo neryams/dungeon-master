@@ -29,8 +29,12 @@
     <dialog id="model-dialog" aria-labelledby="model-title">
       <h2 id="model-title">Change DM model</h2>
       <p id="model-current" class="help"></p>
-      <label for="switch-model">Model</label>
+      <label for="switch-model">Primary model</label>
       <select id="switch-model"></select>
+      <div id="switch-referee-row">
+        <label for="switch-referee-model">Adjudicator model</label>
+        <select id="switch-referee-model"></select>
+      </div>
       <p class="help">
         Switching starts a fresh DM conversation. Previous conversation context will not carry over,
         and cached tokens may need to be rebuilt. Your saved campaign, characters, maps and history
@@ -136,11 +140,15 @@
             ><span id="provider-status">Checking installation…</span>
             <div id="hosted-model-settings">
               <div class="model-label-row">
-                <label for="provider-model">Model</label>
+                <label for="provider-model">Primary model</label>
                 <button id="refresh-models" class="quiet" type="button">Refresh</button>
               </div>
               <select id="provider-model">
                 <option value="">CLI default</option>
+              </select>
+              <label for="provider-referee-model">Adjudicator model</label>
+              <select id="provider-referee-model">
+                <option value="inherit">Inherit primary model</option>
               </select>
               <span id="models-status" role="status"></span>
             </div>
@@ -363,11 +371,15 @@
         </div>
         <div id="session-status" role="status">
           <span id="status-dot" class="small-dot"></span
-          ><span id="status-text">Connect DM to send an action.</span>
+          ><span id="status-text">Connect DM to send an action.</span
+          ><button id="status-resume" class="quiet status-resume" type="button" hidden>
+            Resume turn
+          </button>
         </div>
         <div id="recovery" hidden>
           <p>Turn interrupted. Check saved outcomes before continuing.</p>
-          <button id="reconnect" class="secondary">Reconnect DM</button
+          <button id="resume-turn" class="primary" type="button" hidden>Resume turn</button
+          ><button id="reconnect" class="secondary">Reconnect DM</button
           ><button id="fresh" class="quiet">Reset DM context</button>
           <button id="change-model" class="quiet">Change model…</button>
         </div>

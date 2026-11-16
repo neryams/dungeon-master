@@ -53,6 +53,8 @@ const tags = {
   'model-dialog': 'dialog',
   'model-current': 'p',
   'switch-model': 'select',
+  'switch-referee-row': 'div',
+  'switch-referee-model': 'select',
   'model-dialog-status': 'p',
   'model-apply': 'button',
   'model-cancel': 'button',
@@ -81,6 +83,7 @@ const tags = {
   'provider-help': 'p',
   'hosted-model-settings': 'div',
   'provider-model': 'select',
+  'provider-referee-model': 'select',
   'refresh-models': 'button',
   'models-status': 'span',
   'local-settings': 'div',
@@ -163,7 +166,9 @@ const tags = {
   'dice-dismiss': 'button',
   'status-dot': 'span',
   'status-text': 'span',
+  'status-resume': 'button',
   recovery: 'div',
+  'resume-turn': 'button',
   reconnect: 'button',
   fresh: 'button',
   'action-form': 'form',
@@ -212,6 +217,8 @@ let rollSubmitting = false;
 let renderedRollPromptId: string | undefined;
 let modelSaving: Promise<void> = Promise.resolve();
 let dialogModel: string | undefined;
+let dialogRefereeModel: string | undefined;
+let dialogProvider: Provider = 'antigravity';
 let modelSwitching = false;
 let dialogRequest = 0;
 let viewGeneration = 0;
@@ -606,8 +613,22 @@ function renderQuests() {
   if (!container.children.length)
     container.append(node('p', 'Objectives and active quests will appear here.', 'help'));
 }
+function resumableTurn() {
+  return [...(state?.table ?? [])]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.status === 'interrupted' && !turn.messages.some((m) => m.delivery !== 'progress'),
+    );
+}
 function renderTranscript() {
-  const key = JSON.stringify([state.reviewMode, state.table, state.rollHistory]);
+  const key = JSON.stringify([
+    state.reviewMode,
+    state.table,
+    state.rollHistory,
+    state.stage,
+    submitting,
+  ]);
   if (key === transcriptKey) return;
   transcriptKey = key;
   const log = $('transcript');
@@ -680,10 +701,23 @@ function renderTranscript() {
       items.push({
         revision: turn.revision,
         order: 2,
-        render: () =>
-          log.append(
-            node('p', 'Turn interrupted · Check saved outcomes before continuing.', 'interrupted'),
-          ),
+        render: () => {
+          const row = node(
+            'p',
+            'Turn interrupted · Check saved outcomes before continuing.',
+            'interrupted',
+          );
+          if (!turn.messages.some((m) => m.delivery !== 'progress')) {
+            const btn = node('button', 'Resume turn', 'secondary resume-turn-button');
+            btn.type = 'button';
+            btn.dataset.requestId = turn.id;
+            btn.disabled =
+              submitting || state.stage === 'connecting' || state.stage === 'resolving';
+            btn.addEventListener('click', () => void resumeTurn(turn.id));
+            row.append(' ', btn);
+          }
+          log.append(row);
+        },
       });
   }
   for (const roll of state.rollHistory ?? [])
@@ -922,7 +956,12 @@ function renderState() {
   $('status-text').title = state.detail;
   $('status-dot').className =
     `small-dot${busy ? ' busy' : state.stage === 'attention' ? ' warning' : ''}`;
+  const resumable = resumableTurn();
   $('recovery').hidden = state.stage !== 'attention';
+  $('resume-turn').hidden = !resumable;
+  $('resume-turn').disabled = busy || submitting;
+  $('status-resume').hidden = !resumable || state.stage === 'attention' || busy;
+  $('status-resume').disabled = busy || submitting;
   $('review-mode').textContent =
     state.reviewMode === 'reviewed'
       ? 'Reviewed play'
@@ -1235,6 +1274,39 @@ function showProvider() {
   $('hosted-model-settings').hidden = local;
   $('provider-command').textContent = $('provider').value === 'codex' ? 'codex login' : 'agy';
 }
+const ANTIGRAVITY_REFEREE_CATALOG: ModelCatalog = {
+  models: [
+    { id: 'flash', name: 'Flash', isDefault: true },
+    { id: 'flash_lite', name: 'Flash Lite' },
+    { id: 'inherit', name: 'Inherit primary model' },
+    { id: 'pro', name: 'Pro' },
+  ],
+  defaultModel: 'flash',
+};
+function defaultPrimaryModel(provider: Provider, catalog: ModelCatalog): string | undefined {
+  if (provider === 'antigravity') {
+    return catalog.models.some((m) => m.id === 'gemini-4-argon-medium')
+      ? 'gemini-4-argon-medium'
+      : undefined;
+  }
+  if (provider === 'codex') {
+    for (const candidate of ['gpt-6.1-sol:high', 'gpt-6-sol:high', 'gpt-5.6-sol:high']) {
+      if (catalog.models.some((m) => m.id === candidate)) return candidate;
+    }
+    return catalog.models.find((m) => /^gpt-[0-9.]+-sol:high$/i.test(m.id))?.id;
+  }
+  return undefined;
+}
+function defaultRefereeModel(provider: Provider, catalog: ModelCatalog): string | undefined {
+  if (provider === 'antigravity') return 'flash';
+  if (provider === 'codex') {
+    for (const candidate of ['gpt-6-luna:medium', 'gpt-5.6-luna:medium']) {
+      if (catalog.models.some((m) => m.id === candidate)) return candidate;
+    }
+    return catalog.models.find((m) => /^gpt-[0-9.]+-luna:medium$/i.test(m.id))?.id;
+  }
+  return undefined;
+}
 function fillModels(
   select: HTMLSelectElement,
   catalog: ModelCatalog,
@@ -1260,28 +1332,80 @@ function fillModels(
   }
   select.value = selected ?? '';
 }
+function fillRefereeModels(
+  select: HTMLSelectElement,
+  provider: Provider,
+  catalog: ModelCatalog,
+  selected?: string,
+) {
+  select.replaceChildren();
+  const effectiveCatalog = provider === 'antigravity' ? ANTIGRAVITY_REFEREE_CATALOG : catalog;
+  if (provider !== 'antigravity') {
+    const option = node('option', 'Inherit primary model');
+    option.value = '';
+    select.append(option);
+  }
+  for (const model of effectiveCatalog.models) {
+    const option = node('option', model.name);
+    option.value = model.id;
+    select.append(option);
+  }
+  const normalizedSelected =
+    provider !== 'antigravity' && selected === 'inherit' ? undefined : selected;
+  if (
+    normalizedSelected &&
+    !effectiveCatalog.models.some((model) => model.id === normalizedSelected)
+  ) {
+    const option = node('option', `${normalizedSelected} (saved selection)`);
+    option.value = normalizedSelected;
+    option.disabled = true;
+    select.append(option);
+  }
+  select.value = normalizedSelected ?? (provider === 'antigravity' ? 'flash' : '');
+}
 async function loadModels() {
   const request = ++modelRequest;
   const provider = $('provider').value as Provider;
   if (provider === 'ollama') return;
   $('provider-model').disabled = true;
+  $('provider-referee-model').disabled = true;
   $('models-status').textContent = 'Loading available models…';
   const prefs = await api.preferences();
-  const selected = prefs.models?.[provider];
-  fillModels($('provider-model'), { models: [] }, selected);
+  const savedPrimary = prefs.models?.[provider];
+  const savedReferee = prefs.refereeModels?.[provider];
+  fillModels($('provider-model'), { models: [] }, savedPrimary);
+  fillRefereeModels($('provider-referee-model'), provider, { models: [] }, savedReferee);
   try {
     const catalog = await api.models();
     if (request !== modelRequest || $('provider').value !== provider) return;
+    const selected = savedPrimary ?? defaultPrimaryModel(provider, catalog);
+    const selectedReferee = savedReferee ?? defaultRefereeModel(provider, catalog);
     fillModels($('provider-model'), catalog, selected);
+    fillRefereeModels($('provider-referee-model'), provider, catalog, selectedReferee);
+    if (savedPrimary === undefined && selected !== undefined) {
+      await api.selectModel(selected);
+    }
+    if (savedReferee === undefined && selectedReferee !== undefined) {
+      await api.selectRefereeModel(selectedReferee);
+    }
+    const primaryUnavailable = selected && !catalog.models.some((model) => model.id === selected);
+    const refereeCatalog = provider === 'antigravity' ? ANTIGRAVITY_REFEREE_CATALOG : catalog;
+    const refereeUnavailable =
+      selectedReferee &&
+      selectedReferee !== 'inherit' &&
+      !refereeCatalog.models.some((model) => model.id === selectedReferee);
     $('models-status').textContent =
-      selected && !catalog.models.some((model) => model.id === selected)
+      primaryUnavailable || refereeUnavailable
         ? 'Saved model is unavailable. Choose another model or CLI default.'
         : `${catalog.models.length} models available`;
   } catch {
     if (request !== modelRequest || $('provider').value !== provider) return;
     $('models-status').textContent = 'Could not load models. Check CLI sign-in, then Refresh.';
   } finally {
-    if (request === modelRequest) $('provider-model').disabled = false;
+    if (request === modelRequest) {
+      $('provider-model').disabled = false;
+      $('provider-referee-model').disabled = false;
+    }
   }
 }
 on('refresh-models', loadModels);
@@ -1300,6 +1424,30 @@ $('provider-model').onchange = () => {
       $('provider-model').disabled = false;
     });
 };
+$('provider-referee-model').onchange = () => {
+  $('provider-referee-model').disabled = true;
+  $('models-status').textContent = 'Saving adjudicator model choice…';
+  modelSaving = (async () => {
+    const provider = $('provider').value as Provider;
+    const value = $('provider-referee-model').value;
+    await api.selectRefereeModel(value || (provider === 'antigravity' ? 'flash' : 'inherit'));
+    $('models-status').textContent = 'Adjudicator model selected for this provider.';
+  })()
+    .catch(async (error) => {
+      notice(error);
+      await loadModels();
+    })
+    .finally(() => {
+      $('provider-referee-model').disabled = false;
+    });
+};
+function updateModelDialogApplyState() {
+  const nextModel = $('switch-model').value || undefined;
+  const nextReferee =
+    dialogProvider === 'ollama' ? undefined : $('switch-referee-model').value || undefined;
+  $('model-apply').disabled =
+    modelSwitching || (nextModel === dialogModel && nextReferee === dialogRefereeModel);
+}
 async function showModelDialog() {
   if (modelSwitching || state.stage === 'connecting' || state.stage === 'resolving') return;
   const request = ++dialogRequest;
@@ -1307,26 +1455,43 @@ async function showModelDialog() {
   $('model-dialog-status').textContent = 'Loading available models…';
   $('model-apply').disabled = true;
   $('switch-model').disabled = true;
+  $('switch-referee-model').disabled = true;
   $('switch-model').replaceChildren();
+  $('switch-referee-model').replaceChildren();
   const prefs = await api.preferences();
   const provider = prefs.provider ?? 'antigravity';
+  dialogProvider = provider;
+  $('switch-referee-row').hidden = provider === 'ollama';
   const savedModel = provider === 'ollama' ? prefs.local?.model : prefs.models?.[provider];
+  const savedReferee = provider === 'ollama' ? undefined : prefs.refereeModels?.[provider];
   dialogModel = state.provider === provider ? (state.model ?? savedModel) : savedModel;
-  $('model-current').textContent = `Current: ${dialogModel ?? 'CLI default'}`;
+  const rawReferee =
+    provider === 'ollama'
+      ? undefined
+      : ((state.provider === provider ? (state.refereeModel ?? savedReferee) : savedReferee) ??
+        (provider === 'antigravity' ? 'flash' : undefined));
+  dialogRefereeModel =
+    provider !== 'antigravity' && rawReferee === 'inherit' ? undefined : rawReferee;
+  $('model-current').textContent =
+    provider === 'ollama'
+      ? `Current: ${dialogModel ?? 'CLI default'}`
+      : `Current: ${dialogModel ?? 'CLI default'} · Adjudicator: ${dialogRefereeModel ?? 'Inherit primary model'}`;
   try {
     const catalog = await api.models();
     if (request !== dialogRequest || !$('model-dialog').open) return;
     fillModels($('switch-model'), catalog, dialogModel, provider === 'ollama');
+    if (provider !== 'ollama') {
+      fillRefereeModels($('switch-referee-model'), provider, catalog, dialogRefereeModel);
+      $('switch-referee-model').disabled = false;
+    }
     $('switch-model').disabled = false;
     $('model-dialog-status').textContent = 'Choose a model to start fresh DM context.';
   } catch (error) {
     if (request === dialogRequest) $('model-dialog-status').textContent = errorMessage(error);
   }
 }
-$('switch-model').onchange = () => {
-  $('model-apply').disabled =
-    modelSwitching || ($('switch-model').value || undefined) === dialogModel;
-};
+$('switch-model').onchange = updateModelDialogApplyState;
+$('switch-referee-model').onchange = updateModelDialogApplyState;
 on('model-cancel', () => {
   if (modelSwitching) return;
   ++dialogRequest;
@@ -1342,9 +1507,16 @@ on('model-apply', async () => {
   $('model-apply').disabled = true;
   $('model-cancel').disabled = true;
   $('switch-model').disabled = true;
+  $('switch-referee-model').disabled = true;
   $('model-dialog-status').textContent = 'Starting fresh DM context with the selected model…';
   try {
-    const pending = api.switchModel($('switch-model').value || undefined);
+    const nextModel = $('switch-model').value || undefined;
+    const nextReferee =
+      dialogProvider === 'ollama' ? undefined : $('switch-referee-model').value || undefined;
+    const pending =
+      dialogProvider !== 'ollama' && nextReferee !== dialogRefereeModel
+        ? api.switchModel(nextModel, nextReferee ?? 'inherit')
+        : api.switchModel(nextModel);
     void refresh();
     await pending;
     await api.beginSetup();
@@ -1355,8 +1527,9 @@ on('model-apply', async () => {
     modelSwitching = false;
     $('model-cancel').disabled = false;
     $('switch-model').disabled = false;
+    if (dialogProvider !== 'ollama') $('switch-referee-model').disabled = false;
     await refresh();
-    $('model-apply').disabled = ($('switch-model').value || undefined) === dialogModel;
+    updateModelDialogApplyState();
   }
 });
 on('change-model', showModelDialog);
@@ -1427,7 +1600,30 @@ on('campaigns', async () => {
   }
   await loadModels();
 });
+async function resumeTurn(requestId?: string) {
+  const targetId = requestId ?? resumableTurn()?.id;
+  if (!targetId || submitting || state?.stage === 'connecting' || state?.stage === 'resolving')
+    return;
+  submitting = true;
+  renderState();
+  try {
+    await modelSaving;
+    if ($('provider').value === 'ollama') await api.configureLocal(localSettings());
+    const pending = api.resume(targetId);
+    void refresh();
+    await pending;
+    await refresh();
+    $('transcript').scrollTop = $('transcript').scrollHeight;
+  } catch (e) {
+    notice(e);
+  } finally {
+    submitting = false;
+    await refresh();
+  }
+}
 on('connection', () => (state?.stage === 'ready' ? showModelDialog() : connect()));
+on('resume-turn', () => resumeTurn());
+on('status-resume', () => resumeTurn());
 on('reconnect', () => connect());
 on('fresh', () => connect(true));
 on('stop', async () => {

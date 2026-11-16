@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { providerModels } from '../dist/desktop/models.js';
+import {
+  providerModels,
+  parseCodexModelId,
+  resolveDefaultPrimaryModel,
+  resolveDefaultRefereeModel,
+} from '../dist/desktop/models.js';
 import { fixture } from './helpers.mjs';
 
 test('Antigravity model discovery parses TSV, ignores stderr, filters unsafe IDs and deduplicates', async (t) => {
@@ -195,4 +200,84 @@ createInterface({ input: process.stdin }).on('line', line => {
     }),
     /repeated model catalog cursor/,
   );
+});
+
+test('Codex model discovery expands supportedReasoningEfforts and resolves provider defaults', async (t) => {
+  const { parent } = await fixture(t);
+  const server = join(parent, 'efforts-server.mjs');
+  await writeFile(
+    server,
+    `
+import { createInterface } from 'node:readline';
+const send = message => process.stdout.write(JSON.stringify(message)+'\\n');
+createInterface({ input: process.stdin }).on('line', line => {
+ const request = JSON.parse(line);
+ if(request.method === 'initialize') send({id:request.id,result:{}});
+ if(request.method === 'model/list') send({id:request.id,result:{data:[
+   {
+     model:'gpt-6.1-sol',
+     displayName:'GPT-6.1-Sol',
+     description:'Frontier model',
+     defaultReasoningEffort:'medium',
+     supportedReasoningEfforts:[
+       {reasoningEffort:'low',description:'Fast'},
+       {reasoningEffort:'medium',description:'Balanced'},
+       {reasoningEffort:'high',description:'Deep'}
+     ],
+     isDefault:true,
+     hidden:false
+   },
+   {
+     model:'gpt-6-luna',
+     displayName:'GPT-6-Luna',
+     description:'Fast subagent model',
+     defaultReasoningEffort:'medium',
+     supportedReasoningEfforts:[
+       {reasoningEffort:'low',description:'Fast'},
+       {reasoningEffort:'medium',description:'Balanced'},
+       {reasoningEffort:'high',description:'Deep'}
+     ],
+     isDefault:false,
+     hidden:false
+   }
+ ],nextCursor:null}});
+});
+`,
+  );
+  const result = await providerModels(process.execPath, 'codex', {
+    prefixArgs: [server],
+    cwd: parent,
+    timeoutMs: 1000,
+  });
+  assert.deepEqual(
+    result.models.map((entry) => ({ id: entry.id, name: entry.name, isDefault: entry.isDefault })),
+    [
+      { id: 'gpt-6.1-sol:low', name: 'GPT-6.1-Sol (Low)', isDefault: undefined },
+      { id: 'gpt-6.1-sol:medium', name: 'GPT-6.1-Sol (Medium)', isDefault: true },
+      { id: 'gpt-6.1-sol:high', name: 'GPT-6.1-Sol (High)', isDefault: undefined },
+      { id: 'gpt-6-luna:low', name: 'GPT-6-Luna (Low)', isDefault: undefined },
+      { id: 'gpt-6-luna:medium', name: 'GPT-6-Luna (Medium)', isDefault: undefined },
+      { id: 'gpt-6-luna:high', name: 'GPT-6-Luna (High)', isDefault: undefined },
+    ],
+  );
+  assert.equal(result.defaultModel, 'gpt-6.1-sol:medium');
+  assert.equal(resolveDefaultPrimaryModel('codex', result), 'gpt-6.1-sol:high');
+  assert.equal(resolveDefaultRefereeModel('codex', result), 'gpt-6-luna:medium');
+  assert.equal(
+    resolveDefaultPrimaryModel('antigravity', {
+      models: [
+        { id: 'gemini-4-hydrogen-medium', name: 'Gemini 4 Hydrogen (Medium)' },
+        { id: 'gemini-4-argon-medium', name: 'Gemini 4 Argon (Medium)' },
+      ],
+    }),
+    'gemini-4-argon-medium',
+  );
+  assert.equal(resolveDefaultRefereeModel('antigravity'), 'flash');
+  assert.deepEqual(parseCodexModelId('gpt-6.1-sol:high'), {
+    model: 'gpt-6.1-sol',
+    reasoningEffort: 'high',
+  });
+  assert.deepEqual(parseCodexModelId('qwen3.5:14b'), {
+    model: 'qwen3.5:14b',
+  });
 });

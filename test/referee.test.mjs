@@ -728,3 +728,181 @@ test('roll visibility defaults are independent from planned visibility', async (
   });
   assert.equal(explicitlyHidden.roll.visibility, 'dm');
 });
+
+test('parallel and out-of-order roll steps succeed while enforcing step existence, uniqueness and completion', async (t) => {
+  const { service } = await setup(t);
+  await prepare(service, 'multi-roll');
+  await rule(service, 'multi-roll', {
+    ...ruling,
+    rolls: [
+      {
+        id: 'attack-1',
+        expression: '1d20+5',
+        mode: 'normal',
+        purpose: 'Main-hand attack',
+        visibility: 'party',
+        when: 'Immediately',
+        optional: false,
+      },
+      {
+        id: 'damage-1',
+        expression: '1d6+3',
+        mode: 'normal',
+        purpose: 'Main-hand damage',
+        visibility: 'party',
+        when: 'On hit',
+        optional: false,
+      },
+    ],
+  });
+
+  // Step 2 can resolve before step 1 when parallel roll_dice calls complete out of order.
+  await mutate(service, 'roll_dice', {
+    actionId: 'multi-roll',
+    stepId: 'damage-1',
+    expression: '1d6+3',
+    mode: 'reported',
+    reportedTotal: 7,
+    purpose: 'Main-hand damage',
+  });
+  await assert.rejects(approve(service, 'multi-roll', []), /Resolve all roll steps/);
+  await assert.rejects(
+    mutate(service, 'roll_dice', {
+      actionId: 'multi-roll',
+      stepId: 'damage-1',
+      expression: '1d6+3',
+      mode: 'reported',
+      reportedTotal: 7,
+      purpose: 'Main-hand damage',
+    }),
+    /already rolled/,
+  );
+  await assert.rejects(
+    mutate(service, 'roll_dice', {
+      actionId: 'multi-roll',
+      stepId: 'unknown-step',
+      expression: '1d20+5',
+      mode: 'reported',
+      reportedTotal: 15,
+      purpose: 'Main-hand attack',
+    }),
+    /Unknown roll step/,
+  );
+
+  await mutate(service, 'roll_dice', {
+    actionId: 'multi-roll',
+    stepId: 'attack-1',
+    expression: '1d20+5',
+    mode: 'reported',
+    reportedTotal: 18,
+    purpose: 'Main-hand attack',
+  });
+  await approve(service, 'multi-roll', []);
+  await mutate(service, 'commit_action', { actionId: 'multi-roll' });
+});
+
+test('packet and referee tool responses stay compact and omit uninvolved participant inventory and non-stale currentPacket', async (t) => {
+  const { service, store } = await fixture(t);
+  await apply(service, [
+    {
+      type: 'put_entity',
+      entity: {
+        ...hero,
+        description: 'Active actor biography',
+      },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        ...hero,
+        id: 'ally',
+        name: 'Ally',
+        description: 'Long uninvolved biography '.repeat(40),
+        dmNotes: 'Uninvolved ally secret '.repeat(20),
+        relationships: [{ target: 'hero', description: 'Trusted companion' }],
+      },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'hero-sword',
+        kind: 'item',
+        name: 'Hero Sword',
+        item: { owner: 'hero', quantity: 1, equipped: true },
+      },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'hero-ration',
+        kind: 'item',
+        name: 'Hero Ration',
+        item: { owner: 'hero', quantity: 5, equipped: false },
+      },
+    },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'ally-pack',
+        kind: 'item',
+        name: 'Ally Pack',
+        item: { owner: 'ally', quantity: 1, equipped: true },
+      },
+    },
+    {
+      type: 'set_encounter',
+      encounter: {
+        id: 'skirmish',
+        round: 1,
+        turn: 0,
+        participants: [
+          { id: 'hero', initiative: 18 },
+          { id: 'ally', initiative: 12 },
+        ],
+      },
+    },
+  ]);
+  await mutate(service, 'configure_review', { mode: 'reviewed' });
+
+  const prepared = await mutate(service, 'prepare_action', {
+    actionId: 'compact-check',
+    actors: ['hero'],
+    targets: [],
+    entityIds: ['hero-sword'],
+    intent: 'Strike with sword',
+    circumstances: 'Melee range',
+  });
+  const packetIds = prepared.event.payload.review.action.packet.entities.map((e) => e.id);
+  assert.ok(packetIds.includes('hero'));
+  assert.ok(packetIds.includes('ally'));
+  assert.ok(packetIds.includes('hero-sword'));
+  assert.ok(!packetIds.includes('ally-pack'));
+  assert.ok(!packetIds.includes('hero-ration'));
+  const packetAlly = prepared.event.payload.review.action.packet.entities.find(
+    (e) => e.id === 'ally',
+  );
+  assert.equal(packetAlly.description, '');
+  assert.equal(packetAlly.dmNotes, undefined);
+
+  const freshAction = await service.execute('get_action', { actionId: 'compact-check' });
+  assert.equal(freshAction.status, 'prepared');
+  assert.equal(freshAction.currentPacket, undefined);
+
+  const ruled = await rule(service, 'compact-check');
+  assert.equal(ruled.event.payload.review.ruling, undefined);
+  assert.ok((await store.read()).state.actions['compact-check'].ruling);
+
+  await roll(service, 'compact-check');
+  const approved = await approve(service, 'compact-check', []);
+  assert.equal(approved.event.payload.review.approval, undefined);
+  assert.ok((await store.read()).state.actions['compact-check'].approval);
+
+  await mutate(service, 'administer_campaign', {
+    purpose: 'correction',
+    ruling: 'Damage ally out of turn',
+    changes: [{ type: 'damage', id: 'ally', amount: 1 }],
+  });
+  const staleAction = await service.execute('get_action', { actionId: 'compact-check' });
+  assert.equal(staleAction.status, 'stale');
+  assert.ok(staleAction.currentPacket);
+});

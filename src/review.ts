@@ -179,13 +179,6 @@ export function validateReview(state: State, p: Payload): void {
     if (a.status !== 'ruled') fail('Roll only before approval');
     const spec = a.ruling.rolls.find((s) => s.id === r.stepId);
     if (!spec || !p.roll) fail('Unknown roll step');
-    const stepIndex = a.ruling.rolls.findIndex((s) => s.id === r.stepId);
-    if (
-      a.ruling.rolls
-        .slice(0, stepIndex)
-        .some((s) => !s.optional && !a.rolls.some((roll) => roll.stepId === s.id))
-    )
-      fail('Resolve earlier required roll steps first');
     const minimum = rollDice(spec.expression, spec.mode, () => 0).total;
     const maximum = rollDice(spec.expression, spec.mode, (sides) => sides - 1).total;
     if (p.roll.total < minimum || p.roll.total > maximum)
