@@ -169,28 +169,73 @@ test('guards cover raw writes, replacement, movement, correction and administrat
     { type: 'damage', id: 'hero', amount: 1 },
     { type: 'set_time', time: 'Tomorrow' },
     { type: 'put_entity', entity: { id: 'hero', kind: 'npc', name: 'Replacement' } },
+    {
+      type: 'put_entity',
+      entity: {
+        id: 'raw-map',
+        kind: 'map',
+        name: 'Raw Map',
+        map: { kind: 'grid', bounds: { width: 2, height: 2 } },
+      },
+    },
     { type: 'set_positions', map: 'grid', positions: [{ entityId: 'hero', x: 2, y: 2 }] },
     { type: 'set_map', id: 'grid', map: { kind: 'grid' } },
   ])
     await assert.rejects(apply(service, [change]), { code: 'REVIEW_REQUIRED' });
+  const moved = await mutate(service, 'update_map_positions', {
+    mapId: 'grid',
+    positions: [{ entityId: 'hero', x: 2, y: 2 }],
+  });
+  const movedEvent = (await store.events()).find((e) => e.sequence === moved.revision);
+  assert.equal(movedEvent.payload.review?.type, 'admin');
+  assert.equal(movedEvent.payload.review?.purpose, 'world_preparation');
+  assert.deepEqual((await store.read()).state.entities.grid.map.tokens.hero, { x: 2, y: 2 });
+
+  await apply(service, [
+    {
+      type: 'set_scene',
+      scene: { id: 'opening', title: 'Opening', present: ['hero'], map: 'grid' },
+    },
+  ]);
+  const createdMap = await mutate(service, 'create_location_map', {
+    entity: {
+      id: 'another',
+      kind: 'map',
+      name: 'Another',
+      map: { kind: 'grid', bounds: { width: 4, height: 4 } },
+    },
+    positions: [{ entityId: 'hero', x: 1, y: 1 }],
+  });
+  const createdEvent = (await store.events()).find((e) => e.sequence === createdMap.revision);
+  assert.equal(createdEvent.payload.review?.type, 'admin');
+  assert.equal(createdEvent.payload.review?.purpose, 'world_preparation');
+  const afterMap = (await store.read()).state;
+  assert.equal(afterMap.scene.map, 'another');
+  assert.deepEqual(afterMap.entities.another.map.tokens.hero, { x: 1, y: 1 });
+  assert.equal(afterMap.entities.grid.map.tokens.hero, undefined);
+
+  await mutate(service, 'administer_campaign', {
+    purpose: 'world_preparation',
+    ruling: 'Start combat encounter',
+    changes: [
+      {
+        type: 'set_encounter',
+        encounter: { id: 'fight', participants: [{ id: 'hero', initiative: 14 }] },
+      },
+    ],
+  });
   await assert.rejects(
     mutate(service, 'update_map_positions', {
-      mapId: 'grid',
+      mapId: 'another',
       positions: [{ entityId: 'hero', x: 2, y: 2 }],
     }),
     { code: 'REVIEW_REQUIRED' },
   );
-  await assert.rejects(
-    mutate(service, 'create_location_map', {
-      entity: {
-        id: 'another',
-        kind: 'map',
-        name: 'Another',
-        map: { kind: 'grid', bounds: { width: 2, height: 2 } },
-      },
-    }),
-    { code: 'REVIEW_REQUIRED' },
-  );
+  await mutate(service, 'administer_campaign', {
+    purpose: 'world_preparation',
+    ruling: 'End combat encounter',
+    changes: [{ type: 'set_encounter', encounter: null }],
+  });
   await assert.rejects(
     mutate(service, 'correct_campaign_event', {
       eventId: (await store.events())[0].id,

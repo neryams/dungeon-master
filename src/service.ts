@@ -9,7 +9,7 @@ import { geometryFingerprint } from './map-art.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CampaignStore, atomicWrite, safePath } from './store.js';
-import { CampaignError, partyState, rollDice, replay } from './domain.js';
+import { CampaignError, mapLevel, partyState, rollDice, replay } from './domain.js';
 import { JournalAdapter } from './journal.js';
 import {
   Mutation,
@@ -45,7 +45,18 @@ export const inputs = {
     .strict(),
   get_party_overview: z.object({ audience: z.enum(['party', 'dm']).default('party') }).strict(),
   create_location_map: z
-    .object({ ...metadata, entity: Entity, audience: Audience, viewport: Viewport.optional() })
+    .object({
+      ...metadata,
+      entity: Entity,
+      positions: z
+        .array(Position.extend({ entityId: Id }))
+        .min(1)
+        .max(100)
+        .optional(),
+      setSceneMap: z.boolean().optional(),
+      audience: Audience,
+      viewport: Viewport.optional(),
+    })
     .strict(),
   update_map_positions: z
     .object({
@@ -60,6 +71,7 @@ export const inputs = {
         .object({ entityIds: z.array(Id).min(1).max(100), position: Position })
         .strict()
         .optional(),
+      setSceneMap: z.boolean().optional(),
       audience: Audience,
       viewport: Viewport.optional(),
     })
@@ -147,9 +159,9 @@ export const descriptions: Record<ToolName, string> = {
   get_party_overview:
     'List the saved party roster with HP, conditions, resources and separate map placements from one revision. Defaults to party audience; use character IDs for full sheets. No journal or gameplay writes.',
   create_location_map:
-    'Validate and save a new graph or bounded grid map with stable layout, location links and initial markers; return PNG pixels. Existing IDs are rejected.',
+    'Validate and save a new graph or bounded grid map with stable layout, location links and initial markers (via entity.map.tokens or positions); return PNG pixels. Existing IDs are rejected. By default in reviewed mode, links tactical party-visible maps to the active scene (override with setSceneMap) and records world_preparation automatically.',
   update_map_positions:
-    'Atomically set listed positions or move an explicitly selected roster group; omitted markers stay. Same-level transfers remove old placements. Save before rendering and return original-revision PNG on exact retry.',
+    'Atomically set listed positions or move an explicitly selected roster group; omitted markers stay. Same-level transfers remove old placements. Optionally pass setSceneMap=true to focus the active scene on this map. Outside active combat encounters in reviewed mode, records world_preparation automatically; combat movement during an active encounter uses commit_action or administer_campaign. Save before rendering and return original-revision PNG on exact retry.',
   render_location_map:
     'Render saved state as PNG pixels without gameplay changes. Choose map (schematic with artwork overlay) or reference (clean layout guide without markers or labels, intended for image generation). Optional revision enables render-only recovery. Player audience filters hidden geometry and markers.',
   set_map_reveal:
@@ -248,26 +260,67 @@ export class CampaignService {
         const result = await this.store.transact(this.meta(i), { name, input: i }, (state) => {
           if (state.entities[i.entity.id])
             throw new CampaignError('INVALID_MAP', 'Entity already exists');
+          if (i.setSceneMap === true && !state.scene)
+            throw new CampaignError(
+              'INVALID_CHANGE',
+              'Cannot set scene map without an active scene',
+            );
           const e = prepareMap(i.entity);
-          const tokens = e.map!.tokens;
+          const tokenMap = { ...e.map!.tokens };
+          if (i.positions) {
+            for (const { entityId, ...pos } of i.positions) {
+              if (entityId in tokenMap)
+                throw new CampaignError('INVALID_CHANGE', 'Duplicate position entity');
+              tokenMap[entityId] = pos;
+            }
+          }
           e.map!.tokens = {};
+          const shouldSetSceneMap =
+            i.setSceneMap ??
+            (Boolean(state.scene) &&
+              e.visibility === 'party' &&
+              e.knowledge !== 'plan' &&
+              mapLevel(e.map!) === 'tactical' &&
+              (state.reviewMode === 'reviewed' || !state.scene?.map));
+          const positions = Object.entries(tokenMap).map(([entityId, p]) => ({
+            entityId,
+            ...p,
+          }));
+          const adminNote = i.reason.trim() || 'Create location map';
           return {
             changes: [
               { type: 'put_entity', entity: e },
-              ...(Object.keys(tokens).length
+              ...(positions.length
                 ? [
                     {
                       type: 'set_positions' as const,
                       map: e.id,
-                      positions: Object.entries(tokens).map(([entityId, p]) => ({
-                        entityId,
-                        ...p,
-                      })),
+                      positions,
+                    },
+                  ]
+                : []),
+              ...(shouldSetSceneMap && state.scene
+                ? [
+                    {
+                      type: 'set_scene' as const,
+                      scene: { ...state.scene, map: e.id },
                     },
                   ]
                 : []),
             ],
             records: [],
+            ...(state.reviewMode === 'reviewed'
+              ? {
+                  review: {
+                    type: 'admin' as const,
+                    purpose: 'world_preparation' as const,
+                    closeAction: false,
+                    reason: adminNote,
+                    ruling: adminNote,
+                    publicExplanation: '',
+                  },
+                }
+              : {}),
           };
         });
         return this.renderMutation(result, i.entity.id, i.audience, i.viewport);
@@ -282,6 +335,12 @@ export class CampaignService {
               'INVALID_GROUP',
               'Group members must be in explicit party roster',
             );
+          if (i.setSceneMap === true && !state.scene)
+            throw new CampaignError(
+              'INVALID_CHANGE',
+              'Cannot set scene map without an active scene',
+            );
+          const adminNote = i.reason.trim() || 'Update map positions';
           return {
             changes: [
               {
@@ -291,8 +350,28 @@ export class CampaignService {
                   i.positions ??
                   i.group!.entityIds.map((entityId) => ({ entityId, ...i.group!.position })),
               },
+              ...(i.setSceneMap === true && state.scene
+                ? [
+                    {
+                      type: 'set_scene' as const,
+                      scene: { ...state.scene, map: i.mapId },
+                    },
+                  ]
+                : []),
             ],
             records: [],
+            ...(state.reviewMode === 'reviewed' && !state.encounter
+              ? {
+                  review: {
+                    type: 'admin' as const,
+                    purpose: 'world_preparation' as const,
+                    closeAction: false,
+                    reason: adminNote,
+                    ruling: adminNote,
+                    publicExplanation: '',
+                  },
+                }
+              : {}),
           };
         });
         return this.renderMutation(result, i.mapId, i.audience, i.viewport);

@@ -3,7 +3,7 @@ name: create-map-art
 description: Create illustrated map backgrounds during location setup, or standalone location illustrations and portraits, using the host's built-in image generation and campaign-local asset registration.
 ---
 
-For a map background, follow the reference-and-overlay workflow below. For a standalone location illustration or portrait, omit reference mode and the background field when registering; it stays separate from the positional map.
+For a map background, follow the reference-and-overlay workflow below. When creating a new area map during active play, commit the schematic map, initial character/object placements, and active `scene.map` via `create_location_map` first (and publish a `publish_table_message(delivery="progress")` beat if continuing in the same turn) so players immediately see the playable area before image generation runs. For a standalone location illustration or portrait, omit reference mode and the background field when registering; it stays separate from the positional map.
 
 Read campaign_status, get_campaign_entity for the saved map and relevant locations/characters, and relevant saved descriptions. Choose the intended audience before building a prompt. For player artwork, use only audience=party context and revealed locations; do not send private source material into the player illustration. Call render_location_map with mode=reference at the saved revision and intended viewport to get the clean geometry guide. This reference contains the selected terrain/layout, grid cell outlines and feature shapes, but no transient markers, map title, legend or text labels. Its viewport is the exact coordinate extent for the image edges. The ordinary mode=map remains the default for player-facing and DM map views.
 
