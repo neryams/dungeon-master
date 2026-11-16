@@ -2,7 +2,8 @@ import MarkdownIt from 'markdown-it';
 import type { Event } from '../schema.js';
 
 const markdown = new MarkdownIt({ html: true });
-const MAX_PART_LENGTH = 500;
+const FIRST_PART_LENGTH = 500;
+const MAX_PART_LENGTH = 2500;
 
 /** Return table publication revisions made while public play was allowed. */
 export function speechEligibleRevisions(events: Event[]): number[] {
@@ -78,7 +79,7 @@ export function speechParts(markdownText: string): string[] {
     .replace(/ +([,.;:!?)\]])/gu, '$1')
     .trim();
   if (!normalized) return [];
-  return normalized.split('\n').flatMap(splitSpeechText);
+  return packSpeechParagraphs(normalized.split('\n'));
 }
 
 /** Only discard complete, recognizable annotations; mixed narrative stays readable. */
@@ -101,36 +102,47 @@ function omitSpeechNotation(text: string): string {
   });
 }
 
-function splitSpeechText(text: string): string[] {
-  const sentences = text.match(/[^.!?]+[.!?]+["'”’)]*|[^.!?]+$/gu) ?? [];
+function packSpeechParagraphs(paragraphs: string[]): string[] {
   const parts: string[] = [];
   let current = '';
 
-  for (const rawSentence of sentences) {
-    const sentence = rawSentence.trim();
-    if (!sentence) continue;
-    for (const piece of splitAtLimit(sentence)) {
-      if (current && current.length + 1 + piece.length > MAX_PART_LENGTH) {
-        parts.push(current);
-        current = '';
+  for (const paragraph of paragraphs) {
+    const sentences = paragraph.match(/[^.!?]+[.!?]+["'”’)]*|[^.!?]+$/gu) ?? [];
+    let separator = current ? '\n' : '';
+
+    for (const rawSentence of sentences) {
+      let remaining = rawSentence.trim();
+      while (remaining) {
+        const limit = parts.length === 0 ? FIRST_PART_LENGTH : MAX_PART_LENGTH;
+        if (!current) {
+          if (remaining.length <= limit) {
+            current = remaining;
+            separator = ' ';
+            break;
+          }
+          let cut = remaining.lastIndexOf(' ', limit);
+          if (cut < 1) cut = limit;
+          parts.push(remaining.slice(0, cut).trim());
+          remaining = remaining.slice(cut).trimStart();
+          separator = '';
+        } else if (current.length + 1 + remaining.length <= limit) {
+          current = `${current}${separator}${remaining}`;
+          separator = ' ';
+          break;
+        } else {
+          parts.push(current);
+          current = '';
+          separator = '';
+        }
       }
-      current = current ? `${current} ${piece}` : piece;
+    }
+
+    if (parts.length === 0 && current) {
+      parts.push(current);
+      current = '';
     }
   }
 
   if (current) parts.push(current);
   return parts;
-}
-
-function splitAtLimit(text: string): string[] {
-  const pieces: string[] = [];
-  let remaining = text;
-  while (remaining.length > MAX_PART_LENGTH) {
-    let cut = remaining.lastIndexOf(' ', MAX_PART_LENGTH);
-    if (cut < 1) cut = MAX_PART_LENGTH;
-    pieces.push(remaining.slice(0, cut).trim());
-    remaining = remaining.slice(cut).trimStart();
-  }
-  if (remaining) pieces.push(remaining);
-  return pieces;
 }

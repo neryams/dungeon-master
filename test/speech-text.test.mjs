@@ -60,27 +60,35 @@ test('speech text reads Markdown prose and entities while omitting code and dest
 
   assert.deepEqual(parts, [
     'The Gate & Road',
-    'A weathered sign points east. Say hello.',
-    'First path',
-    'Second path with a silver moon',
-    'The door opens.',
+    [
+      'A weathered sign points east. Say hello.',
+      'First path',
+      'Second path with a silver moon',
+      'The door opens.',
+    ].join('\n'),
   ]);
   assert.doesNotMatch(parts.join(' '), /https|moon\.png|secret code|console\.log|strong/);
 });
 
 test('speech text splits at sentence boundaries and bounds long unbroken text', () => {
-  const sentences = `${'First sentence. '.repeat(50)}${'Second sentence! '.repeat(50)}`;
+  const sentences = `${'First sentence. '.repeat(120)}${'Second sentence! '.repeat(120)}`;
   const sentenceParts = speechParts(sentences);
-  assert.ok(sentenceParts.length > 1);
-  assert.ok(sentenceParts.every((part) => part.length <= 500));
+  assert.ok(sentenceParts.length > 2);
+  assert.ok(sentenceParts[0].length <= 500);
+  assert.ok(sentenceParts.slice(1).every((part) => part.length <= 2500));
   assert.ok(sentenceParts.slice(0, -1).every((part) => /[.!?]["'”’)]*$/.test(part)));
 
-  const unbroken = speechParts('x'.repeat(1201));
+  const overflowOpening = speechParts(`${'Opening sentence. '.repeat(35)}\n\nSecond paragraph.`);
+  assert.equal(overflowOpening.length, 2);
+  assert.ok(overflowOpening[0].length <= 500);
+  assert.ok(overflowOpening[1].endsWith('\nSecond paragraph.'));
+
+  const unbroken = speechParts('x'.repeat(3201));
   assert.deepEqual(
     unbroken.map((part) => part.length),
-    [500, 500, 201],
+    [500, 2500, 201],
   );
-  assert.equal(unbroken.join(''), 'x'.repeat(1201));
+  assert.equal(unbroken.join(''), 'x'.repeat(3201));
   assert.deepEqual(speechParts('  \n ```\nignored\n```  '), []);
 });
 
@@ -93,8 +101,7 @@ test('speech omits coordinate and mechanical annotations before chunking', () =>
     ),
     [
       'The gate opens. Mira waits by the tower.',
-      'The chest is locked. Your armor holds.',
-      'The die settles. You advance, then stop.',
+      'The chest is locked. Your armor holds.\nThe die settles. You advance, then stop.',
     ],
   );
   assert.deepEqual(speechParts('(3,4)\n\n[DC 15]\n\n(2d6 + 3)'), []);
