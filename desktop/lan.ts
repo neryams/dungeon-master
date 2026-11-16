@@ -5,7 +5,7 @@ import type {
   IntentInput,
   MapInput,
 } from '#desktop/contracts';
-import { elements, node, errorMessage } from './dom.js';
+import { elements, node, errorMessage, resolveActiveMap } from './dom.js';
 import { markdownMessage } from './markdown.js';
 import { rollCard } from './roll-cards.js';
 import { DicePromptSound } from './dice-prompt-sound.js';
@@ -112,6 +112,8 @@ let token: string | null | undefined = sessionStorage.getItem(key),
   pending: IntentInput | undefined,
   mapKey = '',
   selectedMap = '',
+  lastSceneMap: string | undefined,
+  lastPartyMap: string | undefined,
   inspectedCharacter: string | undefined,
   viewport: MapInput['viewport'];
 let rollBusy = false;
@@ -341,12 +343,13 @@ function render() {
       }),
     );
   }
-  if (!state.maps.some((m) => m.id === selectedMap)) {
-    selectedMap = state.maps.some((m) => m.id === state.scene?.map)
-      ? (state.scene?.map ?? '')
-      : (state.maps[0]?.id ?? '');
+  const resolvedMap = resolveActiveMap(state, selectedMap, lastSceneMap, lastPartyMap);
+  if (resolvedMap.selectedMap !== selectedMap) {
+    selectedMap = resolvedMap.selectedMap;
     viewport = undefined;
   }
+  lastSceneMap = resolvedMap.lastSceneMap;
+  lastPartyMap = resolvedMap.lastPartyMap;
   maps.value = selectedMap;
   if (!state.sheets.some((s) => s.character.id === inspectedCharacter))
     inspectedCharacter = own ?? state.sheets[0]?.character.id;

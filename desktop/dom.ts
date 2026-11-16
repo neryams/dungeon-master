@@ -31,3 +31,25 @@ export function errorMessage(error: unknown): string {
     '',
   );
 }
+export interface ActiveMapState {
+  maps: { id: string }[];
+  scene?: { map?: string };
+  party?: { members: { placements: { mapId: string; level: string }[] }[] };
+}
+export function resolveActiveMap(
+  state: ActiveMapState,
+  currentMap: string,
+  lastSceneMap: string | undefined,
+  lastPartyMap: string | undefined,
+): { selectedMap: string; lastSceneMap: string | undefined; lastPartyMap: string | undefined } {
+  const has = (id?: string): id is string => !!id && state.maps.some((m) => m.id === id);
+  const sceneMap = has(state.scene?.map) ? state.scene!.map : undefined;
+  const partyMap = state.party?.members
+    .flatMap((m) => m.placements)
+    .find((p) => p.level === 'tactical' && has(p.mapId))?.mapId;
+  let selectedMap = currentMap;
+  if (sceneMap && sceneMap !== lastSceneMap) selectedMap = sceneMap;
+  else if (partyMap && partyMap !== lastPartyMap) selectedMap = partyMap;
+  else if (!has(selectedMap)) selectedMap = sceneMap ?? partyMap ?? state.maps[0]?.id ?? '';
+  return { selectedMap, lastSceneMap: sceneMap, lastPartyMap: partyMap };
+}

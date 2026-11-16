@@ -603,3 +603,87 @@ test('large reveal regions stay compact when individual cells or overlapping rec
   assert.deepEqual(map.tokens, {});
   assert.ok(map.revealedRegions.length < 10);
 });
+
+test('create_location_map accepts top-level positions, setSceneMap, and transfers tactical placements', async (t) => {
+  const { service, store } = await opening(t);
+  await call(service, 'update_map_positions', {
+    mapId: 'river-crossing',
+    positions: [
+      { entityId: 'mara', x: 3, y: 6 },
+      { entityId: 'tess', x: 3, y: 7 },
+    ],
+    setSceneMap: true,
+  });
+  assert.equal((await store.read()).state.scene.map, 'river-crossing');
+
+  const created = await call(service, 'create_location_map', {
+    entity: {
+      id: 'mill-interior',
+      kind: 'map',
+      name: 'Abandoned Mill',
+      map: {
+        kind: 'grid',
+        bounds: { width: 14, height: 10 },
+        revealedRegions: [{ x: 0, y: 0, width: 14, height: 10 }],
+        features: [
+          {
+            id: 'millstone',
+            x: 7,
+            y: 5,
+            label: 'Cracked Millstone',
+            kind: 'obstacle',
+            visibility: 'party',
+            revealed: true,
+          },
+        ],
+      },
+    },
+    positions: [
+      { entityId: 'mara', x: 2, y: 5 },
+      { entityId: 'tess', x: 2, y: 6 },
+    ],
+    setSceneMap: true,
+  });
+  assert.deepEqual(created.positions, { mara: { x: 2, y: 5 }, tess: { x: 2, y: 6 } });
+  const state = (await store.read()).state;
+  assert.equal(state.scene.map, 'mill-interior');
+  assert.deepEqual(state.entities['mill-interior'].map.tokens, {
+    mara: { x: 2, y: 5 },
+    tess: { x: 2, y: 6 },
+  });
+  assert.deepEqual(state.entities['river-crossing'].map.tokens, {});
+  assert.equal(state.entities['ford-map'].map.tokens.mara.node, 'landing');
+});
+
+test('resolveActiveMap switches on scene.map or party tactical map change while respecting manual selection', async () => {
+  const { resolveActiveMap } = await import('../build/desktop/dom.js');
+  const base = {
+    maps: [{ id: 'camp' }, { id: 'shaft' }, { id: 'region' }],
+    scene: { map: 'camp' },
+    party: { members: [{ placements: [{ mapId: 'camp', level: 'tactical' }] }] },
+  };
+  let nav = resolveActiveMap(base, '', undefined, undefined);
+  assert.equal(nav.selectedMap, 'camp');
+
+  // User manually inspects the regional map while scene/party stay at camp.
+  nav = resolveActiveMap(base, 'region', nav.lastSceneMap, nav.lastPartyMap);
+  assert.equal(nav.selectedMap, 'region');
+
+  // When scene.map switches to shaft, UI automatically follows the new scene map.
+  const nextScene = {
+    ...base,
+    scene: { map: 'shaft' },
+    party: { members: [{ placements: [{ mapId: 'shaft', level: 'tactical' }] }] },
+  };
+  nav = resolveActiveMap(nextScene, nav.selectedMap, nav.lastSceneMap, nav.lastPartyMap);
+  assert.equal(nav.selectedMap, 'shaft');
+
+  // If scene.map stayed undefined or unchanged while party moved to another tactical map, UI still switches.
+  const movedPartyOnly = {
+    maps: [{ id: 'camp' }, { id: 'shaft' }, { id: 'cairn' }],
+    scene: { map: 'shaft' },
+    party: { members: [{ placements: [{ mapId: 'cairn', level: 'tactical' }] }] },
+  };
+  nav = resolveActiveMap(movedPartyOnly, nav.selectedMap, nav.lastSceneMap, nav.lastPartyMap);
+  assert.equal(nav.selectedMap, 'cairn');
+});

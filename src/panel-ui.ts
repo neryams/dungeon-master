@@ -229,7 +229,9 @@ let data,
   busy = false,
   imageUrl,
   imageRequest = 0,
-  imageKey = '';
+  imageKey = '',
+  lastSceneMap,
+  lastPartyMap;
 const el = (tag, text) => {
   const e = document.createElement(tag);
   if (text !== undefined) e.textContent = text;
@@ -405,6 +407,27 @@ function render() {
     $('map'),
     data.maps.map((m) => [m.id, m.name]),
   );
+  const sceneMap =
+    data.scene && data.scene.map && data.maps.some((m) => m.id === data.scene.map)
+      ? data.scene.map
+      : undefined;
+  const partyMap = data.party && data.party.members
+    ? data.party.members
+        .flatMap((m) => m.placements)
+        .find((p) => p.level === 'tactical' && data.maps.some((m) => m.id === p.mapId))?.mapId
+    : undefined;
+  let nextMap = $('map').value;
+  if (sceneMap && sceneMap !== lastSceneMap) nextMap = sceneMap;
+  else if (partyMap && partyMap !== lastPartyMap) nextMap = partyMap;
+  else if (!data.maps.some((m) => m.id === nextMap))
+    nextMap = sceneMap || partyMap || (data.maps[0] && data.maps[0].id) || '';
+  if (nextMap !== $('map').value) {
+    $('map').value = nextMap;
+    $('x').value = 0;
+    $('y').value = 0;
+  }
+  lastSceneMap = sceneMap;
+  lastPartyMap = partyMap;
 }
 async function request(path) {
   return fetch(path, {

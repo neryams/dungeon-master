@@ -279,7 +279,7 @@ function phaseFor(name: string): string | undefined {
   )
     return 'Checking rules';
   if (
-    /^(roll_dice|apply_campaign_changes|correct_campaign_event|record_scene|checkpoint_session|publish_table_message|create_location_map|register_map_art)$/.test(
+    /^(roll_dice|apply_campaign_changes|correct_campaign_event|record_scene|checkpoint_session|publish_table_message|create_location_map|update_map_positions|register_map_art)$/.test(
       name,
     )
   )

@@ -862,6 +862,32 @@ The boards creak.
     assert.equal(await page.locator('#lan-host').isEnabled(), true);
     await page.locator('#map-image:not([hidden])').waitFor();
     assert.match(await page.locator('#party').innerText(), /Mara/);
+    await setupService.execute('create_location_map', {
+      operationId: 'reviewed-area-map',
+      expectedRevision: (await setupStore.read()).state.revision,
+      reason: 'Transition to new area map in reviewed play',
+      entity: {
+        id: 'new-area',
+        kind: 'map',
+        name: 'New Area',
+        map: {
+          kind: 'grid',
+          bounds: { width: 12, height: 10 },
+          revealedRegions: [{ x: 0, y: 0, width: 12, height: 10 }],
+        },
+      },
+      positions: [
+        { entityId: 'mara', x: 2, y: 5 },
+        { entityId: 'tess', x: 3, y: 5 },
+      ],
+    });
+    await notifyDesktop(setupStore);
+    await page.waitForFunction(() => document.getElementById('map-select').value === 'new-area');
+    await page.waitForFunction(
+      () =>
+        !document.getElementById('map-image').hidden &&
+        document.getElementById('map-image').naturalWidth > 0,
+    );
     assert.deepEqual(errors, []);
   },
 );

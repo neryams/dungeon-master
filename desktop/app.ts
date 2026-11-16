@@ -12,7 +12,7 @@ import type {
   SpeechSettingsState,
   SpeechVoice,
 } from '#desktop/contracts';
-import { elements, node, errorMessage } from './dom.js';
+import { elements, node, errorMessage, resolveActiveMap } from './dom.js';
 import { markdownMessage } from './markdown.js';
 import { markerBadge } from './markers.js';
 import {
@@ -205,6 +205,8 @@ let state: CampaignSnapshot,
   mapKey = '',
   legendKey = '',
   selectedMap = '',
+  lastSceneMap: string | undefined,
+  lastPartyMap: string | undefined,
   mapDetails = false,
   offset = { x: 0, y: 0 },
   polling = false,
@@ -976,13 +978,13 @@ function renderState() {
     $('scene-title').textContent = state.scene?.title ?? 'Scene';
     $('scene-summary').textContent = state.scene?.summary ?? '';
     $('scene-details').hidden = !state.scene?.summary;
-    if (!state.maps.some((m) => m.id === selectedMap)) {
-      selectedMap =
-        state.scene?.map && state.maps.some((m) => m.id === state.scene?.map)
-          ? state.scene.map
-          : (state.maps[0]?.id ?? '');
+    const resolvedMap = resolveActiveMap(state, selectedMap, lastSceneMap, lastPartyMap);
+    if (resolvedMap.selectedMap !== selectedMap) {
+      selectedMap = resolvedMap.selectedMap;
       offset = { x: 0, y: 0 };
     }
+    lastSceneMap = resolvedMap.lastSceneMap;
+    lastPartyMap = resolvedMap.lastPartyMap;
     $('map-select').replaceChildren(
       ...state.maps.map((m) => {
         const option = node('option', m.name);
@@ -1184,6 +1186,8 @@ export function showCampaign(snapshot: DesktopSnapshot) {
   transcriptKey = '';
   mapKey = '';
   selectedMap = '';
+  lastSceneMap = undefined;
+  lastPartyMap = undefined;
   mapDetails = false;
   $('map-details').setAttribute('aria-pressed', 'false');
   $('map-size').value = 'auto';

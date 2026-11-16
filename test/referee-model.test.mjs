@@ -225,4 +225,13 @@ test('DM and referee skills enforce single-pass pre-roll review, batched lookups
     runSkill,
     /publish the PC's resolved beat with `publish_table_message\(delivery="progress"\)` first/,
   );
+  assert.match(runSkill, /create a new tactical map using `create_location_map`/);
+  assert.match(
+    runSkill,
+    /publish a `publish_table_message\(delivery="progress"\)` beat immediately after `create_location_map`/,
+  );
+  assert.match(
+    runSkill,
+    /`create_location_map` and non-combat `update_map_positions` \(`!state\.encounter`\) work directly in reviewed mode/,
+  );
 });
